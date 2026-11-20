@@ -36,6 +36,14 @@ const normalizeUrl = (url: string) => {
 };
 
 /** The Gustaf server id an imported native server name becomes; also how duplicates are matched. */
+/** A command path relative to `directory`, made absolute; bare names and absolute paths stay. */
+export const commandInDirectory = (command: string, directory: string) => {
+  const path = /^(?:[a-z]:[\\/]|\\\\)/i.test(directory) ? NodePath.win32 : NodePath.posix;
+  return path.isAbsolute(command) || !/[\\/]/.test(command)
+    ? command
+    : path.join(directory, command);
+};
+
 export const toMcpServerName = (name: string) =>
   name
     .trim()

@@ -1,6 +1,8 @@
 import * as Schema from "effect/Schema";
 import { parse } from "smol-toml";
 
+import { commandInDirectory } from "./matcher.ts";
+
 export type NativeMcpSource = "codex" | "cursor" | "claude" | "gemini" | "project-mcp-json";
 
 export type NativeMcpServer = {
@@ -15,6 +17,8 @@ export type NativeMcpServer = {
       readonly command: string;
       readonly args: ReadonlyArray<string>;
       readonly env: Readonly<Record<string, string>>;
+      /** The source's absolute working directory; a relative command is already resolved in it. */
+      readonly cwd?: string;
     }
   | {
       readonly transport: "http";
@@ -37,6 +41,7 @@ export class NativeMcpConfigError extends Schema.TaggedError<
   }
 }
 
+const ABSOLUTE_PATH = /^(?:\/|[a-z]:[\\/]|\\\\)/i;
 const stringMap = Schema.Record(Schema.String, Schema.String);
 const object = Schema.Record(Schema.String, Schema.Unknown);
 const decodeObject = Schema.decodeUnknownSync(object);
@@ -44,6 +49,7 @@ const entry = Schema.Struct({
   command: Schema.optional(Schema.String),
   args: Schema.optional(Schema.Array(Schema.String)),
   env: Schema.optional(stringMap),
+  cwd: Schema.optional(Schema.String),
   url: Schema.optional(Schema.String),
   httpUrl: Schema.optional(Schema.String),
   headers: Schema.optional(stringMap),
@@ -87,12 +93,17 @@ const serversFromObject = (
       };
     }
     if (!config.command?.trim()) throw new Error("Missing MCP command or URL");
+    // Only an absolute cwd says where the source started the server; Codex accepts `cwd = "."`.
+    const cwd = config.cwd?.trim();
+    const directory = cwd && ABSOLUTE_PATH.test(cwd) ? cwd : undefined;
     return {
       ...base,
       transport: "stdio",
-      command: config.command,
+      command:
+        directory === undefined ? config.command : commandInDirectory(config.command, directory),
       args: config.args ?? [],
       env: config.env ?? {},
+      ...(directory === undefined ? {} : { cwd: directory }),
     };
   });
 };

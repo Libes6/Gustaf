@@ -119,7 +119,10 @@ it.effect("asks for sign-in on HTTP 401, and checks again only on refresh", () =
         });
         server.listen(0, "127.0.0.1", () => resume(Effect.succeed(server)));
       }),
-      (server) => Effect.callback<void>((resume) => server.close(() => resume(Effect.void))),
+      (server) =>
+        Effect.callback<void>((resume) => {
+          server.close(() => resume(Effect.void));
+        }),
     ).pipe(
       Effect.map((server) => {
         const address = server.address();
@@ -129,9 +132,15 @@ it.effect("asks for sign-in on HTTP 401, and checks again only on refresh", () =
     const id = McpServerId.make("jam");
     yield* Effect.gen(function* () {
       const checks = yield* McpServerChecks.McpServerChecks;
+      assert.strictEqual((yield* checks.knownUnusable).size, 0);
       assert.deepEqual((yield* checks.list({})).servers, [
         { id, status: "needs-auth", error: "HTTP 401" },
       ]);
+      // Sessions of agents that refuse a failing server read this without checking again.
+      assert.deepEqual(
+        yield* checks.knownUnusable,
+        new Map([[id, "Needs sign-in (last check in Settings → MCP)."]]),
+      );
       yield* checks.list({});
       assert.strictEqual(requests, 1);
       yield* checks.list({ refresh: [id] });

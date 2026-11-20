@@ -18,6 +18,7 @@ import * as Layer from "effect/Layer";
 import * as ManagedPolicy from "../policy/ManagedPolicy.ts";
 import { NativeMcpConfigs } from "./import/NativeMcpConfigs.ts";
 import {
+  commandInDirectory,
   findNativeDuplicate,
   nativeServersForProvider,
   toMcpServerName,
@@ -26,6 +27,12 @@ import * as ServerSettings from "../serverSettings.ts";
 
 /** A user MCP server ready to hand a provider; the provider starts it. */
 export type ResolvedMcpServer = McpUserServer & { readonly id: McpServerId };
+
+/** An enabled server left out of a session because it cannot start, with the reason. */
+export interface SkippedMcpServer {
+  readonly id: McpServerId;
+  readonly reason: string;
+}
 
 export class McpUserServers extends Context.Service<
   McpUserServers,
@@ -45,13 +52,18 @@ export class McpUserServers extends Context.Service<
        * left out so it does not start twice. Omit for isolated provider homes.
        */
       readonly native?: NativeMcpSources;
-    }) => Effect.Effect<ReadonlyArray<ResolvedMcpServer>>;
-    /** One server as a session would get it; the key of a secret that cannot be read otherwise. */
+      /** Servers the caller already knows will not start, with the reason; they are left out. */
+      readonly unusable?: ReadonlyMap<McpServerId, string>;
+    }) => Effect.Effect<{
+      readonly servers: ReadonlyArray<ResolvedMcpServer>;
+      readonly skipped: ReadonlyArray<SkippedMcpServer>;
+    }>;
+    /** One server as a session would get it, or why it cannot start. */
     readonly resolveServer: (input: {
       readonly id: McpServerId;
       readonly server: McpServerConfig;
       readonly cwd: string;
-    }) => Effect.Effect<ResolvedMcpServer | { readonly unreadableKey: string }>;
+    }) => Effect.Effect<ResolvedMcpServer | { readonly unusable: string }>;
   }
 >()("t3/mcpServers/McpUserServers") {}
 
@@ -66,11 +78,11 @@ const withSecrets = Effect.fnUntraced(function* (
   server: McpServerConfig,
   cwd: string,
   literal: (value: SettingsSecretValue) => string | undefined,
-): Effect.fn.Return<ResolvedMcpServer | { readonly unreadableKey: string }> {
+): Effect.fn.Return<ResolvedMcpServer | { readonly unusable: string }> {
   const values: Record<string, string> = {};
   for (const [key, value] of Object.entries(slotsOf(server))) {
     const secret = literal(value);
-    if (secret === undefined) return { unreadableKey: key };
+    if (secret === undefined) return { unusable: `The secret for ${key} cannot be read.` };
     values[key] = secret;
   }
   const { transport } = server;
@@ -88,19 +100,21 @@ const withSecrets = Effect.fnUntraced(function* (
     hostPathKey === undefined || Object.keys(values).some(isPathKey)
       ? values
       : { [hostPathKey]: hostEnvironment[hostPathKey] ?? "", ...values };
-  // Node and most provider runtimes cannot spawn npm's `.cmd` shims by their bare name.
-  const executable =
-    platform === "win32"
-      ? resolveExecutable(transport.command, platform, { ...hostEnvironment, ...env })
-      : undefined;
+  const serverCwd = transport.cwd === "thread" ? cwd : transport.cwd;
+  const { command } = transport;
+  // Providers spawn from their own directory, so a relative path is pinned to the server's cwd.
+  const pinned = commandInDirectory(command, serverCwd);
+  // A provider that cannot start one server may refuse the whole session (Antigravity does).
+  const executable = resolveExecutable(pinned, platform, { ...hostEnvironment, ...env });
+  if (executable === undefined) return { unusable: `Command not found: ${command}` };
   return {
     type: "stdio",
     id,
-    command:
-      executable !== undefined && WINDOWS_SHIM.test(executable) ? executable : transport.command,
+    // Node and most provider runtimes cannot spawn npm's `.cmd` shims by their bare name.
+    command: pinned !== command || WINDOWS_SHIM.test(executable) ? executable : command,
     args: transport.args,
     env,
-    cwd: transport.cwd === "thread" ? cwd : transport.cwd,
+    cwd: serverCwd,
   };
 });
 
@@ -141,7 +155,9 @@ const make = Effect.gen(function* () {
     readonly driver: ProviderDriverKind;
     readonly cwd: string;
     readonly native?: NativeMcpSources;
+    readonly unusable?: ReadonlyMap<McpServerId, string>;
   }) {
+    const none = { servers: [], skipped: [] };
     const current = yield* settings.getSettings.pipe(
       Effect.catchTags({
         ServerSettingsError: (cause) =>
@@ -150,18 +166,18 @@ const make = Effect.gen(function* () {
           }).pipe(Effect.as(undefined)),
       }),
     );
-    if (current === undefined) return [];
+    if (current === undefined) return none;
     const overrides = current.projectSettingsOverrides[input.projectId]?.mcpServers;
     const localDenied = ManagedPolicy.deniedBy(policy, "localMcpServers") !== undefined;
     let enabled = (Object.entries(current.mcpServers) as Array<[McpServerId, McpServerConfig]>)
       .filter(([id, server]) => overrides?.[id]?.enabled ?? server.enabled)
       .filter(([, server]) => server.providers?.includes(input.driver) ?? true)
       .filter(([, server]) => !(localDenied && server.transport.type === "stdio"));
-    if (enabled.length === 0) return [];
+    if (enabled.length === 0) return none;
     if (input.native !== undefined) {
       const isDuplicate = yield* nativeDuplicateFilter(input.native, input.cwd);
       enabled = enabled.filter((entry) => !isDuplicate(entry));
-      if (enabled.length === 0) return [];
+      if (enabled.length === 0) return none;
     }
 
     const references = enabled.flatMap(([, server]) =>
@@ -174,19 +190,26 @@ const make = Effect.gen(function* () {
     const literal = (value: SettingsSecretValue) =>
       isSecretReference(value) ? secretFor.get(value)?.trim() || undefined : value;
 
-    const resolved: Array<ResolvedMcpServer> = [];
+    const servers: Array<ResolvedMcpServer> = [];
+    const skipped: Array<SkippedMcpServer> = [];
     for (const [id, server] of enabled) {
-      const result = yield* withSecrets(id, server, input.cwd, literal);
-      if ("unreadableKey" in result) {
-        yield* Effect.logWarning("MCP server left out of a session: its secret cannot be read", {
+      const known = input.unusable?.get(id);
+      const result =
+        known === undefined
+          ? yield* withSecrets(id, server, input.cwd, literal)
+          : { unusable: known };
+      if ("unusable" in result) {
+        yield* Effect.logWarning("MCP server left out of a session: it cannot start", {
           mcpServerId: id,
-          key: result.unreadableKey,
+          driver: input.driver,
+          reason: result.unusable,
         });
+        skipped.push({ id, reason: result.unusable });
         continue;
       }
-      resolved.push(result);
+      servers.push(result);
     }
-    return resolved;
+    return { servers, skipped };
   });
 
   const resolveServer = Effect.fn("McpUserServers.resolveServer")(function* (input: {

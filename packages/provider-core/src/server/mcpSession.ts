@@ -45,6 +45,8 @@ export interface McpProviderSessionConfig {
   readonly agentDeviceEnvironment?: Readonly<Record<string, string>>;
   /** User MCP servers to start next to `t3-code`, already filtered for this provider. */
   readonly userServers?: ReadonlyArray<McpUserServer>;
+  /** Enabled user servers left out because they cannot start, with the reason. */
+  readonly skippedUserServers?: ReadonlyArray<{ readonly id: string; readonly reason: string }>;
 }
 
 export function withAgentDeviceEnvironment(

@@ -46,3 +46,21 @@ it("stops at once on a spent quota the harness reports in the chat, not on a quo
   assert.equal(failure?.class, "usage_limit");
   assert.isString(failure?.resetAt);
 });
+
+it("stops when the harness refuses the session over an MCP server, not on a quoted refusal", () => {
+  const quoting = makeAntigravityPromptGuard();
+  assert.isUndefined(
+    quoting(message("The log said The MCP server 'spline' failed to initialize: ENOENT.")),
+  );
+
+  const guard = makeAntigravityPromptGuard();
+  assert.isUndefined(guard(message("The MCP server 'computer-")));
+  const failure = guard(
+    message(
+      "use' failed to initialize: spawn ENOENT. Fix the MCP server, or remove it from your configuration and start a new session, to continue.",
+    ),
+  );
+  assert.equal(failure?.code, "ANTIGRAVITY_MCP_SERVER_FAILED");
+  assert.include(failure?.message, '"computer-use"');
+  assert.include(failure?.message, "Settings → MCP");
+});

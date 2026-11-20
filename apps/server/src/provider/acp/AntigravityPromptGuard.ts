@@ -3,7 +3,7 @@ import { makeProviderFailure } from "@t3tools/provider-core/server/failure";
 import * as DateTime from "effect/DateTime";
 import type * as EffectAcpSchema from "effect-acp/compat";
 
-import { antigravityLimitFailure } from "./AntigravityTurnOutcome.ts";
+import { antigravityLimitFailure, antigravityMcpServerFailure } from "./AntigravityTurnOutcome.ts";
 
 // The harness sends this after a model stream breaks, then asks the model again (1.4.5).
 const STREAM_INTERRUPTED =
@@ -16,6 +16,8 @@ const RECENT_TEXT_CHARS = 4_096;
 // tool call or follows its warning sign; a model quoting one mid-sentence is not stopped.
 const HARNESS_ERROR = /(?:^|⚠\uFE0F?\s*)(Error \d{3}, Message: [\s\S]*)$/;
 const FLAGGED_HARNESS_ERROR = /⚠\uFE0F?\s*(Error \d{3}, Message: [\s\S]*)$/;
+// The harness's whole answer when an MCP server in the session did not start.
+const MCP_SERVER_FAILED = /^The MCP server '([^']+)' failed to initialize/;
 
 const STREAM_LOOP_FAILURE = makeProviderFailure({
   class: "provider_error",
@@ -26,7 +28,8 @@ const STREAM_LOOP_FAILURE = makeProviderFailure({
 
 /**
  * Antigravity retries a broken model stream and a spent quota on its own, for up to an
- * hour, while the turn looks busy. This stops the turn once the session shows either.
+ * hour, while the turn looks busy. This stops the turn once the session shows either, or
+ * the harness's refusal to run a session whose MCP server did not start.
  */
 export function makeAntigravityPromptGuard(): (
   notification: EffectAcpSchema.SessionNotification,
@@ -61,6 +64,8 @@ export function makeAntigravityPromptGuard(): (
     }
     if (interruptions >= MAX_INTERRUPTIONS_IN_A_ROW) return STREAM_LOOP_FAILURE;
     if (update.sessionUpdate !== "agent_message_chunk") return undefined;
+    const mcpServer = trimmed ? undefined : MCP_SERVER_FAILED.exec(recent.trimStart())?.[1];
+    if (mcpServer !== undefined) return antigravityMcpServerFailure(mcpServer);
     const harnessError = (trimmed ? FLAGGED_HARNESS_ERROR : HARNESS_ERROR).exec(
       recent.trimStart(),
     )?.[1];

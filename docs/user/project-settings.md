@@ -285,6 +285,12 @@ section and after you change a server, and keeps the answer until you select
 **Refresh**. A check starts local servers briefly, so a `npx` server may first
 download its package.
 
+A local server whose command does not exist on the environment is left out of
+every agent's sessions. Antigravity refuses to answer at all while one of its
+servers fails to start, so it also leaves out servers whose last check failed or
+needs a sign-in. An Antigravity thread names the servers it left out, and a turn
+it refused over a server fails with that server's name.
+
 Enable servers for the whole environment or override their enabled state for a
 project. Mobile Settings lists each environment's servers and lets you switch
 them on or off for that environment; use web or desktop to add or edit them.

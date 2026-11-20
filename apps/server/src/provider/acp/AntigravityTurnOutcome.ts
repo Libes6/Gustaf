@@ -39,6 +39,8 @@ const GO_DURATION_UNIT_MS: Record<string, number> = {
   h: 3_600_000,
 };
 const NATIVE_SESSION_ID = /^[\w-]+$/;
+// The executor error of a session whose MCP server did not start (agy 1.4.x).
+const MCP_LOAD_FAILED = /\bMCP load failed for ['"]?([^'"\s:,]+)/;
 
 interface LastStep {
   readonly type: number;
@@ -120,6 +122,8 @@ function turnFailure(
   if (stopReason === "refusal") return quotaFailure(text, now);
   const limit = antigravityLimitFailure(text, now);
   if (limit !== undefined) return limit;
+  const mcpServer = MCP_LOAD_FAILED.exec(text)?.[1];
+  if (mcpServer !== undefined) return antigravityMcpServerFailure(mcpServer);
   if (text.includes("The stream was interrupted")) {
     return makeProviderFailure({
       class: "transport_error",
@@ -172,6 +176,15 @@ export function antigravityLimitFailure(
     resetAt: resetAtFrom(text, now) ?? null,
   });
 }
+
+/** agy refuses every turn, without asking the model, while one of its MCP servers fails to start. */
+export const antigravityMcpServerFailure = (server: string) =>
+  makeProviderFailure({
+    class: "provider_error",
+    code: "ANTIGRAVITY_MCP_SERVER_FAILED",
+    message: `Antigravity could not start the MCP server "${server}" and refuses every turn while it is in the session. Fix the server or turn it off for Antigravity in Settings → MCP, then send the message again.`,
+    retryable: false,
+  });
 
 function unfinishedToolsFailure(
   result: EffectAcpSchema.PromptResponse,

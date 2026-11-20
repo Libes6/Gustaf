@@ -27,6 +27,7 @@ const figma: NativeMcpServer = {
   command: "npx",
   args: ["-y", "figma-mcp"],
   env: { FIGMA_TOKEN: "figma-secret-value" },
+  cwd: "/opt/figma",
 };
 const linear: NativeMcpServer = {
   source: "claude",
@@ -177,7 +178,7 @@ it.effect("imports chosen entries turned off, for their source's provider only",
           command: "npx",
           args: ["-y", "figma-mcp"],
           env: { FIGMA_TOKEN: "figma-secret-value" },
-          cwd: "thread",
+          cwd: "/opt/figma",
         },
         providers: [ProviderDriverKind.make("codex")],
       },

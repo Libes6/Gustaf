@@ -756,5 +756,10 @@ export class ProviderAdapterV2 extends Context.Service<
     ) => Effect.Effect<ProviderAdapterV2SessionRuntime, ProviderAdapterV2Error, Scope.Scope>;
     /** Omitted when the instance loads no native MCP config, or one Gustaf cannot read. */
     readonly nativeMcpSources?: NativeMcpSources;
+    /**
+     * The agent refuses every turn of a session where one MCP server fails to start, so servers
+     * known to fail are left out of its sessions.
+     */
+    readonly abortsOnFailedMcpServer?: boolean;
   }
 >()("@t3tools/provider-core/server/ProviderAdapter/ProviderAdapterV2") {}

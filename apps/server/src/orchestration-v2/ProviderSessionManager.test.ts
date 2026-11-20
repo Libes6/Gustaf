@@ -43,6 +43,7 @@ import * as ProjectService from "../project/ProjectService.ts";
 import * as McpProviderSession from "@t3tools/provider-core/server/mcpSession";
 import * as McpProviderSessions from "@t3tools/provider-core/server/McpProviderSessions";
 import * as McpSessionRegistry from "../mcp/McpSessionRegistry.ts";
+import * as McpServerChecks from "../mcpServers/McpServerChecks.ts";
 import * as McpUserServers from "../mcpServers/McpUserServers.ts";
 import * as SqlitePersistence from "../persistence/Sqlite.ts";
 import * as ServerSettings from "../serverSettings.ts";
@@ -465,6 +466,7 @@ const makeProviderAdapter = Effect.fnUntraced(function* (
     readonly spawnBeforeOpen?: boolean;
     readonly scopeCloseReached?: Deferred.Deferred<void>;
     readonly nativeMcpSources?: McpProviderSession.NativeMcpSources;
+    readonly abortsOnFailedMcpServer?: boolean;
   } = {},
 ) {
   const mcpSessions = yield* McpProviderSessions.McpProviderSessions;
@@ -487,6 +489,9 @@ const makeProviderAdapter = Effect.fnUntraced(function* (
     ...(options.nativeMcpSources === undefined
       ? {}
       : { nativeMcpSources: options.nativeMcpSources }),
+    ...(options.abortsOnFailedMcpServer === undefined
+      ? {}
+      : { abortsOnFailedMcpServer: options.abortsOnFailedMcpServer }),
     getCapabilities: () => Effect.succeed(options.capabilities ?? CodexCapabilities),
     planSelectionTransition: () => Effect.succeed({ type: "apply_on_next_turn" }),
     openSession: (input) =>
@@ -638,7 +643,9 @@ function layerTest(input: {
   readonly serverSettingsLayer?: ReturnType<typeof ServerSettings.layerTest>;
   readonly projectServiceLayer?: Layer.Layer<ProjectService.ProjectService>;
   readonly mcpUserServersLayer?: Layer.Layer<McpUserServers.McpUserServers>;
+  readonly mcpServerChecksLayer?: Layer.Layer<McpServerChecks.McpServerChecks>;
   readonly nativeMcpSources?: McpProviderSession.NativeMcpSources;
+  readonly abortsOnFailedMcpServer?: boolean;
 }) {
   const layerConfiguredEventSink =
     input.flakyReleaseWrites !== undefined
@@ -685,6 +692,9 @@ function layerTest(input: {
         ? {}
         : { scopeCloseReached: input.scopeCloseReached }),
       ...(input.nativeMcpSources === undefined ? {} : { nativeMcpSources: input.nativeMcpSources }),
+      ...(input.abortsOnFailedMcpServer === undefined
+        ? {}
+        : { abortsOnFailedMcpServer: input.abortsOnFailedMcpServer }),
     }).pipe(Effect.map(ProviderAdapterRegistry.layerSingle)),
   );
   const layerConfiguredMcpRegistry =
@@ -731,6 +741,7 @@ function layerTest(input: {
           ...(input.serverSettingsLayer === undefined ? [] : [input.serverSettingsLayer]),
           ...(input.projectServiceLayer === undefined ? [] : [input.projectServiceLayer]),
           ...(input.mcpUserServersLayer === undefined ? [] : [input.mcpUserServersLayer]),
+          ...(input.mcpServerChecksLayer === undefined ? [] : [input.mcpServerChecksLayer]),
         ),
       ),
     ),
@@ -2576,7 +2587,7 @@ it.effect(
 );
 
 it.effect(
-  "ProviderSessionManagerV2 hands each session the thread's user MCP servers without the provider's native ones",
+  "ProviderSessionManagerV2 hands each session the thread's user MCP servers without the provider's native ones or known failures",
   () =>
     Effect.gen(function* () {
       const state = yield* Ref.make(emptyState);
@@ -2599,13 +2610,16 @@ it.effect(
       const requests = yield* Ref.make<
         ReadonlyArray<Parameters<McpUserServers.McpUserServers["Service"]["resolveForThread"]>[0]>
       >([]);
+      const jam = McpServerId.make("jam");
+      const unusable = new Map([[jam, "Needs sign-in."]]);
       const mcpUserServersLayer = Layer.mock(McpUserServers.McpUserServers)({
         resolveForThread: (request) =>
           Ref.update(requests, (current) => [...current, request]).pipe(
             Effect.andThen(Ref.get(enabled)),
-            Effect.map((servers) =>
-              servers.map((server) => ({ ...server, id: McpServerId.make(server.id) })),
-            ),
+            Effect.map((servers) => ({
+              servers: servers.map((server) => ({ ...server, id: McpServerId.make(server.id) })),
+              skipped: [...(request.unusable ?? [])].map(([id, reason]) => ({ id, reason })),
+            })),
           ),
       });
       const effect = Effect.gen(function* () {
@@ -2639,6 +2653,7 @@ it.effect(
         });
         const opened = (yield* Ref.get(mcpConfigs))[0];
         assert.deepEqual(opened?.userServers, [{ ...figma, id: McpServerId.make("figma") }]);
+        assert.deepEqual(opened?.skippedUserServers, [{ id: jam, reason: "Needs sign-in." }]);
 
         // An attach has no runtime policy, so the cwd falls back to the project checkout.
         yield* manager.open({
@@ -2649,8 +2664,8 @@ it.effect(
         });
         assert.deepEqual((yield* mcpSessions.read(joiner))?.userServers, opened?.userServers);
         assert.deepEqual(yield* Ref.get(requests), [
-          { projectId, driver: CODEX_DRIVER, cwd: runtimePolicy.cwd, native },
-          { projectId, driver: CODEX_DRIVER, cwd: "/projects/user-mcp", native },
+          { projectId, driver: CODEX_DRIVER, cwd: runtimePolicy.cwd, native, unusable },
+          { projectId, driver: CODEX_DRIVER, cwd: "/projects/user-mcp", native, unusable },
         ]);
 
         // A reused credential still carries the servers enabled now.
@@ -2673,7 +2688,11 @@ it.effect(
             idleTimeoutMs: 60_000,
             mcpConfigs,
             nativeMcpSources: native,
+            abortsOnFailedMcpServer: true,
             mcpUserServersLayer,
+            mcpServerChecksLayer: Layer.mock(McpServerChecks.McpServerChecks)({
+              knownUnusable: Effect.succeed(unusable),
+            }),
             projectServiceLayer: Layer.mock(ProjectService.ProjectService)({
               getById: (requestedProjectId) =>
                 Effect.succeedSome({

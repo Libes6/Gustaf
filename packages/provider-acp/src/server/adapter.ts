@@ -337,6 +337,8 @@ export interface AcpAdapterV2Flavor {
   readonly mcpOverHttp?: boolean;
   /** The agent refuses client stdio MCP servers, so the user's stdio servers are left out. */
   readonly rejectsStdioMcpServers?: boolean;
+  /** See `ProviderAdapterV2.abortsOnFailedMcpServer`. */
+  readonly abortsOnFailedMcpServer?: boolean;
   readonly normalizeSessionUpdate?: (
     notification: EffectAcpSchema.SessionNotification,
   ) => EffectAcpSchema.SessionNotification;
@@ -861,6 +863,7 @@ interface AcpMcpContext {
   readonly httpServers: ReadonlyArray<EffectAcpSchema.McpServer>;
   /** Plain stdio or http entries whichever way `t3-code` travels; never via the MCP-over-ACP bridge. */
   readonly userServers: ReadonlyArray<EffectAcpSchema.McpServer>;
+  readonly skippedUserServers?: McpProviderSession.McpProviderSessionConfig["skippedUserServers"];
   readonly processEnvironment?: NodeJS.ProcessEnv;
   readonly endpoint?: string;
   readonly authorization?: string;
@@ -901,6 +904,9 @@ function acpMcpContext(
           ]
         : [],
     userServers: (session.userServers ?? []).map(acpUserMcpServer),
+    ...(session.skippedUserServers === undefined
+      ? {}
+      : { skippedUserServers: session.skippedUserServers }),
     endpoint: session.endpoint,
     authorization: session.authorizationHeader,
     processEnvironment: {
@@ -1805,6 +1811,7 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
   return ProviderAdapter.ProviderAdapterV2.of({
     instanceId: options.instanceId,
     driver,
+    ...(flavor.abortsOnFailedMcpServer === true ? { abortsOnFailedMcpServer: true } : {}),
     getCapabilities: Effect.fn("AcpAdapter.getCapabilities")(function () {
       return Effect.succeed(flavor.capabilities);
     }),
@@ -1847,6 +1854,8 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
           itemIdentityVersion = thread.nativeMetadata?.itemIdentityVersion;
         };
         const terminalEnvironmentBySessionId = new Map<string, NodeJS.ProcessEnv>();
+        // The user MCP servers last reported as left out, so each change is named once.
+        let reportedSkippedMcpServers = "";
         interface PendingTerminalEnvironment {
           readonly environment: NodeJS.ProcessEnv | undefined;
           readonly claimUnknownSession: boolean;
@@ -8503,6 +8512,25 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
                 }
               }
               return;
+            }
+            const skippedMcpServers =
+              (yield* mcpSessions.read(context.input.threadId))?.skippedUserServers ?? [];
+            const skippedKey = skippedMcpServers
+              .map(({ id, reason }) => `- ${id}: ${reason}`)
+              .join("\n");
+            if (skippedKey !== reportedSkippedMcpServers) {
+              reportedSkippedMcpServers = skippedKey;
+              if (skippedMcpServers.length > 0) {
+                yield* runtimeCallbackPermit.withPermit(
+                  emitNotice(context, {
+                    title:
+                      skippedMcpServers.length === 1
+                        ? `MCP server ${skippedMcpServers[0]!.id} was left out`
+                        : `${skippedMcpServers.length} MCP servers were left out`,
+                    description: `${skippedKey}\n\nFix or turn them off in Settings → MCP.`,
+                  }),
+                );
+              }
             }
             // `backgroundReattach` re-sends the prompt; each send gets its own outcome watch.
             let checkPromptOutcome =

@@ -50,6 +50,11 @@ export class McpServerChecks extends Context.Service<
     readonly list: (
       input: McpServerStatusListInput,
     ) => Effect.Effect<McpServerStatusListResult, McpServerStatusError>;
+    /**
+     * Servers whose last finished check, of their current config, failed or needs sign-in.
+     * Reads the cache only; it never starts a check.
+     */
+    readonly knownUnusable: Effect.Effect<ReadonlyMap<McpServerId, string>>;
   }
 >()("t3/mcpServers/McpServerChecks") {}
 
@@ -352,12 +357,8 @@ const make = Effect.gen(function* () {
       server,
       cwd: yield* HostProcess.HomeDirectory,
     });
-    if ("unreadableKey" in resolved) {
-      return {
-        id,
-        status: "failed",
-        error: `The secret for ${resolved.unreadableKey} cannot be read.`,
-      } satisfies McpServerStatus;
+    if ("unusable" in resolved) {
+      return { id, status: "failed", error: resolved.unusable } satisfies McpServerStatus;
     }
     const stderr = { text: "" };
     const connect = resolved.type === "stdio" ? startStdio(resolved, stderr) : startHttp(resolved);
@@ -439,7 +440,30 @@ const make = Effect.gen(function* () {
     return { servers };
   });
 
-  return McpServerChecks.of({ list });
+  const knownUnusable = Effect.gen(function* () {
+    const unusable = new Map<McpServerId, string>();
+    const current = yield* settings.getSettings.pipe(Effect.option);
+    if (Option.isNone(current)) return unusable;
+    for (const [id, { fingerprint, result }] of checks) {
+      const server = current.value.mcpServers[id];
+      if (server === undefined || JSON.stringify(server.transport) !== fingerprint) continue;
+      const done = yield* Deferred.poll(result);
+      if (Option.isNone(done)) continue;
+      const status = yield* done.value.pipe(Effect.option);
+      if (Option.isNone(status)) continue;
+      if (status.value.status === "needs-auth") {
+        unusable.set(id, "Needs sign-in (last check in Settings → MCP).");
+      } else if (status.value.status === "failed") {
+        unusable.set(
+          id,
+          `Failed its last check in Settings → MCP${status.value.error === undefined ? "." : `: ${status.value.error}`}`,
+        );
+      }
+    }
+    return unusable;
+  }).pipe(Effect.withSpan("McpServerChecks.knownUnusable"));
+
+  return McpServerChecks.of({ list, knownUnusable });
 });
 
 export const layer = Layer.effect(McpServerChecks, make);

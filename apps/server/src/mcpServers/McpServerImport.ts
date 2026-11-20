@@ -157,7 +157,13 @@ const make = Effect.gen(function* () {
         ...(provider === undefined ? {} : { providers: [provider] }),
         transport:
           native.transport === "stdio"
-            ? { type: "stdio", command: native.command, args: native.args, env: native.env }
+            ? {
+                type: "stdio",
+                command: native.command,
+                args: native.args,
+                env: native.env,
+                ...(native.cwd === undefined ? {} : { cwd: native.cwd }),
+              }
             : { type: "http", url: native.url, headers: native.headers },
       }).pipe(Effect.mapError((cause) => fail("invalid-entry", cause)));
     }

@@ -3,6 +3,7 @@ import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, describe, it } from "@effect/vitest";
 import {
   ChatFileAttachment,
+  EnvironmentId,
   MessageId,
   NodeId,
   ProjectId,
@@ -753,6 +754,16 @@ describe("AntigravityAdapterV2 html_render pages", () => {
         modelSelection,
         runtimePolicy,
       });
+      yield* mcpSessions.set({
+        environmentId: EnvironmentId.make("environment-antigravity-html-render"),
+        threadId,
+        providerSessionId: "mcp-session-antigravity-html-render",
+        providerInstanceId: instanceId,
+        endpoint: "http://127.0.0.1:43123/mcp",
+        authorizationHeader: "Bearer token",
+        browserToolsAvailable: false,
+        skippedUserServers: [{ id: "spline", reason: "Command not found: spline" }],
+      });
       const now = yield* DateTime.now;
       yield* session.startTurn({
         appThread: {
@@ -865,6 +876,16 @@ describe("AntigravityAdapterV2 html_render pages", () => {
       assert.strictEqual(yield* mcpSessions.takeHtmlRender(threadId, report), undefined);
       assert.strictEqual(yield* mcpSessions.takeHtmlRender(threadId, failed), undefined);
       assert.strictEqual(yield* mcpSessions.takeHtmlRender(threadId, errored), undefined);
+      assert.deepEqual(
+        events.flatMap((event) =>
+          event.type === "turn_item.updated" && event.turnItem.type === "system_notice"
+            ? [event.turnItem.message]
+            : [],
+        ),
+        [
+          "MCP server spline was left out\n\n- spline: Command not found: spline\n\nFix or turn them off in Settings → MCP.",
+        ],
+      );
     }).pipe(Effect.provide(layerSession), Effect.scoped),
   );
 });

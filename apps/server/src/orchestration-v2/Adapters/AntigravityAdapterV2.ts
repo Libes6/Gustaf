@@ -262,6 +262,8 @@ export function makeAntigravityAcpAdapterFlavor(
     capabilities: AntigravityProviderCapabilitiesV2,
     // Agents that advertise HTTP MCP skip the stdio bridge process; others keep stdio.
     mcpOverHttp: true,
+    // agy answers every prompt with "The MCP server 'X' failed to initialize" instead.
+    abortsOnFailedMcpServer: true,
     sessionCarriesPullRequestLinking: antigravityAppendsSystemPrompt,
     makeRuntime,
     buildPrompt: ({

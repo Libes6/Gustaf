@@ -49,11 +49,9 @@ import * as ProjectService from "../project/ProjectService.ts";
 import * as McpProviderSessions from "@t3tools/provider-core/server/McpProviderSessions";
 import * as ServerSettings from "../serverSettings.ts";
 import * as McpSessionRegistry from "../mcp/McpSessionRegistry.ts";
+import * as McpServerChecks from "../mcpServers/McpServerChecks.ts";
 import * as McpUserServers from "../mcpServers/McpUserServers.ts";
-import type {
-  McpProviderSessionConfig,
-  McpUserServer,
-} from "@t3tools/provider-core/server/mcpSession";
+import type { McpProviderSessionConfig } from "@t3tools/provider-core/server/mcpSession";
 import * as EventSink from "./EventSink.ts";
 import * as CommandOutputHub from "./CommandOutputHub.ts";
 import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
@@ -319,8 +317,8 @@ function releasedRuntimeRequestStatusFor(
 
 // Both lists come from the same resolver in settings order, so their JSON is comparable.
 const sameUserServers = (
-  previous: ReadonlyArray<McpUserServer> | undefined,
-  next: ReadonlyArray<McpUserServer>,
+  previous: ReadonlyArray<unknown> | undefined,
+  next: ReadonlyArray<unknown>,
 ) => JSON.stringify(previous ?? []) === JSON.stringify(next);
 
 function sessionKey(providerSessionId: ProviderSessionId): string {
@@ -404,6 +402,7 @@ export const layerWithOptions = (
       const serverSettings = yield* Effect.serviceOption(ServerSettings.ServerSettingsService);
       const projectService = yield* Effect.serviceOption(ProjectService.ProjectService);
       const mcpUserServers = yield* Effect.serviceOption(McpUserServers.McpUserServers);
+      const mcpServerChecks = yield* Effect.serviceOption(McpServerChecks.McpServerChecks);
       const eventSink = yield* EventSink.EventSinkV2;
       const commandOutput = yield* CommandOutputHub.CommandOutputHub;
       const promptSuggestionStore = yield* SubscriptionRef.make<
@@ -521,9 +520,10 @@ export const layerWithOptions = (
       /** The user MCP servers for a thread's session, minus those its provider loads natively. */
       const resolveUserServers = Effect.fn("ProviderSessionManagerV2.resolveUserServers")(
         function* (threadId: ThreadId, providerInstanceId: ProviderInstanceId, cwd: string | null) {
-          if (Option.isNone(mcpUserServers)) return [];
+          const none = { servers: [], skipped: [] };
+          if (Option.isNone(mcpUserServers)) return none;
           const thread = yield* projectionStore.getThread(threadId).pipe(Effect.option);
-          if (Option.isNone(thread)) return [];
+          if (Option.isNone(thread)) return none;
           const { projectId, worktreePath } = thread.value;
           // Attaches carry no runtime policy; fall back the way RuntimePolicy resolves cwd.
           const threadCwd =
@@ -536,17 +536,22 @@ export const layerWithOptions = (
                   Effect.orElseSucceed(() => undefined),
                 )
               : undefined);
-          if (threadCwd === undefined) return [];
+          if (threadCwd === undefined) return none;
           const adapter = yield* registry
             .get(providerInstanceId)
             .pipe(Effect.orElseSucceed(() => undefined));
-          if (adapter === undefined) return [];
+          if (adapter === undefined) return none;
           const native = adapter.nativeMcpSources;
+          const unusable =
+            adapter.abortsOnFailedMcpServer === true && Option.isSome(mcpServerChecks)
+              ? yield* mcpServerChecks.value.knownUnusable
+              : undefined;
           return yield* mcpUserServers.value.resolveForThread({
             projectId,
             driver: adapter.driver,
             cwd: threadCwd,
             ...(native === undefined ? {} : { native }),
+            ...(unusable === undefined || unusable.size === 0 ? {} : { unusable }),
           });
         },
       );
@@ -576,12 +581,17 @@ export const layerWithOptions = (
                   Effect.map((thread) => thread.lineage.relationshipToParent === "subagent"),
                   Effect.orElseSucceed(() => false),
                 );
-                const userServers = yield* resolveUserServers(threadId, providerInstanceId, cwd);
+                const { servers: userServers, skipped: skippedUserServers } =
+                  yield* resolveUserServers(threadId, providerInstanceId, cwd);
                 const withUserServers = ({
                   userServers: _previous,
+                  skippedUserServers: _previousSkipped,
                   ...config
-                }: McpProviderSessionConfig): McpProviderSessionConfig =>
-                  userServers.length === 0 ? config : { ...config, userServers };
+                }: McpProviderSessionConfig): McpProviderSessionConfig => ({
+                  ...config,
+                  ...(userServers.length === 0 ? {} : { userServers }),
+                  ...(skippedUserServers.length === 0 ? {} : { skippedUserServers }),
+                });
                 const existing = yield* mcpSessions.read(threadId);
                 if (existing !== undefined) {
                   // Reserve before async validation so release cannot revoke between validation and reservation.
@@ -607,7 +617,10 @@ export const layerWithOptions = (
                     (resolved.thread.subagent === true) === subagent
                   ) {
                     // Live clients keep the token; the next session starts the servers enabled now.
-                    if (!sameUserServers(existing.userServers, userServers)) {
+                    if (
+                      !sameUserServers(existing.userServers, userServers) ||
+                      !sameUserServers(existing.skippedUserServers, skippedUserServers)
+                    ) {
                       yield* mcpSessions.set(withUserServers(existing));
                     }
                     return { mcpCredentialId: existing.providerSessionId, issued: false };
