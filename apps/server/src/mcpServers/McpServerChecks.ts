@@ -53,6 +53,7 @@ export class McpServerChecks extends Context.Service<
     ) => Effect.Effect<McpServerStatusListResult, McpServerStatusError>;
     /**
      * Servers whose last finished check, of their current config, failed or needs sign-in.
+     * Checks of stdio servers that run in the thread's folder count only when a session failed.
      * Reads the cache only; it never starts a check.
      */
     readonly knownUnusable: Effect.Effect<ReadonlyMap<McpServerId, string>>;
@@ -181,7 +182,12 @@ const make = Effect.gen(function* () {
   // The latest check per server and the config it checked; a changed config is checked again.
   const checks = new Map<
     McpServerId,
-    { readonly fingerprint: string; readonly result: Deferred.Deferred<McpServerStatus> }
+    {
+      readonly fingerprint: string;
+      readonly result: Deferred.Deferred<McpServerStatus>;
+      /** A session's own failure, as opposed to a check run here. */
+      readonly fromSession?: boolean;
+    }
   >();
 
   const startStdio = Effect.fn("McpServerChecks.startStdio")(function* (
@@ -474,9 +480,17 @@ const make = Effect.gen(function* () {
     const unusable = new Map<McpServerId, string>();
     const current = yield* settings.getSettings.pipe(Effect.option);
     if (Option.isNone(current)) return unusable;
-    for (const [id, { fingerprint, result }] of checks) {
+    for (const [id, { fingerprint, result, fromSession }] of checks) {
       const server = current.value.mcpServers[id];
       if (server === undefined || (yield* fingerprintOf(id, server)) !== fingerprint) continue;
+      // Checks run such a server in the home folder; a thread's folder may well have what it needs.
+      if (
+        fromSession !== true &&
+        server.transport.type === "stdio" &&
+        server.transport.cwd === "thread"
+      ) {
+        continue;
+      }
       const done = yield* Deferred.poll(result);
       if (Option.isNone(done)) continue;
       const status = yield* done.value.pipe(Effect.option);
@@ -505,6 +519,7 @@ const make = Effect.gen(function* () {
     checks.set(id, {
       fingerprint: yield* fingerprintOf(id, current.value.mcpServers[id]!),
       result,
+      fromSession: true,
     });
   });
 

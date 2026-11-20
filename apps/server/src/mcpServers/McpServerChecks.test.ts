@@ -249,3 +249,33 @@ it.effect("a token refresh that hangs counts against the check's timeout", () =>
     );
   }),
 );
+
+it.effect("a check in the home folder never keeps a thread-folder server out of sessions", () =>
+  Effect.gen(function* () {
+    const crashes = node('console.error("No package.json here"); process.exit(1)');
+    yield* Effect.gen(function* () {
+      const checks = yield* McpServerChecks.McpServerChecks;
+      const { servers } = yield* checks.list({});
+      assert.deepEqual(
+        servers.map((server) => server.status),
+        ["failed", "failed"],
+      );
+      const pinned = McpServerId.make("pinned");
+      const project = McpServerId.make("project");
+      assert.deepEqual([...(yield* checks.knownUnusable).keys()], [pinned]);
+
+      // A session that could not start it in the thread's folder is another matter.
+      yield* checks.markFailed(project, "Antigravity could not start it.");
+      assert.deepEqual([...(yield* checks.knownUnusable).keys()], [pinned, project]);
+    }).pipe(
+      Effect.provide(
+        layer({
+          mcpServers: {
+            pinned: { ...crashes, transport: { ...crashes.transport, cwd: process.cwd() } },
+            project: crashes,
+          },
+        }),
+      ),
+    );
+  }),
+);
