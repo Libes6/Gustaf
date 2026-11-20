@@ -779,8 +779,12 @@ function McpToolsDialog({
   const names = [...reads, ...writes];
   const enabledCount = names.filter((name) => !off.includes(name)).length;
   function apply(next: readonly string[]) {
+    const previous = off;
     setOff(next);
-    void onSave(withDisabledTools(config, next));
+    void onSave(withDisabledTools(config, next)).then((saved) => {
+      // A switch flipped since then sent its own save; only an untouched list rolls back.
+      if (!saved) setOff((current) => (current === next ? previous : current));
+    });
   }
   const modeLabels: Record<McpToolGroupMode, string> = {
     all: t("settingsE.mcp.tools.allowAll"),
