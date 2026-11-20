@@ -13,6 +13,8 @@ import * as Stream from "effect/Stream";
 import type * as Types from "effect/Types";
 import { AiError, McpProtocol, McpSchema, McpServer, Tool, Toolkit } from "effect/ai";
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http";
+import * as McpProviderSessions from "@t3tools/provider-core/server/McpProviderSessions";
+import { HTML_RENDER_TOOL_NAME } from "@t3tools/shared/htmlRender";
 import {
   ComputerUseError,
   DeviceToolError,
@@ -1096,6 +1098,49 @@ const withToolSpans = Effect.fn("McpHttpServer.withToolSpans")(function* <A, E, 
   return yield* registration.pipe(Effect.provideService(McpServer.McpServer, tracingServer));
 });
 
+const isCallToolResult = Schema.is(McpSchema.CallToolResult);
+const encodeCallToolResult = Schema.encodeOption(McpSchema.CallToolResult);
+
+/** Some providers show the model's own stand-in for a result; keep the real one for the thread. */
+const withProviderToolResults = Effect.fn("McpHttpServer.withProviderToolResults")(function* <
+  A,
+  E,
+  R,
+>(registration: Effect.Effect<A, E, R>) {
+  const server = yield* McpServer.McpServer;
+  const sessions = yield* Effect.serviceOption(McpProviderSessions.McpProviderSessions);
+  if (Option.isNone(sessions)) return yield* registration;
+  const keepingServer = McpServer.McpServer.of({
+    ...server,
+    addTool: Effect.fn("McpServer.addTool")(function (options) {
+      const tool = options.tool.name;
+      // html_render keeps its published page itself.
+      if (tool === HTML_RENDER_TOOL_NAME) return server.addTool(options);
+      return server.addTool({
+        ...options,
+        handle: (payload) =>
+          options.handle(payload).pipe(
+            Effect.tap((result) =>
+              isCallToolResult(result)
+                ? Effect.serviceOption(McpInvocationContext.McpInvocationContext).pipe(
+                    Effect.flatMap((invocation) => {
+                      const threadId = Option.getOrUndefined(invocation)?.thread?.threadId;
+                      return threadId === undefined
+                        ? Effect.void
+                        : sessions.value.recordToolResult(threadId, tool, payload, () =>
+                            Option.getOrUndefined(encodeCallToolResult(result)),
+                          );
+                    }),
+                  )
+                : Effect.void,
+            ),
+          ),
+      });
+    }),
+  });
+  return yield* registration.pipe(Effect.provideService(McpServer.McpServer, keepingServer));
+});
+
 /** `McpServer.registerToolkit` advertises the full codec schema; agents get the compact one. */
 const withAdvertisedSchemas = Effect.fn("McpHttpServer.withAdvertisedSchemas")(function* <
   Tools extends Record<string, Tool.Any>,
@@ -1149,7 +1194,9 @@ export const toolkitRegistration = <Tools extends Record<string, Tool.Any>, EX, 
   Layer.effectDiscard(
     withToolAnalytics(
       withToolSpans(
-        withAdvertisedSchemas(toolkit, McpServer.registerToolkit(decodeAsAdvertised(toolkit))),
+        withProviderToolResults(
+          withAdvertisedSchemas(toolkit, McpServer.registerToolkit(decodeAsAdvertised(toolkit))),
+        ),
       ),
     ),
   ).pipe(
@@ -1166,7 +1213,7 @@ const imageToolRegistration = <Tools extends Record<string, Tool.Any>, A, E, R, 
   register: Effect.Effect<A, E, R>,
   handlers: McpToolAccess.HandlersLayer<Tools, EX, RX>,
 ) =>
-  Layer.effectDiscard(withToolAnalytics(withToolSpans(register))).pipe(
+  Layer.effectDiscard(withToolAnalytics(withToolSpans(withProviderToolResults(register)))).pipe(
     Layer.provide(McpToolAccess.HandlersLayer.layer(handlers)),
   );
 

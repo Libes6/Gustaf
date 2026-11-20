@@ -11,6 +11,8 @@ import type { McpProviderSessionConfig } from "./mcpSession.ts";
 
 // Other providers may never consume these references.
 const MAX_KEPT_HTML_RENDERS = 64;
+// Results are taken on completion; this bounds calls whose completion never arrives.
+const MAX_KEPT_TOOL_RESULTS = 16;
 
 // Antigravity truncates long HTML arguments to a marked tail of at most 8,000 characters.
 const BOUNDED_TEXT_MARKER = "[Earlier output truncated]\n\n";
@@ -25,6 +27,19 @@ interface KeptHtmlRender {
   readonly htmlEnd: string;
   readonly reference: HtmlRenderReference;
 }
+
+interface KeptToolResult {
+  readonly tool: string;
+  readonly argumentsKey: string;
+  readonly result: unknown;
+}
+
+const sortedKeys = (_key: string, value: unknown) =>
+  typeof value === "object" && value !== null && !Array.isArray(value)
+    ? Object.fromEntries(Object.entries(value).toSorted(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)))
+    : value;
+
+const argumentsKey = (args: unknown) => JSON.stringify(args ?? {}, sortedKeys);
 
 const hashHtml = (html: string) => NodeCrypto.createHash("sha256").update(html).digest("hex");
 
@@ -51,6 +66,24 @@ export class McpProviderSessions extends Context.Service<
       input: PageInput,
       reported?: HtmlRenderReference,
     ) => Effect.Effect<HtmlRenderReference | undefined>;
+    /**
+     * The thread's provider reports a stand-in for MCP results, so its `t3-code` results are kept
+     * until the provider session changes.
+     */
+    readonly keepToolResults: (threadId: ThreadId) => Effect.Effect<void>;
+    /** Calls `encode` only for threads that keep results; an undefined result is not kept. */
+    readonly recordToolResult: (
+      threadId: ThreadId,
+      tool: string,
+      args: unknown,
+      encode: () => unknown,
+    ) => Effect.Effect<void>;
+    /** The oldest kept result of a call with this tool and these arguments. */
+    readonly takeToolResult: (
+      threadId: ThreadId,
+      tool: string,
+      args: unknown,
+    ) => Effect.Effect<{ readonly result: unknown } | undefined>;
   }
 >()("@t3tools/provider-core/server/McpProviderSessions") {}
 
@@ -102,6 +135,15 @@ const matchingPageIndex = (kept: ReadonlyArray<KeptHtmlRender>, input: PageInput
 const make = Effect.gen(function* () {
   const sessions = yield* Ref.make(new Map<ThreadId, McpProviderSessionConfig>());
   const htmlRenders = yield* Ref.make(new Map<ThreadId, ReadonlyArray<KeptHtmlRender>>());
+  // A thread is present once its provider asked to keep results.
+  const toolResults = yield* Ref.make(new Map<ThreadId, ReadonlyArray<KeptToolResult>>());
+  const forgetToolResults = (threadId: ThreadId) =>
+    Ref.update(toolResults, (kept) => {
+      if (!kept.has(threadId)) return kept;
+      const next = new Map(kept);
+      next.delete(threadId);
+      return next;
+    });
   return McpProviderSessions.of({
     set: Effect.fn("McpProviderSessions.set")(function* (config) {
       const current = yield* Ref.get(sessions);
@@ -111,6 +153,7 @@ const make = Effect.gen(function* () {
           next.delete(config.threadId);
           return next;
         });
+        yield* forgetToolResults(config.threadId);
       }
       yield* Ref.update(sessions, (current) => new Map(current).set(config.threadId, config));
     }),
@@ -130,6 +173,7 @@ const make = Effect.gen(function* () {
             return next;
           }),
         ),
+        Effect.andThen(forgetToolResults(threadId)),
       );
     }),
     recordHtmlRender: Effect.fn("McpProviderSessions.recordHtmlRender")(
@@ -175,6 +219,44 @@ const make = Effect.gen(function* () {
             next.set(threadId, rest);
           }
           return [kept[index]!.reference, next];
+        });
+      },
+    ),
+    keepToolResults: Effect.fn("McpProviderSessions.keepToolResults")(function (threadId) {
+      return Ref.update(toolResults, (kept) =>
+        kept.has(threadId) ? kept : new Map(kept).set(threadId, []),
+      );
+    }),
+    recordToolResult: Effect.fn("McpProviderSessions.recordToolResult")(
+      function* (threadId, tool, args, encode) {
+        if (!(yield* Ref.get(toolResults)).has(threadId)) return;
+        const result = encode();
+        if (result === undefined) return;
+        const entry = { tool, argumentsKey: argumentsKey(args), result };
+        yield* Ref.update(toolResults, (kept) => {
+          const current = kept.get(threadId);
+          return current === undefined
+            ? kept
+            : new Map(kept).set(threadId, [...current, entry].slice(-MAX_KEPT_TOOL_RESULTS));
+        });
+      },
+    ),
+    takeToolResult: Effect.fn("McpProviderSessions.takeToolResult")(
+      function (threadId, tool, args) {
+        const key = argumentsKey(args);
+        return Ref.modify(toolResults, (kept) => {
+          const current = kept.get(threadId) ?? [];
+          const index = current.findIndex(
+            (entry) => entry.tool === tool && entry.argumentsKey === key,
+          );
+          if (index === -1) return [undefined, kept];
+          return [
+            { result: current[index]!.result },
+            new Map(kept).set(
+              threadId,
+              current.filter((_, keptIndex) => keptIndex !== index),
+            ),
+          ];
         });
       },
     ),
