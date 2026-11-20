@@ -17,7 +17,8 @@ import { useEffect, useEffectEvent, useState } from "react";
 import { ChevronDownIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { ensureLocalApi } from "../../localApi";
 import { formatProviderDriverKindLabel } from "../../providerModels";
-import { useEnvironmentProviders } from "../../state/environments";
+import { isLoopbackHost } from "@t3tools/shared/preview";
+import { useEnvironmentHttpBaseUrl, useEnvironmentProviders } from "../../state/environments";
 import { Checkbox } from "../ui/checkbox";
 import { Label } from "../ui/label";
 import { Textarea } from "../ui/textarea";
@@ -170,6 +171,9 @@ function McpEnvironmentSettings({
       return next;
     });
   }
+  // Only a browser on the environment's machine reaches its loopback callback.
+  const httpBaseUrl = useEnvironmentHttpBaseUrl(environmentId);
+  const sameMachine = httpBaseUrl !== null && isLoopbackHost(new URL(httpBaseUrl).hostname);
   const [signingIn, setSigningIn] = useState(false);
   async function startSignIn(id: McpServerId) {
     setSigningIn(true);
@@ -243,7 +247,11 @@ function McpEnvironmentSettings({
     if (awaiting === undefined) return null;
     return (
       <div className="grid gap-2 px-4 pb-3">
-        <p className="text-sm text-muted-foreground">{t("settingsE.mcp.signIn.pasteHint")}</p>
+        <p className="text-sm text-muted-foreground">
+          {t(
+            sameMachine ? "settingsE.mcp.signIn.pasteHint" : "settingsE.mcp.signIn.pasteHintRemote",
+          )}
+        </p>
         {/* Opened after an await, the window can be blocked as a popup; this link always works. */}
         <a
           href={awaiting.authUrl}
