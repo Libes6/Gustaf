@@ -8,6 +8,7 @@ import { McpServerId, ServerSettings as ServerSettingsSchema } from "@t3tools/co
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
+import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Queue from "effect/Queue";
@@ -37,8 +38,7 @@ const bodyText = (body: unknown) =>
  * A server that refuses without a token and points at its authorization server through the
  * challenge, as `jam` does; the authorization server registers clients and checks PKCE.
  */
-/** A route answering `undefined` never answers, like a hung authorization server. */
-type Routes = Record<string, () => Response | undefined>;
+type Routes = Record<string, () => Response | Effect.Effect<Response>>;
 
 const fakeAuthorizationServer = (routes: Routes = {}) => {
   const calls: Array<string> = [];
@@ -53,9 +53,9 @@ const fakeAuthorizationServer = (routes: Routes = {}) => {
     const override = routes[route];
     if (override !== undefined) {
       const response = override();
-      return response === undefined
-        ? Effect.never
-        : Effect.succeed(HttpClientResponse.fromWeb(request, response));
+      return (Effect.isEffect(response) ? response : Effect.succeed(response)).pipe(
+        Effect.map((answer) => HttpClientResponse.fromWeb(request, answer)),
+      );
     }
     switch (route) {
       case `POST ${serverUrl}`:
@@ -130,7 +130,7 @@ const setup = ({
   readonly settingsLayer?: Layer.Layer<ServerSettings.ServerSettingsService>;
   readonly onRemove?: (name: string) => Effect.Effect<void>;
   readonly routes?: Routes;
-  readonly host?: string;
+  readonly host?: string | undefined;
 } = {}) => {
   const secrets = new Map<string, Uint8Array>();
   const fake = fakeAuthorizationServer(routes);
@@ -138,6 +138,7 @@ const setup = ({
     Layer.provide([
       settingsLayer,
       Layer.mock(ServerSecretStore.ServerSecretStore)({
+        directory: "/secrets",
         get: (name) => Effect.sync(() => Option.fromUndefinedOr(secrets.get(name))),
         set: (name, value) => Effect.sync(() => void secrets.set(name, value)),
         remove: (name) =>
@@ -153,6 +154,14 @@ const setup = ({
         Layer.provide(NodeServices.layer),
       ),
       Layer.succeed(HttpClient.HttpClient, fake.client),
+      FileSystem.layerNoop({
+        readDirectory: (directory) =>
+          Effect.sync(() =>
+            directory === "/secrets"
+              ? [...secrets.keys()].map((name) => `${name}.bin`).concat("unrelated.bin")
+              : [],
+          ),
+      }),
       NodePlatformCrypto.layer,
     ]),
   );
@@ -354,7 +363,15 @@ const storeExpiredLogin = (
 
 it.effect("a hung authorization server delays neither another server nor past its timeout", () => {
   const { secrets, layer } = setup({
-    routes: { "POST https://auth.hung.test/token": () => undefined },
+    settingsLayer: ServerSettings.layerTest(
+      decodeSettings({
+        mcpServers: {
+          jam: { enabled: true, transport: { type: "http", url: serverUrl } },
+          hung: { enabled: true, transport: { type: "http", url: serverUrl } },
+        },
+      }),
+    ).pipe(Layer.orDie),
+    routes: { "POST https://auth.hung.test/token": () => Effect.never },
   });
   const hung = McpServerId.make("hung");
   storeExpiredLogin(secrets, hung, "https://auth.hung.test/token");
@@ -369,3 +386,50 @@ it.effect("a hung authorization server delays neither another server nor past it
     assert.strictEqual(yield* Fiber.join(waiting), "access-1");
   }).pipe(Effect.provide(layer));
 });
+
+it.effect("signing out during a token refresh is not undone when the refresh lands", () =>
+  Effect.gen(function* () {
+    const requested = yield* Deferred.make<void>();
+    const answer = yield* Deferred.make<void>();
+    const { secrets, layer } = setup({
+      routes: {
+        "POST https://auth.jam.test/token": () =>
+          Deferred.succeed(requested, undefined).pipe(
+            Effect.andThen(Deferred.await(answer)),
+            Effect.as(Response.json({ access_token: "access-2", expires_in: 3600 })),
+          ),
+      },
+    });
+    storeExpiredLogin(secrets, id, "https://auth.jam.test/token");
+    yield* Effect.gen(function* () {
+      const auth = yield* McpServerAuth.McpServerAuth;
+      const refreshing = yield* auth.accessToken(id, serverUrl).pipe(Effect.forkChild);
+      yield* Deferred.await(requested);
+      yield* auth.signOut({ id });
+      yield* Deferred.succeed(answer, undefined);
+
+      assert.isUndefined(yield* Fiber.join(refreshing));
+      assert.strictEqual(secrets.size, 0);
+      assert.isFalse(yield* auth.isSignedIn(id, serverUrl));
+    }).pipe(Effect.provide(layer));
+  }),
+);
+
+it.effect("drops sign-ins of servers removed while the environment was off, and only those", () =>
+  Effect.gen(function* () {
+    const removed = yield* Deferred.make<string>();
+    const { secrets, layer } = setup({
+      onRemove: (name) => Deferred.succeed(removed, name).pipe(Effect.asVoid),
+    });
+    storeExpiredLogin(secrets, id, "https://auth.jam.test/token");
+    storeExpiredLogin(secrets, McpServerId.make("gone"), "https://auth.jam.test/token");
+    yield* Effect.gen(function* () {
+      yield* McpServerAuth.McpServerAuth;
+      assert.strictEqual(
+        yield* Deferred.await(removed),
+        `mcp-server-oauth-${base64UrlEncode("gone")}`,
+      );
+      assert.deepEqual([...secrets.keys()], [`mcp-server-oauth-${base64UrlEncode(id)}`]);
+    }).pipe(Effect.provide(layer));
+  }),
+);

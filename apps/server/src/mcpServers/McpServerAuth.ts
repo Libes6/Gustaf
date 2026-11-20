@@ -8,6 +8,7 @@ import {
   type McpServerSignInResult,
   type McpServerSignOutInput,
 } from "@t3tools/contracts";
+import * as KeyedLock from "@t3tools/shared/KeyedLock";
 import * as Clock from "effect/Clock";
 import * as Context from "effect/Context";
 import * as Deferred from "effect/Deferred";
@@ -15,6 +16,7 @@ import * as Duration from "effect/Duration";
 import * as Digest from "effect/crypto/Digest";
 import * as SecureRandom from "effect/crypto/SecureRandom";
 import * as Effect from "effect/Effect";
+import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
@@ -141,7 +143,8 @@ const withOAuthTimeout = <A, R>(effect: Effect.Effect<A, McpServerAuthError, R>)
     }),
   );
 
-const secretName = (id: McpServerId) => `mcp-server-oauth-${base64UrlEncode(id)}`;
+const SECRET_PREFIX = "mcp-server-oauth-";
+const secretName = (id: McpServerId) => `${SECRET_PREFIX}${base64UrlEncode(id)}`;
 
 const header = (response: HttpClientResponse.HttpClientResponse, name: string) =>
   response.headers[name];
@@ -224,6 +227,7 @@ interface PendingSignIn {
 const make = Effect.gen(function* () {
   const settings = yield* ServerSettings.ServerSettingsService;
   const secretStore = yield* ServerSecretStore.ServerSecretStore;
+  const fileSystem = yield* FileSystem.FileSystem;
   const config = yield* ServerConfig.ServerConfig;
   const httpClient = yield* HttpClient.HttpClient;
   const random = yield* SecureRandom.SecureRandom;
@@ -235,7 +239,9 @@ const make = Effect.gen(function* () {
   const revisions = new Map<McpServerId, number>();
   const pending = new Map<string, PendingSignIn>();
   // One refresh per server at a time; others join it, and other servers never wait on it.
-  const refreshing = new Map<McpServerId, Deferred.Deferred<string>>();
+  const refreshing = new Map<McpServerId, Deferred.Deferred<string | undefined>>();
+  // Orders a server's writes, so a refresh or sign-in that lands after a sign-out is dropped.
+  const writes = yield* KeyedLock.make<McpServerId>();
 
   const bump = (id: McpServerId) => revisions.set(id, (revisions.get(id) ?? 0) + 1);
 
@@ -258,14 +264,27 @@ const make = Effect.gen(function* () {
     return login;
   });
 
-  const store = Effect.fnUntraced(function* (id: McpServerId, login: Login) {
-    yield* secretStore
-      .set(secretName(id), new TextEncoder().encode(encodeLogin(login)))
-      .pipe(
-        Effect.mapError(() => authError("The sign-in could not be saved on this environment.")),
-      );
-    logins.set(id, login);
-  });
+  /** Saves a login unless signing in or out changed the server since `revision`; true if saved. */
+  const storeIfCurrent = (
+    id: McpServerId,
+    login: Login,
+    revision: number,
+    options?: { readonly bump?: boolean },
+  ) =>
+    writes.withLock(
+      id,
+      Effect.gen(function* () {
+        if ((revisions.get(id) ?? 0) !== revision) return false;
+        yield* secretStore
+          .set(secretName(id), new TextEncoder().encode(encodeLogin(login)))
+          .pipe(
+            Effect.mapError(() => authError("The sign-in could not be saved on this environment.")),
+          );
+        logins.set(id, login);
+        if (options?.bump === true) bump(id);
+        return true;
+      }),
+    );
 
   const getJson = Effect.fnUntraced(function* <A, E>(
     decode: (input: unknown) => Effect.Effect<A, E>,
@@ -337,13 +356,13 @@ const make = Effect.gen(function* () {
 
   const refresh = Effect.fnUntraced(function* (id: McpServerId, login: Login) {
     if (login.refreshToken === undefined) return login;
+    const revision = revisions.get(id) ?? 0;
     const tokens = yield* tokenRequest(login, {
       grant_type: "refresh_token",
       refresh_token: login.refreshToken,
     });
     const next = yield* toLogin(login.serverUrl, login, tokens, login.refreshToken);
-    yield* store(id, next);
-    return next;
+    return (yield* storeIfCurrent(id, next, revision)) ? next : yield* loginOf(id);
   });
 
   const accessToken: McpServerAuth["Service"]["accessToken"] = Effect.fn(
@@ -358,7 +377,7 @@ const make = Effect.gen(function* () {
     if (!stale || login.refreshToken === undefined) return login.accessToken;
     const inFlight = refreshing.get(id);
     if (inFlight !== undefined) return yield* Deferred.await(inFlight);
-    const refreshed = Deferred.makeUnsafe<string>();
+    const refreshed = Deferred.makeUnsafe<string | undefined>();
     refreshing.set(id, refreshed);
     // Forked so a caller that gives up does not leave the others waiting.
     yield* refresh(id, login).pipe(
@@ -369,7 +388,7 @@ const make = Effect.gen(function* () {
         }),
       ),
       Effect.orElseSucceed(() => login),
-      Effect.flatMap((next) => Deferred.succeed(refreshed, next.accessToken)),
+      Effect.flatMap((next) => Deferred.succeed(refreshed, next?.accessToken)),
       Effect.ensuring(
         Effect.sync(() => refreshing.delete(id)).pipe(
           Effect.andThen(Deferred.succeed(refreshed, login.accessToken)),
@@ -587,6 +606,7 @@ const make = Effect.gen(function* () {
       return yield* authError("This sign-in has expired or was started elsewhere. Sign in again.");
     }
     pending.delete(state);
+    const revision = revisions.get(flow.id) ?? 0;
     const refused = url.searchParams.get("error");
     if (refused !== null) {
       return yield* authError(
@@ -601,31 +621,58 @@ const make = Effect.gen(function* () {
       redirect_uri: flow.redirectUri,
       code_verifier: flow.verifier,
     });
-    yield* store(flow.id, yield* toLogin(flow.serverUrl, flow.client, tokens));
-    bump(flow.id);
+    const login = yield* toLogin(flow.serverUrl, flow.client, tokens);
+    if (!(yield* storeIfCurrent(flow.id, login, revision, { bump: true }))) {
+      return yield* authError("The server was signed out or removed while signing in.");
+    }
     return { id: flow.id };
   });
 
   const signOut: McpServerAuth["Service"]["signOut"] = Effect.fn("McpServerAuth.signOut")(
     function* ({ id }) {
-      yield* secretStore
-        .remove(secretName(id))
-        .pipe(Effect.mapError(() => authError("The sign-in could not be removed.")));
-      logins.set(id, null);
-      bump(id);
+      yield* writes.withLock(
+        id,
+        secretStore.remove(secretName(id)).pipe(
+          Effect.mapError(() => authError("The sign-in could not be removed.")),
+          Effect.andThen(
+            Effect.sync(() => {
+              logins.set(id, null);
+              bump(id);
+            }),
+          ),
+        ),
+      );
     },
   );
 
   // Whatever removes a server from settings (a client, an agent, a pasted file) drops its sign-in.
   const changes = yield* settings.subscribeChanges;
+  const initial = yield* settings.getSettings.pipe(Effect.option);
   let knownIds = new Set(
-    Object.keys(
-      yield* settings.getSettings.pipe(
-        Effect.map((current) => current.mcpServers),
-        Effect.orElseSucceed(() => ({})),
-      ),
-    ) as Array<McpServerId>,
+    Option.match(initial, {
+      onNone: () => [],
+      onSome: (current) => Object.keys(current.mcpServers) as Array<McpServerId>,
+    }),
   );
+  // Servers removed while this environment was off left their sign-ins behind.
+  if (Option.isSome(initial) && secretStore.directory !== undefined) {
+    const directory = secretStore.directory;
+    const kept = new Set([...knownIds].map(secretName));
+    yield* forkParked(
+      Effect.gen(function* () {
+        for (const file of yield* fileSystem.readDirectory(directory)) {
+          const name = file.endsWith(".bin") ? file.slice(0, -".bin".length) : undefined;
+          if (name === undefined || !name.startsWith(SECRET_PREFIX) || kept.has(name)) continue;
+          yield* secretStore.remove(name);
+        }
+      }).pipe(
+        Effect.catchCause((cause) =>
+          Effect.logWarning("Sign-ins of removed MCP servers could not be swept", { cause }),
+        ),
+        Effect.withSpan("McpServerAuth.sweepRemovedSignIns"),
+      ),
+    );
+  }
   yield* forkParked(
     Stream.runForEach(changes, (next) => {
       const nextIds = new Set(Object.keys(next.mcpServers) as Array<McpServerId>);
