@@ -446,6 +446,13 @@ export const prepareAntigravityProfile = Effect.fn("prepareAntigravityProfile")(
       ),
     );
   yield* linkAntigravityUserSkills({ profileDirectory: geminiHome, userHome, platform });
+  const mcpConfigPath = path.join(geminiHome, "config", "mcp_config.json");
+  if (yield* fs.exists(mcpConfigPath).pipe(Effect.orElseSucceed(() => false))) {
+    yield* Effect.logWarning(
+      "Antigravity loads MCP servers from this profile file beside Gustaf's list.",
+      { path: mcpConfigPath },
+    );
+  }
   return profile;
 });
 
