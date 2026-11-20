@@ -2,7 +2,11 @@ import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 
 import { TrimmedNonEmptyString } from "./baseSchemas.ts";
-import { ProviderInstanceEnvironmentVariableName, ProviderInstanceId } from "./providerInstance.ts";
+import {
+  ProviderDriverKind,
+  ProviderInstanceEnvironmentVariableName,
+  ProviderInstanceId,
+} from "./providerInstance.ts";
 import { SettingsSecretValue } from "./settingsSecretValue.ts";
 
 /** Providers see this id as the server's name; `t3-code*` and `ext` are names Gustaf passes itself. */
@@ -67,6 +71,8 @@ export const McpServerConfig = Schema.Struct({
   name: Schema.optionalKey(TrimmedNonEmptyString),
   enabled: Schema.Boolean.pipe(Schema.withDecodingDefaultKey(Effect.succeed(false))),
   transport: McpServerTransport,
+  /** Driver kinds whose sessions get this server; absent means every provider. */
+  providers: Schema.optionalKey(Schema.Array(ProviderDriverKind)),
 });
 export type McpServerConfig = typeof McpServerConfig.Type;
 

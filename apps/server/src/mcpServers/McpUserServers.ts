@@ -3,6 +3,7 @@ import {
   type McpServerConfig,
   type McpServerId,
   type ProjectId,
+  type ProviderDriverKind,
   type SecretReference,
   type SettingsSecretValue,
 } from "@t3tools/contracts";
@@ -35,6 +36,8 @@ export class McpUserServers extends Context.Service<
      */
     readonly resolveForThread: (input: {
       readonly projectId: ProjectId;
+      /** The session's provider; servers limited to other providers are left out. */
+      readonly driver: ProviderDriverKind;
       /** The thread's working directory: its worktree when it has one. */
       readonly cwd: string;
       /**
@@ -82,6 +85,7 @@ const make = Effect.gen(function* () {
 
   const resolveForThread = Effect.fn("McpUserServers.resolveForThread")(function* (input: {
     readonly projectId: ProjectId;
+    readonly driver: ProviderDriverKind;
     readonly cwd: string;
     readonly native?: NativeMcpSources;
   }) {
@@ -98,6 +102,7 @@ const make = Effect.gen(function* () {
     const localDenied = ManagedPolicy.deniedBy(policy, "localMcpServers") !== undefined;
     let enabled = (Object.entries(current.mcpServers) as Array<[McpServerId, McpServerConfig]>)
       .filter(([id, server]) => overrides?.[id]?.enabled ?? server.enabled)
+      .filter(([, server]) => server.providers?.includes(input.driver) ?? true)
       .filter(([, server]) => !(localDenied && server.transport.type === "stdio"));
     if (enabled.length === 0) return [];
     if (input.native !== undefined) {

@@ -537,12 +537,14 @@ export const layerWithOptions = (
                 )
               : undefined);
           if (threadCwd === undefined) return [];
-          const native = yield* registry.get(providerInstanceId).pipe(
-            Effect.map((adapter) => adapter.nativeMcpSources),
-            Effect.orElseSucceed(() => undefined),
-          );
+          const adapter = yield* registry
+            .get(providerInstanceId)
+            .pipe(Effect.orElseSucceed(() => undefined));
+          if (adapter === undefined) return [];
+          const native = adapter.nativeMcpSources;
           return yield* mcpUserServers.value.resolveForThread({
             projectId,
+            driver: adapter.driver,
             cwd: threadCwd,
             ...(native === undefined ? {} : { native }),
           });
