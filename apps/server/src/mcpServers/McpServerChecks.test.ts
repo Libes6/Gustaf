@@ -173,10 +173,7 @@ it.effect("asks for sign-in on HTTP 401, checks again on refresh, and after sign
         { id, status: "needs-auth", error: "HTTP 401" },
       ]);
       // Sessions of agents that refuse a failing server read this without checking again.
-      assert.deepEqual(
-        yield* checks.knownUnusable,
-        new Map([[id, "Needs sign-in (last check in Settings → MCP)."]]),
-      );
+      assert.deepEqual(yield* checks.knownUnusable, new Map([[id, "Needs sign-in."]]));
       yield* checks.list({});
       assert.strictEqual(requests.length, 1);
       yield* checks.list({ refresh: [id] });
@@ -206,10 +203,8 @@ it.effect("asks for sign-in on HTTP 401, checks again on refresh, and after sign
       assert.deepEqual((yield* checks.list({})).servers, [
         { id, status: "failed", error: "Antigravity could not start it." },
       ]);
-      assert.deepEqual(
-        yield* checks.knownUnusable,
-        new Map([[id, "Failed its last check in Settings → MCP: Antigravity could not start it."]]),
-      );
+      // Thread notices show these reasons, so no server output reaches them.
+      assert.deepEqual(yield* checks.knownUnusable, new Map([[id, "Did not start."]]));
       assert.strictEqual(requests.length, requestsBefore);
       assert.strictEqual((yield* checks.list({ refresh: [id] })).servers[0]?.status, "connected");
     }).pipe(

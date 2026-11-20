@@ -98,6 +98,19 @@ export const usesGustafSignIn = ({ transport }: McpServerConfig) =>
 const slotsOf = ({ transport }: McpServerConfig) =>
   transport.type === "stdio" ? transport.env : transport.headers;
 
+/**
+ * Why a server was left out, as thread notices show it. Every reader of the thread sees these,
+ * so they never carry commands, server output or secrets; Settings → MCP shows the details.
+ */
+export const SKIP_REASONS = {
+  secret: "A secret it needs cannot be read.",
+  command: "Its command was not found.",
+  needsAuth: "Needs sign-in.",
+  failed: "Did not start.",
+} as const;
+
+type Unusable = { readonly unusable: string; readonly reason: string };
+
 // Runs once per server inside the traced resolve calls below.
 const withSecrets = Effect.fnUntraced(function* (
   id: McpServerId,
@@ -106,11 +119,13 @@ const withSecrets = Effect.fnUntraced(function* (
   literal: (value: SettingsSecretValue) => string | undefined,
   bearer: string | undefined,
   filtersTools = true,
-): Effect.fn.Return<ResolvedMcpServer | { readonly unusable: string }> {
+): Effect.fn.Return<ResolvedMcpServer | Unusable> {
   const values: Record<string, string> = {};
   for (const [key, value] of Object.entries(slotsOf(server))) {
     const secret = literal(value);
-    if (secret === undefined) return { unusable: `The secret for ${key} cannot be read.` };
+    if (secret === undefined) {
+      return { unusable: `The secret for ${key} cannot be read.`, reason: SKIP_REASONS.secret };
+    }
     values[key] = secret;
   }
   const { transport } = server;
@@ -144,7 +159,9 @@ const withSecrets = Effect.fnUntraced(function* (
   const pinned = commandInDirectory(command, serverCwd);
   // A provider that cannot start one server may refuse the whole session (Antigravity does).
   const executable = resolveExecutable(pinned, platform, { ...hostEnvironment, ...env });
-  if (executable === undefined) return { unusable: `Command not found: ${command}` };
+  if (executable === undefined) {
+    return { unusable: `Command not found: ${command}`, reason: SKIP_REASONS.command };
+  }
   return {
     type: "stdio",
     id,
@@ -257,14 +274,14 @@ const make = Effect.gen(function* () {
               yield* bearerFor(id, server),
               input.filtersTools === true,
             )
-          : { unusable: known };
+          : { unusable: known, reason: known };
       if ("unusable" in result) {
         yield* Effect.logWarning("MCP server left out of a session: it cannot start", {
           mcpServerId: id,
           driver: input.driver,
           reason: result.unusable,
         });
-        skipped.push({ id, reason: result.unusable });
+        skipped.push({ id, reason: result.reason });
         continue;
       }
       servers.push(result);

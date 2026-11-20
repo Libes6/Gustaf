@@ -503,12 +503,9 @@ const make = Effect.gen(function* () {
       const status = yield* done.value.pipe(Effect.option);
       if (Option.isNone(status)) continue;
       if (status.value.status === "needs-auth") {
-        unusable.set(id, "Needs sign-in (last check in Settings → MCP).");
+        unusable.set(id, McpUserServers.SKIP_REASONS.needsAuth);
       } else if (status.value.status === "failed") {
-        unusable.set(
-          id,
-          `Failed its last check in Settings → MCP${status.value.error === undefined ? "." : `: ${status.value.error}`}`,
-        );
+        unusable.set(id, McpUserServers.SKIP_REASONS.failed);
       }
     }
     return unusable;

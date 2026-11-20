@@ -250,7 +250,7 @@ it.effect(
         },
       ]);
       assert.deepEqual(skipped, [
-        { id: McpServerId.make("figma"), reason: "The secret for FIGMA_TOKEN cannot be read." },
+        { id: McpServerId.make("figma"), reason: "A secret it needs cannot be read." },
       ]);
     }),
 );
@@ -358,17 +358,14 @@ it.effect("leaves out, for every provider, a stdio server whose command does not
       resolved.servers.map((server) => (server.type === "stdio" ? server.command : server.url)),
       ["/opt/tools/bin/server", "https://mcp.example.test/mcp"],
     );
-    assert.deepEqual(resolved.skipped, [
-      {
-        id: McpServerId.make("spline"),
-        reason: "Command not found: /missing/Spline.app/Contents/MacOS/Spline",
-      },
-      { id: McpServerId.make("not-on-path"), reason: "Command not found: missing-tool" },
-      {
-        id: McpServerId.make("computer-use"),
-        reason: "Command not found: ./Codex Computer Use.app/Client",
-      },
-    ]);
+    // Thread notices keep only the category; the command stays in Settings → MCP.
+    assert.deepEqual(
+      resolved.skipped,
+      ["spline", "not-on-path", "computer-use"].map((id) => ({
+        id: McpServerId.make(id),
+        reason: "Its command was not found.",
+      })),
+    );
   }),
 );
 
