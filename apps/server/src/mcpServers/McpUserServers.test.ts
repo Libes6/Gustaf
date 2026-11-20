@@ -38,26 +38,74 @@ const http = (enabled: boolean, headers: Record<string, unknown> = {}) => ({
 
 const decodeSettings = Schema.decodeUnknownSync(ServerSettingsSchema);
 
-const resolve = (
-  settings: unknown,
-  options: {
-    readonly projectId?: ProjectId;
-    readonly driver?: string;
-    readonly secrets?: Readonly<Record<string, string>>;
-    readonly policy?: ManagedPolicyDocument;
-    readonly platform?: NodeJS.Platform;
-    readonly environment?: NodeJS.ProcessEnv;
-    /** Defaults to every command existing except names under `/missing`. */
-    readonly executables?: SpawnExecutableResolver;
-    readonly unusable?: ReadonlyMap<McpServerId, string>;
-    /** Access tokens of servers signed in through Gustaf. */
-    readonly tokens?: Readonly<Record<string, string>>;
-    readonly native?: {
-      readonly sources: NativeMcpSources;
-      readonly servers: ReadonlyArray<NativeMcpServer>;
-    };
-  } = {},
-) =>
+interface Options {
+  readonly projectId?: ProjectId;
+  readonly driver?: string;
+  readonly secrets?: Readonly<Record<string, string>>;
+  readonly policy?: ManagedPolicyDocument;
+  readonly platform?: NodeJS.Platform;
+  readonly environment?: NodeJS.ProcessEnv;
+  /** Defaults to every command existing except names under `/missing`. */
+  readonly executables?: SpawnExecutableResolver;
+  readonly unusable?: ReadonlyMap<McpServerId, string>;
+  /** Access tokens of servers signed in through Gustaf. */
+  readonly tokens?: Readonly<Record<string, string>>;
+  /** Signed-in servers whose token is due for a refresh. */
+  readonly refreshDue?: ReadonlyArray<string>;
+  readonly filtersTools?: boolean;
+  readonly native?: {
+    readonly sources: NativeMcpSources;
+    readonly servers: ReadonlyArray<NativeMcpServer>;
+  };
+}
+
+const withUserServers =
+  (settings: unknown, options: Options) =>
+  <A, E>(effect: Effect.Effect<A, E, McpUserServers.McpUserServers>) =>
+    effect.pipe(
+      Effect.provide(
+        McpUserServers.layer.pipe(
+          Layer.provide([
+            ServerSettings.layerTest(decodeSettings(settings)),
+            ManagedPolicy.layerTest(options.policy),
+            Layer.succeed(SecretResolver.SecretResolver, {
+              label: (provider) => Effect.succeed(provider),
+              read: (references) =>
+                Effect.succeed(references.map(({ reference }) => options.secrets?.[reference])),
+              invalidate: () => Effect.void,
+            }),
+            Layer.succeed(NativeMcpConfigs, {
+              list: () => Effect.succeed({ servers: options.native?.servers ?? [], errors: [] }),
+            }),
+            Layer.mock(McpServerAuth)({
+              accessToken: (id) => Effect.succeed(options.tokens?.[id]),
+              tokenState: (id) =>
+                Effect.succeed({
+                  token: options.tokens?.[id],
+                  refreshDue: options.refreshDue?.includes(id) === true,
+                }),
+            }),
+          ]),
+        ),
+      ),
+      Effect.provideService(HostProcess.Platform, options.platform ?? "darwin"),
+      Effect.provideService(
+        HostProcess.Environment,
+        options.environment ?? { PATH: "/opt/homebrew/bin:/usr/bin" },
+      ),
+      Effect.provideService(
+        SpawnExecutableResolution,
+        options.executables ??
+          ((command) =>
+            command.startsWith("/missing")
+              ? undefined
+              : command.startsWith("/")
+                ? command
+                : `/usr/bin/${command}`),
+      ),
+    );
+
+const resolve = (settings: unknown, options: Options = {}) =>
   Effect.gen(function* () {
     const service = yield* McpUserServers.McpUserServers;
     return yield* service.resolveForThread({
@@ -66,44 +114,21 @@ const resolve = (
       cwd: threadCwd,
       ...(options.native === undefined ? {} : { native: options.native.sources }),
       ...(options.unusable === undefined ? {} : { unusable: options.unusable }),
+      ...(options.filtersTools === true ? { filtersTools: true } : {}),
     });
-  }).pipe(
-    Effect.provide(
-      McpUserServers.layer.pipe(
-        Layer.provide([
-          ServerSettings.layerTest(decodeSettings(settings)),
-          ManagedPolicy.layerTest(options.policy),
-          Layer.succeed(SecretResolver.SecretResolver, {
-            label: (provider) => Effect.succeed(provider),
-            read: (references) =>
-              Effect.succeed(references.map(({ reference }) => options.secrets?.[reference])),
-            invalidate: () => Effect.void,
-          }),
-          Layer.succeed(NativeMcpConfigs, {
-            list: () => Effect.succeed({ servers: options.native?.servers ?? [], errors: [] }),
-          }),
-          Layer.mock(McpServerAuth)({
-            accessToken: (id) => Effect.succeed(options.tokens?.[id]),
-          }),
-        ]),
-      ),
-    ),
-    Effect.provideService(HostProcess.Platform, options.platform ?? "darwin"),
-    Effect.provideService(
-      HostProcess.Environment,
-      options.environment ?? { PATH: "/opt/homebrew/bin:/usr/bin" },
-    ),
-    Effect.provideService(
-      SpawnExecutableResolution,
-      options.executables ??
-        ((command) =>
-          command.startsWith("/missing")
-            ? undefined
-            : command.startsWith("/")
-              ? command
-              : `/usr/bin/${command}`),
-    ),
-  );
+  }).pipe(withUserServers(settings, options));
+
+const sessionKey = (settings: unknown, options: Options = {}) =>
+  Effect.gen(function* () {
+    const service = yield* McpUserServers.McpUserServers;
+    return yield* service.sessionKey({
+      projectId: options.projectId ?? projectId,
+      driver: ProviderDriverKind.make(options.driver ?? "codex"),
+      ...(options.unusable === undefined ? {} : { unusable: options.unusable }),
+      ...(options.filtersTools === true ? { filtersTools: true } : {}),
+    });
+  }).pipe(withUserServers(settings, options));
+
 const ids = (resolved: { readonly servers: ReadonlyArray<McpUserServers.ResolvedMcpServer> }) =>
   resolved.servers.map((server) => server.id);
 
@@ -155,7 +180,7 @@ it.effect(
   "runs stdio servers in the thread's directory unless pinned, with the host PATH and disabled tools",
   () =>
     Effect.gen(function* () {
-      const { servers } = yield* resolve({
+      const settings = {
         mcpServers: {
           thread: stdio(true, { env: { API_URL: "https://api.test" } }),
           pinned: {
@@ -163,7 +188,13 @@ it.effect(
             disabledTools: ["delete_scene"],
           },
         },
-      });
+      };
+      // An agent without a tool filter is never sent the list.
+      assert.notProperty(
+        (yield* resolve(settings, { driver: "antigravity" })).servers[1],
+        "disabledTools",
+      );
+      const { servers } = yield* resolve(settings, { filtersTools: true });
       assert.deepEqual(servers, [
         {
           type: "stdio",
@@ -350,4 +381,36 @@ it.effect("leaves out the servers the caller knows will not start", () =>
     assert.deepEqual(ids(resolved), ["linear"]);
     assert.deepEqual(resolved.skipped, [{ id: McpServerId.make("jam"), reason: "Needs sign-in." }]);
   }),
+);
+
+it.effect(
+  "the session key follows settings, tokens and known failures, and tool switches only for agents that filter",
+  () =>
+    Effect.gen(function* () {
+      const settings = (disabledTools: ReadonlyArray<string>) => ({
+        mcpServers: {
+          jam: { ...http(true, { "X-Team": "core" }), disabledTools },
+          files: stdio(true),
+        },
+      });
+      const base = { tokens: { jam: "one" } };
+      const key = yield* sessionKey(settings([]), base);
+      assert.strictEqual(yield* sessionKey(settings([]), base), key);
+      for (const changed of [
+        sessionKey(settings([]), { tokens: { jam: "two" } }),
+        sessionKey(settings([]), { ...base, refreshDue: ["jam"] }),
+        sessionKey(settings([]), {
+          ...base,
+          unusable: new Map([[McpServerId.make("files"), "x"]]),
+        }),
+        sessionKey({ mcpServers: { jam: http(true, { "X-Team": "other" }) } }, base),
+      ]) {
+        assert.notStrictEqual(yield* changed, key);
+      }
+      assert.strictEqual(yield* sessionKey(settings(["delete_issue"]), base), key);
+      assert.notStrictEqual(
+        yield* sessionKey(settings(["delete_issue"]), { ...base, filtersTools: true }),
+        yield* sessionKey(settings([]), { ...base, filtersTools: true }),
+      );
+    }),
 );

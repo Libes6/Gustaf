@@ -5,6 +5,7 @@ import {
   type ProjectId,
   type ProviderDriverKind,
   type SecretReference,
+  type ServerSettings as ServerSettingsValue,
   type SettingsSecretValue,
 } from "@t3tools/contracts";
 import type { McpUserServer, NativeMcpSources } from "@t3tools/provider-core/server/mcpSession";
@@ -14,6 +15,7 @@ import { SpawnExecutableResolution } from "@t3tools/shared/shell";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
 
 import * as ManagedPolicy from "../policy/ManagedPolicy.ts";
 import { McpServerAuth } from "./McpServerAuth.ts";
@@ -55,10 +57,23 @@ export class McpUserServers extends Context.Service<
       readonly native?: NativeMcpSources;
       /** Servers the caller already knows will not start, with the reason; they are left out. */
       readonly unusable?: ReadonlyMap<McpServerId, string>;
+      /** Set for agents that honor `disabledTools`; others are never sent it. */
+      readonly filtersTools?: boolean;
     }) => Effect.Effect<{
       readonly servers: ReadonlyArray<ResolvedMcpServer>;
       readonly skipped: ReadonlyArray<SkippedMcpServer>;
     }>;
+    /**
+     * Changes when what `resolveForThread` would hand a session changes: settings, a sign-in's
+     * token or its refresh falling due, or the servers known not to start. It reads memory only,
+     * so it can run before every turn; native configs and secret values are not part of it.
+     */
+    readonly sessionKey: (input: {
+      readonly projectId: ProjectId;
+      readonly driver: ProviderDriverKind;
+      readonly unusable?: ReadonlyMap<McpServerId, string>;
+      readonly filtersTools?: boolean;
+    }) => Effect.Effect<string>;
     /** One server as a session would get it, or why it cannot start. */
     readonly resolveServer: (input: {
       readonly id: McpServerId;
@@ -71,6 +86,9 @@ export class McpUserServers extends Context.Service<
 >()("t3/mcpServers/McpUserServers") {}
 
 const WINDOWS_SHIM = /\.(?:cmd|bat)$/i;
+
+// Plain settings values and strings, which always serialize.
+const keyOf = (parts: unknown) => JSON.stringify(parts);
 
 /** An http server is sent a Gustaf sign-in's token unless the user set their own header. */
 export const usesGustafSignIn = ({ transport }: McpServerConfig) =>
@@ -87,6 +105,7 @@ const withSecrets = Effect.fnUntraced(function* (
   cwd: string,
   literal: (value: SettingsSecretValue) => string | undefined,
   bearer: string | undefined,
+  filtersTools = true,
 ): Effect.fn.Return<ResolvedMcpServer | { readonly unusable: string }> {
   const values: Record<string, string> = {};
   for (const [key, value] of Object.entries(slotsOf(server))) {
@@ -96,7 +115,7 @@ const withSecrets = Effect.fnUntraced(function* (
   }
   const { transport } = server;
   const disabledTools =
-    server.disabledTools === undefined || server.disabledTools.length === 0
+    !filtersTools || server.disabledTools === undefined || server.disabledTools.length === 0
       ? {}
       : { disabledTools: server.disabledTools };
   if (transport.type === "http") {
@@ -176,12 +195,25 @@ const make = Effect.gen(function* () {
       ) !== undefined;
   });
 
+  const enabledFor = (
+    current: Pick<ServerSettingsValue, "mcpServers" | "projectSettingsOverrides">,
+    input: { readonly projectId: ProjectId; readonly driver: ProviderDriverKind },
+  ) => {
+    const overrides = current.projectSettingsOverrides[input.projectId]?.mcpServers;
+    const localDenied = ManagedPolicy.deniedBy(policy, "localMcpServers") !== undefined;
+    return (Object.entries(current.mcpServers) as Array<[McpServerId, McpServerConfig]>)
+      .filter(([id, server]) => overrides?.[id]?.enabled ?? server.enabled)
+      .filter(([, server]) => server.providers?.includes(input.driver) ?? true)
+      .filter(([, server]) => !(localDenied && server.transport.type === "stdio"));
+  };
+
   const resolveForThread = Effect.fn("McpUserServers.resolveForThread")(function* (input: {
     readonly projectId: ProjectId;
     readonly driver: ProviderDriverKind;
     readonly cwd: string;
     readonly native?: NativeMcpSources;
     readonly unusable?: ReadonlyMap<McpServerId, string>;
+    readonly filtersTools?: boolean;
   }) {
     const none = { servers: [], skipped: [] };
     const current = yield* settings.getSettings.pipe(
@@ -193,12 +225,7 @@ const make = Effect.gen(function* () {
       }),
     );
     if (current === undefined) return none;
-    const overrides = current.projectSettingsOverrides[input.projectId]?.mcpServers;
-    const localDenied = ManagedPolicy.deniedBy(policy, "localMcpServers") !== undefined;
-    let enabled = (Object.entries(current.mcpServers) as Array<[McpServerId, McpServerConfig]>)
-      .filter(([id, server]) => overrides?.[id]?.enabled ?? server.enabled)
-      .filter(([, server]) => server.providers?.includes(input.driver) ?? true)
-      .filter(([, server]) => !(localDenied && server.transport.type === "stdio"));
+    let enabled = enabledFor(current, input);
     if (enabled.length === 0) return none;
     if (input.native !== undefined) {
       const isDuplicate = yield* nativeDuplicateFilter(input.native, input.cwd);
@@ -222,7 +249,14 @@ const make = Effect.gen(function* () {
       const known = input.unusable?.get(id);
       const result =
         known === undefined
-          ? yield* withSecrets(id, server, input.cwd, literal, yield* bearerFor(id, server))
+          ? yield* withSecrets(
+              id,
+              server,
+              input.cwd,
+              literal,
+              yield* bearerFor(id, server),
+              input.filtersTools === true,
+            )
           : { unusable: known };
       if ("unusable" in result) {
         yield* Effect.logWarning("MCP server left out of a session: it cannot start", {
@@ -259,7 +293,31 @@ const make = Effect.gen(function* () {
     );
   });
 
-  return McpUserServers.of({ resolveForThread, resolveServer });
+  const sessionKey = Effect.fn("McpUserServers.sessionKey")(function* (input: {
+    readonly projectId: ProjectId;
+    readonly driver: ProviderDriverKind;
+    readonly unusable?: ReadonlyMap<McpServerId, string>;
+    readonly filtersTools?: boolean;
+  }) {
+    const current = yield* settings.getSettings.pipe(Effect.option);
+    if (Option.isNone(current)) return keyOf(null);
+    const parts = yield* Effect.forEach(enabledFor(current.value, input), ([id, server]) =>
+      Effect.gen(function* () {
+        const { disabledTools: _disabledTools, ...rest } = server;
+        return [
+          id,
+          input.filtersTools === true ? server : rest,
+          server.transport.type === "http" && usesGustafSignIn(server)
+            ? yield* auth.tokenState(id, server.transport.url)
+            : null,
+          input.unusable?.has(id) === true,
+        ];
+      }),
+    );
+    return keyOf(parts);
+  });
+
+  return McpUserServers.of({ resolveForThread, resolveServer, sessionKey });
 });
 
 export const layer = Layer.effect(McpUserServers, make);

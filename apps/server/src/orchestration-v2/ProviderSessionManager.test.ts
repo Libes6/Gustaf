@@ -2640,6 +2640,7 @@ it.effect(
               skipped: [...(request.unusable ?? [])].map(([id, reason]) => ({ id, reason })),
             })),
           ),
+        sessionKey: () => Ref.get(enabled).pipe(Effect.map((servers) => JSON.stringify(servers))),
       });
       const effect = Effect.gen(function* () {
         const eventSink = yield* EventSink.EventSinkV2;
@@ -2704,9 +2705,7 @@ it.effect(
           runtimePolicy,
         });
         assert.deepEqual((yield* mcpSessions.read(joiner))?.userServers, opened?.userServers);
-        // The failed turn re-reads the servers before marking one failed.
         assert.deepEqual(yield* Ref.get(requests), [
-          { projectId, driver: CODEX_DRIVER, cwd: runtimePolicy.cwd, native, unusable },
           { projectId, driver: CODEX_DRIVER, cwd: runtimePolicy.cwd, native, unusable },
           { projectId, driver: CODEX_DRIVER, cwd: "/projects/user-mcp", native, unusable },
         ]);
@@ -2776,6 +2775,10 @@ const userMcpScenario = Effect.fnUntraced(function* () {
           skipped: [...(request.unusable ?? [])].map(([id, reason]) => ({ id, reason })),
         })),
       ),
+    sessionKey: (request) =>
+      Ref.get(enabled).pipe(
+        Effect.map((servers) => JSON.stringify([servers, [...(request.unusable?.keys() ?? [])]])),
+      ),
   });
   const mcpServerChecksLayer = Layer.mock(McpServerChecks.McpServerChecks)({
     knownUnusable: Ref.get(unusable),
@@ -2785,9 +2788,13 @@ const userMcpScenario = Effect.fnUntraced(function* () {
   return { enabled, unusable, mcpUserServersLayer, mcpServerChecksLayer };
 });
 
-it.effect.each([true, false] as const)(
-  "ProviderSessionManagerV2 reopens an exclusive session whose user MCP servers changed only when the agent aborts on them (%s)",
-  (abortsOnFailedMcpServer) =>
+it.effect.each([
+  { abortsOnFailedMcpServer: true, capabilities: ExclusiveCapabilities, reopens: true },
+  { abortsOnFailedMcpServer: false, capabilities: ExclusiveCapabilities, reopens: true },
+  { abortsOnFailedMcpServer: false, capabilities: CodexCapabilities, reopens: false },
+] as const)(
+  "ProviderSessionManagerV2 reopens an idle session whose user MCP servers changed unless other threads share it (%#)",
+  ({ abortsOnFailedMcpServer, capabilities, reopens }) =>
     Effect.gen(function* () {
       const state = yield* Ref.make(emptyState);
       const mcpConfigs = yield* Ref.make<
@@ -2820,11 +2827,9 @@ it.effect.each([true, false] as const)(
         const { openCount, closeCount } = yield* Ref.get(state);
         assert.deepEqual(
           { openCount, closeCount },
-          abortsOnFailedMcpServer
-            ? { openCount: 2, closeCount: 1 }
-            : { openCount: 1, closeCount: 0 },
+          reopens ? { openCount: 2, closeCount: 1 } : { openCount: 1, closeCount: 0 },
         );
-        if (abortsOnFailedMcpServer) {
+        if (reopens) {
           assert.deepEqual((yield* Ref.get(mcpConfigs)).at(-1)?.userServers, [jamServer("two")]);
         }
       });
@@ -2835,7 +2840,7 @@ it.effect.each([true, false] as const)(
             state,
             idleTimeoutMs: 60_000,
             mcpConfigs,
-            capabilities: ExclusiveCapabilities,
+            capabilities,
             abortsOnFailedMcpServer,
             mcpUserServersLayer: scenario.mcpUserServersLayer,
             mcpServerChecksLayer: scenario.mcpServerChecksLayer,

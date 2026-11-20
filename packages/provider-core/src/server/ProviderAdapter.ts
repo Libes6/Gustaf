@@ -761,6 +761,8 @@ export class ProviderAdapterV2 extends Context.Service<
      * known to fail are left out of its sessions.
      */
     readonly abortsOnFailedMcpServer?: boolean;
+    /** The agent honors a user MCP server's `disabledTools`; others are never sent the list. */
+    readonly filtersMcpTools?: boolean;
     /** The user MCP server a turn failure names as the one that did not start. */
     readonly failedMcpServerOf?: (
       failure: OrchestrationV2ProviderFailure,

@@ -318,11 +318,18 @@ Pi, OpenCode 1.x and external OpenCode servers are not supported.
 
 When an http server needs a sign-in, select **Sign in** next to it on web or
 desktop and finish in the browser. Gustaf keeps the sign-in on the environment
-and sends it to the agents that get the server, renewing it before it expires; a header named
+and sends its token to the agents that get the server; a header named
 `Authorization` that you set yourself takes its place. If the browser runs on
 another device than the environment, the page it lands on cannot load: copy that
-page's address into the field Gustaf shows and select **Finish**. Threads started
-before signing in get the server in their next session. **Sign out**, or removing
+page's address into the field Gustaf shows and select **Finish**.
+
+An agent gets the token when its session opens, renewed first if it is about to
+expire, and keeps that token while the session runs. Before your next message,
+an idle thread of Claude, Antigravity, Cursor and other agents with one session
+per thread reopens its session to pick up a new sign-in or a renewed token. Codex
+shares one session between threads, so it keeps the token until that session
+closes, normally after 30 minutes in which none of its threads is used; if the
+server starts refusing a long-running Codex thread, start a new thread. The same applies to servers you switch on or off. **Sign out**, or removing
 the server, deletes the sign-in. Gustaf can sign in only where the server lets apps register themselves
 (OAuth dynamic client registration); otherwise add its token as a header.
 

@@ -58,6 +58,14 @@ export class McpServerAuth extends Context.Service<
       options?: { readonly force?: boolean },
     ) => Effect.Effect<string | undefined>;
     readonly isSignedIn: (id: McpServerId, url: string) => Effect.Effect<boolean>;
+    /**
+     * The token `accessToken` would hand out now, read from memory without refreshing, and
+     * whether it is due for a refresh first. Cheap enough to compare before every turn.
+     */
+    readonly tokenState: (
+      id: McpServerId,
+      url: string,
+    ) => Effect.Effect<{ readonly token: string | undefined; readonly refreshDue: boolean }>;
     /** Changes whenever signing in or out changes what the server is sent. */
     readonly revision: (id: McpServerId) => Effect.Effect<number>;
     readonly signIn: (
@@ -365,15 +373,18 @@ const make = Effect.gen(function* () {
     return (yield* storeIfCurrent(id, next, revision)) ? next : yield* loginOf(id);
   });
 
+  const refreshDue = (login: Login, now: number) =>
+    login.refreshToken !== undefined &&
+    login.expiresAt !== undefined &&
+    login.expiresAt - REFRESH_MARGIN_MS <= now;
+
   const accessToken: McpServerAuth["Service"]["accessToken"] = Effect.fn(
     "McpServerAuth.accessToken",
   )(function* (id, url, options) {
     const login = yield* loginOf(id);
     if (login === undefined || login.serverUrl !== url) return undefined;
     const now = yield* Clock.currentTimeMillis;
-    const stale =
-      options?.force === true ||
-      (login.expiresAt !== undefined && login.expiresAt - REFRESH_MARGIN_MS <= now);
+    const stale = options?.force === true || refreshDue(login, now);
     if (!stale || login.refreshToken === undefined) return login.accessToken;
     const inFlight = refreshing.get(id);
     if (inFlight !== undefined) return yield* Deferred.await(inFlight);
@@ -700,6 +711,17 @@ const make = Effect.gen(function* () {
     accessToken,
     isSignedIn: Effect.fn("McpServerAuth.isSignedIn")(function* (id, url) {
       return (yield* loginOf(id))?.serverUrl === url;
+    }),
+    // Read per server before every turn; a span each would be noise.
+    tokenState: Effect.fnUntraced(function* (id, url) {
+      const login = yield* loginOf(id);
+      if (login === undefined || login.serverUrl !== url) {
+        return { token: undefined, refreshDue: false };
+      }
+      return {
+        token: login.accessToken,
+        refreshDue: refreshDue(login, yield* Clock.currentTimeMillis),
+      };
     }),
     // Read per server on every status list; a span each would be noise.
     revision: Effect.fnUntraced(function* (id) {

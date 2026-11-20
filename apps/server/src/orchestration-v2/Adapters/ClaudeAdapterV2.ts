@@ -5455,6 +5455,7 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
     instanceId: adapterOptions.instanceId,
     driver: CLAUDE_PROVIDER,
     ...(nativeMcpSources === undefined ? {} : { nativeMcpSources }),
+    filtersMcpTools: true,
     getCapabilities: Effect.fn("ClaudeAdapterV2.getCapabilities")(function () {
       return Effect.succeed(ClaudeProviderCapabilitiesV2);
     }),

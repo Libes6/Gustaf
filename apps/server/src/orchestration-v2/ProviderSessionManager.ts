@@ -6,6 +6,8 @@ import {
   McpServerId,
   ModelSelection,
   OrchestrationV2DomainEvent,
+  type ProjectId,
+  type ProviderDriverKind,
   OrchestrationV2ProviderSession,
   type OrchestrationV2PromptSuggestion,
   type OrchestrationV2ProviderFailure,
@@ -269,7 +271,7 @@ interface LiveSessionEntry {
   /** null marks an unknown catalog; undefined means MCP refresh is not configured. */
   readonly openedWithLinkedEnvironments: boolean | null | undefined;
   readonly linkedEnvironmentsByThread: ReadonlyMap<ThreadId, boolean | null>;
-  /** The user MCP servers the session started with, kept only for agents that cannot change them later. */
+  /** The user MCP servers the session started with; agents build their clients once, at open. */
   readonly openedWithUserMcpServers: OpenedUserMcpServers | undefined;
   /** Scope revocation to recorded credential ids so superseded sessions cannot revoke replacements opened before detach. */
   readonly mcpCredentialIdByThread: ReadonlyMap<ThreadId, string>;
@@ -289,9 +291,14 @@ interface LiveSessionEntry {
 }
 
 interface OpenedUserMcpServers {
-  readonly threadId: ThreadId;
-  readonly cwd: string | null;
+  /** `McpUserServers.sessionKey` at open; a different key now means the session is stale. */
   readonly key: string;
+  readonly keyInput: {
+    readonly projectId: ProjectId;
+    readonly driver: ProviderDriverKind;
+    readonly filtersTools: boolean;
+    readonly abortsOnFailedMcpServer: boolean;
+  };
   /** Only these can be the server a turn failed over. */
   readonly serverIds: ReadonlySet<string>;
 }
@@ -332,8 +339,6 @@ const sameUserServers = (
   previous: ReadonlyArray<unknown> | undefined,
   next: ReadonlyArray<unknown>,
 ) => JSON.stringify(previous ?? []) === JSON.stringify(next);
-const userServersKey = (servers: ReadonlyArray<unknown>, skipped: ReadonlyArray<unknown>) =>
-  JSON.stringify([servers, skipped]);
 
 function sessionKey(providerSessionId: ProviderSessionId): string {
   return String(providerSessionId);
@@ -511,8 +516,7 @@ export const layerWithOptions = (
       interface PreparedMcpCredential {
         readonly mcpCredentialId: string | undefined;
         readonly issued: boolean;
-        readonly userServersKey?: string;
-        readonly userServerIds?: ReadonlySet<string>;
+        readonly openedUserServers?: OpenedUserMcpServers;
       }
       /** ACP and OpenCode consume credentials during openSession; reserve them against revocation until publication. */
       const mcpCredentialReservations = new Map<string, number>();
@@ -533,10 +537,14 @@ export const layerWithOptions = (
       };
       const isMcpCredentialReserved = (threadId: ThreadId, mcpCredentialId: string) =>
         (mcpCredentialReservations.get(mcpReservationKey(threadId, mcpCredentialId)) ?? 0) > 0;
+      const knownUnusableFor = (abortsOnFailedMcpServer: boolean) =>
+        abortsOnFailedMcpServer && Option.isSome(mcpServerChecks)
+          ? mcpServerChecks.value.knownUnusable
+          : Effect.undefined;
       /** The user MCP servers for a thread's session, minus those its provider loads natively. */
       const resolveUserServers = Effect.fn("ProviderSessionManagerV2.resolveUserServers")(
         function* (threadId: ThreadId, providerInstanceId: ProviderInstanceId, cwd: string | null) {
-          const none = { servers: [], skipped: [] };
+          const none = { servers: [], skipped: [], opened: undefined };
           if (Option.isNone(mcpUserServers)) return none;
           const thread = yield* projectionStore.getThread(threadId).pipe(Effect.option);
           if (Option.isNone(thread)) return none;
@@ -558,28 +566,52 @@ export const layerWithOptions = (
             .pipe(Effect.orElseSucceed(() => undefined));
           if (adapter === undefined) return none;
           const native = adapter.nativeMcpSources;
-          const unusable =
-            adapter.abortsOnFailedMcpServer === true && Option.isSome(mcpServerChecks)
-              ? yield* mcpServerChecks.value.knownUnusable
-              : undefined;
-          return yield* mcpUserServers.value.resolveForThread({
+          const keyInput = {
+            projectId,
+            driver: adapter.driver,
+            filtersTools: adapter.filtersMcpTools === true,
+            abortsOnFailedMcpServer: adapter.abortsOnFailedMcpServer === true,
+          };
+          const unusable = yield* knownUnusableFor(keyInput.abortsOnFailedMcpServer);
+          const withUnusable = unusable === undefined || unusable.size === 0 ? {} : { unusable };
+          const filtersTools = keyInput.filtersTools ? { filtersTools: true } : {};
+          const { servers, skipped } = yield* mcpUserServers.value.resolveForThread({
             projectId,
             driver: adapter.driver,
             cwd: threadCwd,
             ...(native === undefined ? {} : { native }),
-            ...(unusable === undefined || unusable.size === 0 ? {} : { unusable }),
+            ...withUnusable,
+            ...filtersTools,
           });
+          const key = yield* mcpUserServers.value.sessionKey({
+            projectId,
+            driver: adapter.driver,
+            ...withUnusable,
+            ...filtersTools,
+          });
+          return {
+            servers,
+            skipped,
+            opened: {
+              key,
+              keyInput,
+              serverIds: new Set(servers.map((server) => server.id)),
+            } satisfies OpenedUserMcpServers,
+          };
         },
       );
       /** Whether a live session still carries the user MCP servers it would be opened with now. */
       const userMcpServersCurrent = Effect.fn("ProviderSessionManagerV2.userMcpServersCurrent")(
-        function* (entry: LiveSessionEntry, opened: OpenedUserMcpServers) {
-          const { servers, skipped } = yield* resolveUserServers(
-            opened.threadId,
-            entry.runtime.instanceId,
-            opened.cwd,
-          );
-          return userServersKey(servers, skipped) === opened.key;
+        function* (opened: OpenedUserMcpServers) {
+          if (Option.isNone(mcpUserServers)) return true;
+          const { abortsOnFailedMcpServer, filtersTools, ...input } = opened.keyInput;
+          const unusable = yield* knownUnusableFor(abortsOnFailedMcpServer);
+          const key = yield* mcpUserServers.value.sessionKey({
+            ...input,
+            ...(unusable === undefined || unusable.size === 0 ? {} : { unusable }),
+            ...(filtersTools ? { filtersTools: true } : {}),
+          });
+          return key === opened.key;
         },
       );
       /** A turn that failed over a user MCP server marks it failed, so the next session leaves it out. */
@@ -595,7 +627,7 @@ export const layerWithOptions = (
             return;
           }
           // A sign-in since open changed what the server gets; the next turn reopens with it instead.
-          if (!(yield* userMcpServersCurrent(entry, opened))) return;
+          if (!(yield* userMcpServersCurrent(opened))) return;
           yield* mcpServerChecks.value.markFailed({
             id: McpServerId.make(server.id),
             error: failure.message,
@@ -629,8 +661,11 @@ export const layerWithOptions = (
                   Effect.map((thread) => thread.lineage.relationshipToParent === "subagent"),
                   Effect.orElseSucceed(() => false),
                 );
-                const { servers: userServers, skipped: skippedUserServers } =
-                  yield* resolveUserServers(threadId, providerInstanceId, cwd);
+                const {
+                  servers: userServers,
+                  skipped: skippedUserServers,
+                  opened: openedUserServers,
+                } = yield* resolveUserServers(threadId, providerInstanceId, cwd);
                 const withUserServers = ({
                   userServers: _previous,
                   skippedUserServers: _previousSkipped,
@@ -664,7 +699,8 @@ export const layerWithOptions = (
                     // A credential issued while the lineage read failed is replaced once it works.
                     (resolved.thread.subagent === true) === subagent
                   ) {
-                    // Live clients keep the token; the next session starts the servers enabled now.
+                    // Live clients keep the servers they started with; an idle exclusive session
+                    // reopens with these (releaseForStaleMcp), a shared one keeps them.
                     if (
                       !sameUserServers(existing.userServers, userServers) ||
                       !sameUserServers(existing.skippedUserServers, skippedUserServers)
@@ -674,8 +710,7 @@ export const layerWithOptions = (
                     return {
                       mcpCredentialId: existing.providerSessionId,
                       issued: false,
-                      userServersKey: userServersKey(userServers, skippedUserServers),
-                      userServerIds: new Set(userServers.map((server) => server.id)),
+                      ...(openedUserServers === undefined ? {} : { openedUserServers }),
                     };
                   }
                   dropMcpCredentialReservation(threadId, existing.providerSessionId);
@@ -693,8 +728,7 @@ export const layerWithOptions = (
                 return {
                   mcpCredentialId: credential.config.providerSessionId,
                   issued: true,
-                  userServersKey: userServersKey(userServers, skippedUserServers),
-                  userServerIds: new Set(userServers.map((server) => server.id)),
+                  ...(openedUserServers === undefined ? {} : { openedUserServers }),
                 };
               }),
             );
@@ -2112,7 +2146,7 @@ export const layerWithOptions = (
           }
         }
         const opened = entry.openedWithUserMcpServers;
-        if (opened !== undefined && !(yield* userMcpServersCurrent(entry, opened))) {
+        if (opened !== undefined && !(yield* userMcpServersCurrent(opened))) {
           return "MCP servers changed; reopening the provider session.";
         }
         return undefined;
@@ -3018,15 +3052,7 @@ export const layerWithOptions = (
                 attachedThreadIds: new Set([input.threadId]),
                 loadedProviderThreadKeyByThread: new Map(),
                 openedWithLinkedEnvironments,
-                openedWithUserMcpServers:
-                  adapter.abortsOnFailedMcpServer === true && prepared.userServersKey !== undefined
-                    ? {
-                        threadId: input.threadId,
-                        cwd,
-                        key: prepared.userServersKey,
-                        serverIds: prepared.userServerIds ?? new Set(),
-                      }
-                    : undefined,
+                openedWithUserMcpServers: prepared.openedUserServers,
                 linkedEnvironmentsByThread: new Map(),
                 mcpCredentialIdByThread:
                   mcpCredentialId === undefined
