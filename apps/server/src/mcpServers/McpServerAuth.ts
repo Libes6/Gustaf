@@ -10,13 +10,14 @@ import {
 } from "@t3tools/contracts";
 import * as Clock from "effect/Clock";
 import * as Context from "effect/Context";
+import * as Deferred from "effect/Deferred";
+import * as Duration from "effect/Duration";
 import * as Digest from "effect/crypto/Digest";
 import * as SecureRandom from "effect/crypto/SecureRandom";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
-import * as Semaphore from "effect/Semaphore";
 import * as Stream from "effect/Stream";
 import * as HttpClient from "effect/http/HttpClient";
 import * as HttpClientRequest from "effect/http/HttpClientRequest";
@@ -37,6 +38,8 @@ const SIGN_IN_TTL_MS = 10 * 60_000;
 // A token this close to expiry is refreshed before a provider gets it.
 const REFRESH_MARGIN_MS = 60_000;
 const PROTOCOL_VERSION = "2025-06-18";
+// Sessions open and status checks wait on these calls; undici alone would wait 5 minutes.
+const OAUTH_TIMEOUT = Duration.seconds(10);
 
 /**
  * Signs in to the user's http MCP servers over OAuth (MCP Authorization: protected resource
@@ -125,6 +128,19 @@ const decodeOAuthError = Schema.decodeUnknownOption(OAuthErrorBody);
 
 const authError = (detail: string) => new McpServerAuthError({ detail });
 
+const withOAuthTimeout = <A, R>(effect: Effect.Effect<A, McpServerAuthError, R>) =>
+  effect.pipe(
+    Effect.timeoutOrElse({
+      duration: OAUTH_TIMEOUT,
+      orElse: () =>
+        Effect.fail(
+          authError(
+            `The server did not answer in ${Duration.toSeconds(OAUTH_TIMEOUT)} seconds. Try again later.`,
+          ),
+        ),
+    }),
+  );
+
 const secretName = (id: McpServerId) => `mcp-server-oauth-${base64UrlEncode(id)}`;
 
 const header = (response: HttpClientResponse.HttpClientResponse, name: string) =>
@@ -212,12 +228,14 @@ const make = Effect.gen(function* () {
   const httpClient = yield* HttpClient.HttpClient;
   const random = yield* SecureRandom.SecureRandom;
   const digester = yield* Digest.Digest;
-  const refreshLock = yield* Semaphore.make(1);
+  const serviceScope = yield* Effect.scope;
 
   // Logins read from the secret store; `null` is a server known to have none.
   const logins = new Map<McpServerId, Login | null>();
   const revisions = new Map<McpServerId, number>();
   const pending = new Map<string, PendingSignIn>();
+  // One refresh per server at a time; others join it, and other servers never wait on it.
+  const refreshing = new Map<McpServerId, Deferred.Deferred<string>>();
 
   const bump = (id: McpServerId) => revisions.set(id, (revisions.get(id) ?? 0) + 1);
 
@@ -298,7 +316,7 @@ const make = Effect.gen(function* () {
     return yield* decodeTokenResponse(json).pipe(
       Effect.mapError(() => authError("The authorization server sent no access token.")),
     );
-  });
+  }, withOAuthTimeout);
 
   const toLogin = Effect.fnUntraced(function* (
     serverUrl: string,
@@ -338,23 +356,28 @@ const make = Effect.gen(function* () {
       options?.force === true ||
       (login.expiresAt !== undefined && login.expiresAt - REFRESH_MARGIN_MS <= now);
     if (!stale || login.refreshToken === undefined) return login.accessToken;
-    return yield* refreshLock.withPermits(1)(
-      Effect.gen(function* () {
-        // Another caller may have refreshed while this one waited.
-        const current = (yield* loginOf(id)) ?? login;
-        if (current.accessToken !== login.accessToken) return current.accessToken;
-        const next = yield* refresh(id, current).pipe(
-          Effect.tapError((error) =>
-            Effect.logWarning("MCP server token could not be refreshed", {
-              mcpServerId: id,
-              detail: error.detail,
-            }),
-          ),
-          Effect.orElseSucceed(() => current),
-        );
-        return next.accessToken;
-      }),
+    const inFlight = refreshing.get(id);
+    if (inFlight !== undefined) return yield* Deferred.await(inFlight);
+    const refreshed = Deferred.makeUnsafe<string>();
+    refreshing.set(id, refreshed);
+    // Forked so a caller that gives up does not leave the others waiting.
+    yield* refresh(id, login).pipe(
+      Effect.tapError((error) =>
+        Effect.logWarning("MCP server token could not be refreshed", {
+          mcpServerId: id,
+          detail: error.detail,
+        }),
+      ),
+      Effect.orElseSucceed(() => login),
+      Effect.flatMap((next) => Deferred.succeed(refreshed, next.accessToken)),
+      Effect.ensuring(
+        Effect.sync(() => refreshing.delete(id)).pipe(
+          Effect.andThen(Deferred.succeed(refreshed, login.accessToken)),
+        ),
+      ),
+      Effect.forkIn(serviceScope),
     );
+    return yield* Deferred.await(refreshed);
   });
 
   const httpServer = Effect.fnUntraced(function* (id: McpServerId) {
@@ -467,7 +490,7 @@ const make = Effect.gen(function* () {
       resource: resource?.resource ?? serverUrl,
       ...(scope === undefined || scope === "" ? {} : { scope }),
     };
-  });
+  }, withOAuthTimeout);
 
   const register = Effect.fnUntraced(function* (registrationEndpoint: string, redirect: string) {
     const response = yield* httpClient
@@ -507,7 +530,7 @@ const make = Effect.gen(function* () {
         : { clientSecret: registration.client_secret }),
       clientAuth,
     };
-  });
+  }, withOAuthTimeout);
 
   const signIn: McpServerAuth["Service"]["signIn"] = Effect.fn("McpServerAuth.signIn")(function* ({
     id,

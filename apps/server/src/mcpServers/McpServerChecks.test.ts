@@ -6,9 +6,11 @@ import { assert, it } from "@effect/vitest";
 import { McpServerId, ServerSettings as ServerSettingsSchema } from "@t3tools/contracts";
 import * as SecretResolver from "@t3tools/secret-provider-core/server/SecretResolver";
 import * as Effect from "effect/Effect";
+import * as Fiber from "effect/Fiber";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 import { FetchHttpClient } from "effect/http";
+import * as TestClock from "effect/testing/TestClock";
 
 import * as ManagedPolicy from "../policy/ManagedPolicy.ts";
 import * as ServerSettings from "../serverSettings.ts";
@@ -212,4 +214,38 @@ it.effect("asks for sign-in on HTTP 401, checks again on refresh, and after sign
       ),
     );
   }).pipe(Effect.scoped),
+);
+
+it.effect("a token refresh that hangs counts against the check's timeout", () =>
+  Effect.gen(function* () {
+    const hung = Layer.mock(McpServerAuth)({
+      accessToken: () => Effect.never,
+      isSignedIn: () => Effect.succeed(true),
+      revision: () => Effect.succeed(1),
+    });
+    yield* Effect.gen(function* () {
+      const checks = yield* McpServerChecks.McpServerChecks;
+      const listed = yield* checks.list({}).pipe(Effect.forkChild);
+      yield* TestClock.adjust("15 seconds");
+      assert.deepEqual((yield* Fiber.join(listed)).servers, [
+        {
+          id: McpServerId.make("jam"),
+          status: "failed",
+          error: "No answer in 15 seconds.",
+          signedIn: true,
+        },
+      ]);
+    }).pipe(
+      Effect.provide(
+        layer(
+          {
+            mcpServers: {
+              jam: { enabled: true, transport: { type: "http", url: "https://mcp.jam.test/mcp" } },
+            },
+          },
+          hung,
+        ),
+      ),
+    );
+  }),
 );

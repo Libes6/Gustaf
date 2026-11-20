@@ -357,12 +357,19 @@ const make = Effect.gen(function* () {
     cwd: string,
     refreshToken: boolean,
   ) {
-    const resolved = yield* userServers.resolveServer({ id, server, cwd, refreshToken });
-    if ("unusable" in resolved) {
-      return { id, status: "failed", error: resolved.unusable } satisfies McpServerStatus;
-    }
     const stderr = { text: "" };
-    const connect = resolved.type === "stdio" ? startStdio(resolved, stderr) : startHttp(resolved);
+    // Resolving may refresh a sign-in's token over the network, so it shares the timeout.
+    const connect = userServers
+      .resolveServer({ id, server, cwd, refreshToken })
+      .pipe(
+        Effect.flatMap((resolved) =>
+          "unusable" in resolved
+            ? Effect.fail(failed(resolved.unusable))
+            : resolved.type === "stdio"
+              ? startStdio(resolved, stderr)
+              : startHttp(resolved),
+        ),
+      );
     return yield* connect.pipe(
       Effect.flatMap(inspect),
       Effect.scoped,

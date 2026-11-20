@@ -7,6 +7,7 @@ import { assert, it } from "@effect/vitest";
 import { McpServerId, ServerSettings as ServerSettingsSchema } from "@t3tools/contracts";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
+import * as Fiber from "effect/Fiber";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Queue from "effect/Queue";
@@ -17,6 +18,7 @@ import * as HttpClient from "effect/http/HttpClient";
 import * as HttpClientResponse from "effect/http/HttpClientResponse";
 
 import * as ServerSecretStore from "../auth/ServerSecretStore.ts";
+import { base64UrlEncode } from "../auth/utils.ts";
 import * as ServerConfig from "../config.ts";
 import * as ServerSettings from "../serverSettings.ts";
 import * as McpServerAuth from "./McpServerAuth.ts";
@@ -35,7 +37,10 @@ const bodyText = (body: unknown) =>
  * A server that refuses without a token and points at its authorization server through the
  * challenge, as `jam` does; the authorization server registers clients and checks PKCE.
  */
-const fakeAuthorizationServer = (routes: Record<string, () => Response> = {}) => {
+/** A route answering `undefined` never answers, like a hung authorization server. */
+type Routes = Record<string, () => Response | undefined>;
+
+const fakeAuthorizationServer = (routes: Routes = {}) => {
   const calls: Array<string> = [];
   let challenge: string | undefined;
   const client = HttpClient.make((request) => {
@@ -47,7 +52,10 @@ const fakeAuthorizationServer = (routes: Record<string, () => Response> = {}) =>
     const form = new URLSearchParams(bodyText(request.body));
     const override = routes[route];
     if (override !== undefined) {
-      return Effect.succeed(HttpClientResponse.fromWeb(request, override()));
+      const response = override();
+      return response === undefined
+        ? Effect.never
+        : Effect.succeed(HttpClientResponse.fromWeb(request, response));
     }
     switch (route) {
       case `POST ${serverUrl}`:
@@ -121,7 +129,7 @@ const setup = ({
 }: {
   readonly settingsLayer?: Layer.Layer<ServerSettings.ServerSettingsService>;
   readonly onRemove?: (name: string) => Effect.Effect<void>;
-  readonly routes?: Record<string, () => Response>;
+  readonly routes?: Routes;
   readonly host?: string;
 } = {}) => {
   const secrets = new Map<string, Uint8Array>();
@@ -319,5 +327,45 @@ it.effect.each([
     assert.include(error.detail, detail);
     assert.notInclude(fake.calls, "POST https://auth.jam.test/register");
     assert.strictEqual(secrets.size, 0);
+  }).pipe(Effect.provide(layer));
+});
+
+/** A stored sign-in whose token has expired, as `completeSignIn` would have saved it. */
+const storeExpiredLogin = (
+  secrets: Map<string, Uint8Array>,
+  serverId: McpServerId,
+  tokenEndpoint: string,
+) =>
+  secrets.set(
+    `mcp-server-oauth-${base64UrlEncode(serverId)}`,
+    new TextEncoder().encode(
+      JSON.stringify({
+        tokenEndpoint,
+        resource: serverUrl,
+        clientId: "gustaf-client",
+        clientAuth: "none",
+        serverUrl,
+        accessToken: "access-1",
+        refreshToken: "refresh-1",
+        expiresAt: 0,
+      }),
+    ),
+  );
+
+it.effect("a hung authorization server delays neither another server nor past its timeout", () => {
+  const { secrets, layer } = setup({
+    routes: { "POST https://auth.hung.test/token": () => undefined },
+  });
+  const hung = McpServerId.make("hung");
+  storeExpiredLogin(secrets, hung, "https://auth.hung.test/token");
+  storeExpiredLogin(secrets, id, "https://auth.jam.test/token");
+  return Effect.gen(function* () {
+    const auth = yield* McpServerAuth.McpServerAuth;
+    const waiting = yield* auth.accessToken(hung, serverUrl).pipe(Effect.forkChild);
+    assert.strictEqual(yield* auth.accessToken(id, serverUrl), "access-2");
+
+    yield* TestClock.adjust("10 seconds");
+    // The session opens with the token it has; the agent's own 401 tells the user.
+    assert.strictEqual(yield* Fiber.join(waiting), "access-1");
   }).pipe(Effect.provide(layer));
 });
