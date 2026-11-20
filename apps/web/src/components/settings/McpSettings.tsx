@@ -244,6 +244,15 @@ function McpEnvironmentSettings({
     return (
       <div className="grid gap-2 px-4 pb-3">
         <p className="text-sm text-muted-foreground">{t("settingsE.mcp.signIn.pasteHint")}</p>
+        {/* Opened after an await, the window can be blocked as a popup; this link always works. */}
+        <a
+          href={awaiting.authUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="justify-self-start text-sm text-muted-foreground underline underline-offset-2 hover:text-foreground"
+        >
+          {t("settingsE.mcp.signIn.openPage")}
+        </a>
         <div className="flex gap-2">
           <Input
             aria-label={t("settingsE.mcp.signIn.pasteLabel")}

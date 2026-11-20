@@ -78,6 +78,7 @@ export const settingsEMessages = {
     "settingsE.mcp.signIn.signOut": "Sign out",
     "settingsE.mcp.signIn.pasteHint":
       "Finish signing in in the browser. On this computer Gustaf picks it up by itself; if the browser then shows a page that cannot be opened, copy that page's address here.",
+    "settingsE.mcp.signIn.openPage": "Open the sign-in page",
     "settingsE.mcp.signIn.pasteLabel": "Address after signing in",
     "settingsE.mcp.signIn.finish": "Finish",
     "settingsE.mcp.signIn.cancel": "Cancel",
@@ -727,6 +728,7 @@ export const settingsEMessages = {
     "settingsE.mcp.signIn.signOut": "Выйти",
     "settingsE.mcp.signIn.pasteHint":
       "Завершите вход в браузере. На этом компьютере Gustaf подхватит его сам; если браузер затем покажет страницу, которая не открывается, скопируйте сюда её адрес.",
+    "settingsE.mcp.signIn.openPage": "Открыть страницу входа",
     "settingsE.mcp.signIn.pasteLabel": "Адрес после входа",
     "settingsE.mcp.signIn.finish": "Готово",
     "settingsE.mcp.signIn.cancel": "Отмена",
