@@ -268,6 +268,8 @@ interface LiveSessionEntry {
   /** null marks an unknown catalog; undefined means MCP refresh is not configured. */
   readonly openedWithLinkedEnvironments: boolean | null | undefined;
   readonly linkedEnvironmentsByThread: ReadonlyMap<ThreadId, boolean | null>;
+  /** The user MCP servers the session started with, kept only for agents that cannot change them later. */
+  readonly openedWithUserMcpServers: OpenedUserMcpServers | undefined;
   /** Scope revocation to recorded credential ids so superseded sessions cannot revoke replacements opened before detach. */
   readonly mcpCredentialIdByThread: ReadonlyMap<ThreadId, string>;
   readonly supportsMultipleProviderThreads: boolean;
@@ -283,6 +285,12 @@ interface LiveSessionEntry {
   readonly idleFiber: Fiber.Fiber<void, never> | null;
   readonly pinnedSinceMs: number | null;
   readonly idleThreadUnloads: ReadonlyMap<ThreadId, IdleThreadUnload>;
+}
+
+interface OpenedUserMcpServers {
+  readonly threadId: ThreadId;
+  readonly cwd: string | null;
+  readonly key: string;
 }
 
 interface IdleThreadUnload {
@@ -321,6 +329,8 @@ const sameUserServers = (
   previous: ReadonlyArray<unknown> | undefined,
   next: ReadonlyArray<unknown>,
 ) => JSON.stringify(previous ?? []) === JSON.stringify(next);
+const userServersKey = (servers: ReadonlyArray<unknown>, skipped: ReadonlyArray<unknown>) =>
+  JSON.stringify([servers, skipped]);
 
 function sessionKey(providerSessionId: ProviderSessionId): string {
   return String(providerSessionId);
@@ -498,6 +508,7 @@ export const layerWithOptions = (
       interface PreparedMcpCredential {
         readonly mcpCredentialId: string | undefined;
         readonly issued: boolean;
+        readonly userServersKey?: string;
       }
       /** ACP and OpenCode consume credentials during openSession; reserve them against revocation until publication. */
       const mcpCredentialReservations = new Map<string, number>();
@@ -518,22 +529,6 @@ export const layerWithOptions = (
       };
       const isMcpCredentialReserved = (threadId: ThreadId, mcpCredentialId: string) =>
         (mcpCredentialReservations.get(mcpReservationKey(threadId, mcpCredentialId)) ?? 0) > 0;
-      /** A turn that failed over a user MCP server marks it failed, so the next session leaves it out. */
-      const markFailedMcpServer = Effect.fn("ProviderSessionManagerV2.markFailedMcpServer")(
-        function* (
-          providerInstanceId: ProviderInstanceId,
-          failure: OrchestrationV2ProviderFailure,
-        ) {
-          if (Option.isNone(mcpServerChecks)) return;
-          const adapter = yield* registry
-            .get(providerInstanceId)
-            .pipe(Effect.orElseSucceed(() => undefined));
-          const server = adapter?.failedMcpServerOf?.(failure);
-          if (server !== undefined)
-            yield* mcpServerChecks.value.markFailed(server, failure.message);
-        },
-      );
-
       /** The user MCP servers for a thread's session, minus those its provider loads natively. */
       const resolveUserServers = Effect.fn("ProviderSessionManagerV2.resolveUserServers")(
         function* (threadId: ThreadId, providerInstanceId: ProviderInstanceId, cwd: string | null) {
@@ -570,6 +565,32 @@ export const layerWithOptions = (
             ...(native === undefined ? {} : { native }),
             ...(unusable === undefined || unusable.size === 0 ? {} : { unusable }),
           });
+        },
+      );
+      /** Whether a live session still carries the user MCP servers it would be opened with now. */
+      const userMcpServersCurrent = Effect.fn("ProviderSessionManagerV2.userMcpServersCurrent")(
+        function* (entry: LiveSessionEntry, opened: OpenedUserMcpServers) {
+          const { servers, skipped } = yield* resolveUserServers(
+            opened.threadId,
+            entry.runtime.instanceId,
+            opened.cwd,
+          );
+          return userServersKey(servers, skipped) === opened.key;
+        },
+      );
+      /** A turn that failed over a user MCP server marks it failed, so the next session leaves it out. */
+      const markFailedMcpServer = Effect.fn("ProviderSessionManagerV2.markFailedMcpServer")(
+        function* (entry: LiveSessionEntry, failure: OrchestrationV2ProviderFailure) {
+          if (Option.isNone(mcpServerChecks)) return;
+          const adapter = yield* registry
+            .get(entry.runtime.instanceId)
+            .pipe(Effect.orElseSucceed(() => undefined));
+          const server = adapter?.failedMcpServerOf?.(failure);
+          if (server === undefined) return;
+          // A sign-in since open changed what the server gets; the next turn reopens with it instead.
+          const opened = entry.openedWithUserMcpServers;
+          if (opened !== undefined && !(yield* userMcpServersCurrent(entry, opened))) return;
+          yield* mcpServerChecks.value.markFailed(server, failure.message);
         },
       );
       const mcpPrepareLock = yield* KeyedLock.make<ThreadId>();
@@ -640,7 +661,11 @@ export const layerWithOptions = (
                     ) {
                       yield* mcpSessions.set(withUserServers(existing));
                     }
-                    return { mcpCredentialId: existing.providerSessionId, issued: false };
+                    return {
+                      mcpCredentialId: existing.providerSessionId,
+                      issued: false,
+                      userServersKey: userServersKey(userServers, skippedUserServers),
+                    };
                   }
                   dropMcpCredentialReservation(threadId, existing.providerSessionId);
                 }
@@ -654,7 +679,11 @@ export const layerWithOptions = (
                 });
                 yield* mcpSessions.set(withUserServers(credential.config));
                 reserveMcpCredential(threadId, credential.config.providerSessionId);
-                return { mcpCredentialId: credential.config.providerSessionId, issued: true };
+                return {
+                  mcpCredentialId: credential.config.providerSessionId,
+                  issued: true,
+                  userServersKey: userServersKey(userServers, skippedUserServers),
+                };
               }),
             );
       const clearMcpSession = (threadId: ThreadId, mcpCredentialId?: string) =>
@@ -2058,25 +2087,38 @@ export const layerWithOptions = (
         );
       });
 
+      const staleMcpDetail = Effect.fn("ProviderSessionManager.staleMcpDetail")(function* (
+        entry: LiveSessionEntry,
+      ) {
+        if (entry.openedWithLinkedEnvironments !== undefined) {
+          const linkedEnvironments = yield* readLinkedEnvironments;
+          if (
+            typeof linkedEnvironments === "boolean" &&
+            linkedEnvironments !== entry.openedWithLinkedEnvironments
+          ) {
+            return "Linked environments changed; reopening the provider session.";
+          }
+        }
+        const opened = entry.openedWithUserMcpServers;
+        if (opened !== undefined && !(yield* userMcpServersCurrent(entry, opened))) {
+          return "MCP servers changed; reopening the provider session.";
+        }
+        return undefined;
+      });
+
       /** An exclusive runtime configures MCP at open, so it reopens once nothing would be lost. */
-      const releaseForLinkedEnvironments = Effect.fn(
-        "ProviderSessionManager.releaseForLinkedEnvironments",
-      )(function* (entry: LiveSessionEntry) {
+      const releaseForStaleMcp = Effect.fn("ProviderSessionManager.releaseForStaleMcp")(function* (
+        entry: LiveSessionEntry,
+      ) {
         if (
           entry.supportsMultipleProviderThreads ||
           entry.runtime.canResumeAfterRestart === false ||
-          entry.openedWithLinkedEnvironments === undefined ||
           entry.busyTurns.size > 0
         ) {
           return;
         }
-        const linkedEnvironments = yield* readLinkedEnvironments;
-        if (
-          typeof linkedEnvironments !== "boolean" ||
-          linkedEnvironments === entry.openedWithLinkedEnvironments
-        ) {
-          return;
-        }
+        const detail = yield* staleMcpDetail(entry);
+        if (detail === undefined) return;
         const providerSessionId = entry.runtime.providerSessionId;
         // Any activity during these reads bumps the generation and keeps the runtime.
         const generation = entry.idleGeneration;
@@ -2113,7 +2155,7 @@ export const layerWithOptions = (
         yield* releaseEntry({
           providerSessionId,
           reason: "idle_timeout",
-          detail: "Linked environments changed; reopening the provider session.",
+          detail,
           onlyIfIdleGeneration: generation,
           keepIf: hasUnfinishedRecords,
         }).pipe(logReleaseFailure(providerSessionId));
@@ -2755,7 +2797,7 @@ export const layerWithOptions = (
                     return;
                   }
                   if (event.type === "turn.terminal" && event.failure !== null) {
-                    yield* markFailedMcpServer(entry.runtime.instanceId, event.failure);
+                    yield* markFailedMcpServer(entry, event.failure);
                   }
                   yield* publishToSubscribers(entry.eventSubscribers, { type: "event", event });
                   yield* releaseLiveOutput;
@@ -2858,7 +2900,7 @@ export const layerWithOptions = (
               }
               const key = sessionKey(input.providerSessionId);
               const live = (yield* Ref.get(sessions)).get(key);
-              if (live !== undefined) yield* releaseForLinkedEnvironments(live);
+              if (live !== undefined) yield* releaseForStaleMcp(live);
               const existing = (yield* Ref.get(sessions)).get(key);
               if (existing !== undefined) {
                 const attached = existing.attachedThreadIds.has(input.threadId);
@@ -2964,6 +3006,10 @@ export const layerWithOptions = (
                 attachedThreadIds: new Set([input.threadId]),
                 loadedProviderThreadKeyByThread: new Map(),
                 openedWithLinkedEnvironments,
+                openedWithUserMcpServers:
+                  adapter.abortsOnFailedMcpServer === true && prepared.userServersKey !== undefined
+                    ? { threadId: input.threadId, cwd, key: prepared.userServersKey }
+                    : undefined,
                 linkedEnvironmentsByThread: new Map(),
                 mcpCredentialIdByThread:
                   mcpCredentialId === undefined
