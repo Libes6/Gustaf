@@ -273,11 +273,15 @@ local work, resolve it yourself before automatic pulls can resume.
 
 ## MCP servers
 
-Add an MCP server once in **Settings → MCP** on web or desktop to give Claude,
-Codex, Cursor, OpenCode and ACP agents access to its tools. You can enter its
-configuration or import it from a native agent config. Review imported commands
-before enabling them. A server a provider already loads from its native config
-is not started a second time.
+Add an MCP server once in **Settings → MCP** on web or desktop to share its
+tools with your agents: Claude, Codex, Cursor, OpenCode and ACP agents. You can
+enter its configuration or import it from a native agent config. Review imported
+commands before enabling them. A server a provider already loads from its native
+config is not started a second time.
+
+By default a server goes to every agent. To give it to some agents only, select
+**Edit**, choose **Selected agents** under **Agents** and tick them. A server
+imported from an agent's config goes only to that agent; change it the same way.
 
 Each enabled server shows whether it works: how many tools it offers, that it
 needs a sign-in, or the error it stopped with. Gustaf checks when you open the
@@ -294,7 +298,8 @@ failed here until you select **Refresh**.
 
 To switch off single tools of a connected server, select **Tools** next to it.
 Tools are grouped into reads and writes by what the server declares, and a tool
-the server adds later starts switched on. Only Claude and Codex hide switched-off
+the server adds later starts switched on. While the server is not connected,
+**Tools** lists only the tools you switched off, so you can switch them back on. Only Claude and Codex hide switched-off
 tools; other agents still get every tool, and the window names them. Running
 threads may keep the old list until their next session.
 
@@ -313,7 +318,7 @@ Pi, OpenCode 1.x and external OpenCode servers are not supported.
 
 When an http server needs a sign-in, select **Sign in** next to it on web or
 desktop and finish in the browser. Gustaf keeps the sign-in on the environment
-and sends it to every agent, renewing it before it expires; a header named
+and sends it to the agents that get the server, renewing it before it expires; a header named
 `Authorization` that you set yourself takes its place. If the browser runs on
 another device than the environment, the page it lands on cannot load: copy that
 page's address into the field Gustaf shows and select **Finish**. Threads started
