@@ -20,6 +20,8 @@ export const settingsEMessages = {
     "settingsE.mcp.agentsOnly": "Only {names}",
     "settingsE.mcp.importAgents":
       "A server imported from an agent's config goes to that agent only; change it in Edit.",
+    "settingsE.mcp.importAgentsProject":
+      "A server imported from an agent's config goes to that agent only; change it in the environment's MCP settings.",
     "settingsE.mcp.idHint":
       "Use 1–32 lowercase letters, digits or hyphens, starting with a letter or digit.",
     "settingsE.mcp.idTaken": "This server ID is already in use.",
@@ -674,6 +676,8 @@ export const settingsEMessages = {
     "settingsE.mcp.agentsOnly": "Только {names}",
     "settingsE.mcp.importAgents":
       "Сервер из настроек агента получает только этот агент; изменить можно в «Изменить».",
+    "settingsE.mcp.importAgentsProject":
+      "Сервер из настроек агента получает только этот агент; изменить это можно в настройках MCP окружения.",
     "settingsE.mcp.idHint":
       "От 1 до 32 строчных латинских букв, цифр и дефисов. Начните с буквы или цифры.",
     "settingsE.mcp.idTaken": "Этот идентификатор сервера уже занят.",

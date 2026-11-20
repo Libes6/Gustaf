@@ -575,7 +575,12 @@ function McpEnvironmentSettings({
             <DialogHeader>
               <DialogTitle>{t("settingsE.mcp.s7")}</DialogTitle>
               <DialogDescription>
-                {t("settingsE.mcp.s15")} {t("settingsE.mcp.importAgents")}
+                {t("settingsE.mcp.s15")}{" "}
+                {t(
+                  projectIds.length === 0
+                    ? "settingsE.mcp.importAgents"
+                    : "settingsE.mcp.importAgentsProject",
+                )}
               </DialogDescription>
             </DialogHeader>
             <DialogPanel>
