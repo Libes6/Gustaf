@@ -157,10 +157,19 @@ function McpEnvironmentSettings({
   const signIn = useAtomCommand(serverEnvironment.signInMcpServer);
   const submitSignIn = useAtomCommand(serverEnvironment.submitMcpServerSignInCallback);
   const signOut = useAtomCommand(serverEnvironment.signOutMcpServer);
-  // A sign-in whose browser may be on another device; its landing address can be pasted.
-  const [awaitingSignIn, setAwaitingSignIn] = useState<{ id: McpServerId; url: string } | null>(
-    null,
-  );
+  // Sign-ins whose browser may be on another device; each landing address can be pasted.
+  const [awaitingSignIn, setAwaitingSignIn] = useState<
+    Readonly<Partial<Record<McpServerId, { url: string; authUrl: string }>>>
+  >({});
+  const awaitingIds = Object.keys(awaitingSignIn) as McpServerId[];
+  function setAwaiting(id: McpServerId, value: { url: string; authUrl: string } | undefined) {
+    setAwaitingSignIn((previous) => {
+      const next: Partial<Record<McpServerId, { url: string; authUrl: string }>> = { ...previous };
+      if (value === undefined) delete next[id];
+      else next[id] = value;
+      return next;
+    });
+  }
   const [signingIn, setSigningIn] = useState(false);
   async function startSignIn(id: McpServerId) {
     setSigningIn(true);
@@ -168,18 +177,16 @@ function McpEnvironmentSettings({
     setSigningIn(false);
     if (result._tag !== "Success") return;
     void ensureLocalApi().shell.openExternal(result.value.authUrl);
-    setAwaitingSignIn({ id, url: "" });
+    setAwaiting(id, { url: "", authUrl: result.value.authUrl });
   }
-  async function finishSignIn() {
-    if (!awaitingSignIn?.url.trim()) return;
+  async function finishSignIn(id: McpServerId) {
+    const callbackUrl = awaitingSignIn[id]?.url.trim();
+    if (!callbackUrl) return;
     setSigningIn(true);
-    const result = await submitSignIn({
-      environmentId,
-      input: { callbackUrl: awaitingSignIn.url.trim() },
-    });
+    const result = await submitSignIn({ environmentId, input: { callbackUrl } });
     setSigningIn(false);
     if (result._tag !== "Success") return;
-    setAwaitingSignIn(null);
+    setAwaiting(result.value.id, undefined);
     await refreshStatuses([result.value.id]);
   }
   async function endSignIn(id: McpServerId) {
@@ -189,29 +196,28 @@ function McpEnvironmentSettings({
     if (result._tag === "Success") await refreshStatuses([id]);
   }
   const recheckAwaited = useEffectEvent(async () => {
-    if (awaitingSignIn === null) return;
-    const result = await refreshStatuses([awaitingSignIn.id]);
-    const status =
-      result._tag === "Success"
-        ? result.value.servers.find((server) => server.id === awaitingSignIn.id)
-        : undefined;
-    if (status?.signedIn) setAwaitingSignIn(null);
+    if (awaitingIds.length === 0) return;
+    const result = await refreshStatuses(awaitingIds);
+    if (result._tag !== "Success") return;
+    for (const server of result.value.servers) {
+      if (server.signedIn && awaitingIds.includes(server.id)) setAwaiting(server.id, undefined);
+    }
   });
-  const awaitingId = awaitingSignIn?.id;
+  const awaitingAny = awaitingIds.length > 0;
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- A sign-in finished in the browser lands on the environment; returning to the window is when to look.
   useEffect(() => {
-    if (awaitingId === undefined) return;
+    if (!awaitingAny) return;
     const onFocus = () => void recheckAwaited();
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
-  }, [awaitingId]);
+  }, [awaitingAny]);
   function currentStatus(id: McpServerId) {
     return currentMcpStatus(checked, id, settings.mcpServers[id]);
   }
   function signInControl(id: McpServerId) {
     const status = currentStatus(id);
     // A stored sign-in the server no longer accepts offers both: sign in again, or drop it.
-    const canSignIn = status?.status === "needs-auth" && awaitingSignIn?.id !== id;
+    const canSignIn = status?.status === "needs-auth" && awaitingSignIn[id] === undefined;
     return (
       <>
         {canSignIn && (
@@ -230,6 +236,33 @@ function McpEnvironmentSettings({
           </Button>
         )}
       </>
+    );
+  }
+  function signInPrompt(id: McpServerId) {
+    const awaiting = awaitingSignIn[id];
+    if (awaiting === undefined) return null;
+    return (
+      <div className="grid gap-2 px-4 pb-3">
+        <p className="text-sm text-muted-foreground">{t("settingsE.mcp.signIn.pasteHint")}</p>
+        <div className="flex gap-2">
+          <Input
+            aria-label={t("settingsE.mcp.signIn.pasteLabel")}
+            placeholder="http://127.0.0.1:…/mcp-oauth/callback?code=…"
+            value={awaiting.url}
+            onChange={(event) => setAwaiting(id, { ...awaiting, url: event.target.value })}
+          />
+          <Button
+            size="sm"
+            disabled={signingIn || !awaiting.url.trim()}
+            onClick={() => finishSignIn(id)}
+          >
+            {t("settingsE.mcp.signIn.finish")}
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => setAwaiting(id, undefined)}>
+            {t("settingsE.mcp.signIn.cancel")}
+          </Button>
+        </div>
+      </div>
     );
   }
   function statusLine(id: McpServerId) {
@@ -491,33 +524,7 @@ function McpEnvironmentSettings({
                 </div>
               }
             >
-              {awaitingSignIn?.id === id && (
-                <div className="grid gap-2 px-4 pb-3">
-                  <p className="text-sm text-muted-foreground">
-                    {t("settingsE.mcp.signIn.pasteHint")}
-                  </p>
-                  <div className="flex gap-2">
-                    <Input
-                      aria-label={t("settingsE.mcp.signIn.pasteLabel")}
-                      placeholder="http://127.0.0.1:…/mcp-oauth/callback?code=…"
-                      value={awaitingSignIn.url}
-                      onChange={(event) =>
-                        setAwaitingSignIn({ ...awaitingSignIn, url: event.target.value })
-                      }
-                    />
-                    <Button
-                      size="sm"
-                      disabled={signingIn || !awaitingSignIn.url.trim()}
-                      onClick={finishSignIn}
-                    >
-                      {t("settingsE.mcp.signIn.finish")}
-                    </Button>
-                    <Button size="sm" variant="ghost" onClick={() => setAwaitingSignIn(null)}>
-                      {t("settingsE.mcp.signIn.cancel")}
-                    </Button>
-                  </div>
-                </div>
-              )}
+              {signInPrompt(id)}
             </SettingsRow>
           ),
         )}
