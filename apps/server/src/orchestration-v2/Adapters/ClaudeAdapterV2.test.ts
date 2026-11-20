@@ -564,6 +564,7 @@ describe("ClaudeAdapterV2 MCP query overrides", () => {
           args: ["blender-mcp"],
           env: { PATH: "/usr/bin", TOKEN: "stdio-secret" },
           cwd: "/workspace",
+          disabledTools: ["delete_object", "render.image"],
         },
         {
           type: "http",
@@ -585,6 +586,7 @@ describe("ClaudeAdapterV2 MCP query overrides", () => {
         ...ClaudeAdapterV2.CLAUDE_READ_ONLY_ALLOWED_TOOLS,
         ...ClaudeAdapterV2.CLAUDE_READ_ONLY_T3_MCP_ALLOWED_TOOLS,
       ],
+      disallowedTools: ["mcp__blender__delete_object", "mcp__blender__render_image"],
       mcpServers: {
         blender: {
           type: "stdio",
@@ -603,7 +605,7 @@ describe("ClaudeAdapterV2 MCP query overrides", () => {
     assert.isFalse(overrides.allowedTools?.includes(ClaudeAdapterV2.CLAUDE_T3_MCP_TOOL_WILDCARD));
   });
 
-  it("invalidates live-query reuse when MCP credentials rotate", () => {
+  it("invalidates live-query reuse when MCP credentials or disabled tools change", () => {
     const threadId = ThreadId.make("thread-claude-mcp-credential-rotation");
     const mcpSession = mcpSessionFor(threadId);
     const queryPolicy = ClaudeAdapterV2.claudeRuntimeQueryPolicyForRuntimePolicy(
@@ -626,6 +628,27 @@ describe("ClaudeAdapterV2 MCP query overrides", () => {
       }),
     );
     assert.notEqual(rotatedKey, initialKey);
+
+    const withServer = (disabledTools?: ReadonlyArray<string>) =>
+      ClaudeAdapterV2.claudeEffectiveQueryPolicyKey(
+        queryPolicy,
+        ClaudeAdapterV2.claudeMcpQueryOverrides({
+          mcpSession: {
+            ...mcpSession,
+            userServers: [
+              {
+                type: "http",
+                id: "figma",
+                url: "https://mcp.figma.test/mcp",
+                headers: {},
+                ...(disabledTools === undefined ? {} : { disabledTools }),
+              },
+            ],
+          },
+          readOnlySandbox: false,
+        }),
+      );
+    assert.notEqual(withServer(["get_file"]), withServer());
   });
 
   it("matches the read-only allowlist to the orchestrator toolkit annotations", () => {

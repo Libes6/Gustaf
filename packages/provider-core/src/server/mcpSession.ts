@@ -1,7 +1,7 @@
 import type { EnvironmentId, ProviderInstanceId, ThreadId } from "@t3tools/contracts";
 
 /** A user MCP server the provider starts itself, resolved for one thread (secrets read). */
-export type McpUserServer =
+export type McpUserServer = (
   | {
       readonly type: "stdio";
       readonly id: string;
@@ -16,7 +16,11 @@ export type McpUserServer =
       readonly id: string;
       readonly url: string;
       readonly headers: Readonly<Record<string, string>>;
-    };
+    }
+) & {
+  /** Tool names the provider must not offer, for providers that can filter them. */
+  readonly disabledTools?: ReadonlyArray<string>;
+};
 
 /**
  * MCP config a provider instance loads by itself. Gustaf leaves a user server out of the session
