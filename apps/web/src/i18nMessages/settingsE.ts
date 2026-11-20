@@ -11,6 +11,13 @@ export const settingsEMessages = {
     "settingsE.mcp.name": "Name",
     "settingsE.mcp.secretValue": "Secret value",
     "settingsE.mcp.advanced": "Advanced settings",
+    "settingsE.mcp.agents": "Agents",
+    "settingsE.mcp.agentsAll": "All agents",
+    "settingsE.mcp.agentsSelected": "Selected agents",
+    "settingsE.mcp.agentsNone": "No agents",
+    "settingsE.mcp.agentsOnly": "Only {names}",
+    "settingsE.mcp.importAgents":
+      "A server imported from an agent's config goes to that agent only; change it in Edit.",
     "settingsE.mcp.idHint":
       "Use 1–32 lowercase letters, digits or hyphens, starting with a letter or digit.",
     "settingsE.mcp.idTaken": "This server ID is already in use.",
@@ -632,6 +639,13 @@ export const settingsEMessages = {
     "settingsE.mcp.name": "Название",
     "settingsE.mcp.secretValue": "Значение секрета",
     "settingsE.mcp.advanced": "Дополнительные настройки",
+    "settingsE.mcp.agents": "Агенты",
+    "settingsE.mcp.agentsAll": "Все агенты",
+    "settingsE.mcp.agentsSelected": "Выбранные агенты",
+    "settingsE.mcp.agentsNone": "Ни одному агенту",
+    "settingsE.mcp.agentsOnly": "Только {names}",
+    "settingsE.mcp.importAgents":
+      "Сервер из настроек агента получает только этот агент; изменить можно в «Изменить».",
     "settingsE.mcp.idHint":
       "От 1 до 32 строчных латинских букв, цифр и дефисов. Начните с буквы или цифры.",
     "settingsE.mcp.idTaken": "Этот идентификатор сервера уже занят.",

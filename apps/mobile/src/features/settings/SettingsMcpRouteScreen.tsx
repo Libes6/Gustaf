@@ -16,7 +16,7 @@ import { useSettingsEnvironmentMenu } from "./components/SettingsEnvironmentFilt
 import { SettingsScreen } from "./components/SettingsScreen";
 import { SettingsSection } from "./components/SettingsSection";
 import { SettingsSwitchRow } from "./components/SettingsSwitchRow";
-import { mcpEnabledPatch, mcpServerAddress } from "./mcp-settings";
+import { mcpEnabledPatch, mcpServerAddress, mcpServerAgents } from "./mcp-settings";
 import { useSettingsEnvironmentFilter, type SettingsTarget } from "./settings-environment-filter";
 import { resolveMobileSettingsTargets } from "./settings-scoped-server";
 import { useSettingsWriter } from "./useSettingsWriter";
@@ -89,7 +89,7 @@ function EnvironmentMcpServers({ environment }: { readonly environment: Settings
           <SettingsSwitchRow
             key={id}
             label={server.name ?? id}
-            subtitle={`${local ? t("Local (stdio)") : t("Remote (HTTP)")} · ${mcpServerAddress(server)}${locked ? ` · ${t("Managed by your organization")}` : ""}`}
+            subtitle={`${local ? t("Local (stdio)") : t("Remote (HTTP)")} · ${mcpServerAddress(server)} · ${mcpServerAgents(server)}${locked ? ` · ${t("Managed by your organization")}` : ""}`}
             value={server.enabled}
             disabled={
               pending || !canWrite || locked || (local && (!localAllowed || !terminalScope))

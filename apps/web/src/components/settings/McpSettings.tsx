@@ -5,7 +5,9 @@ import {
   type EnvironmentId,
   type McpImportableServer,
   type McpServerStatus,
+  PROVIDER_DISPLAY_NAMES,
   type ProjectId,
+  type ProviderDriverKind,
   type ServerSettingsPatch,
 } from "@t3tools/contracts";
 import { parseMcpServerJson } from "@t3tools/client-runtime/mcp-server-input";
@@ -14,6 +16,9 @@ import { useT } from "../../useUiLanguage";
 import { useEffect, useEffectEvent, useState } from "react";
 import { ChevronDownIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { ensureLocalApi } from "../../localApi";
+import { formatProviderDriverKindLabel } from "../../providerModels";
+import { useEnvironmentProviders } from "../../state/environments";
+import { Checkbox } from "../ui/checkbox";
 import { Label } from "../ui/label";
 import { Textarea } from "../ui/textarea";
 import { Select, SelectTrigger, SelectValue, SelectPopup, SelectItem } from "../ui/select";
@@ -43,6 +48,9 @@ import { SettingsPageContainer, SettingsRow, SettingsSection } from "./settingsL
 const isMcpId = Schema.is(McpServerId);
 const decodeMcpId = Schema.decodeSync(McpServerId);
 const decodeMcpConfig = Schema.decodeUnknownSync(McpServerConfig);
+
+const driverName = (driver: ProviderDriverKind) =>
+  PROVIDER_DISPLAY_NAMES[driver] ?? formatProviderDriverKindLabel(driver);
 
 // React Compiler skips components that throw inside try, so parsing stays out here.
 function parsePastedServers(paste: string) {
@@ -281,7 +289,16 @@ function McpEnvironmentSettings({
             <SettingsRow
               key={id}
               title={config.name ?? id}
-              description={`${id} · ${config.transport.type} · ${config.transport.type === "stdio" ? [config.transport.command, ...config.transport.args].join(" ") : config.transport.url}`}
+              description={`${id} · ${config.transport.type} · ${config.transport.type === "stdio" ? [config.transport.command, ...config.transport.args].join(" ") : config.transport.url} · ${
+                config.providers === undefined
+                  ? t("settingsE.mcp.agentsAll")
+                  : config.providers.length === 0
+                    ? t("settingsE.mcp.agentsNone")
+                    : t("settingsE.mcp.agentsOnly").replace(
+                        "{names}",
+                        config.providers.map(driverName).join(", "),
+                      )
+              }`}
               status={statusLine(id)}
               control={
                 <div className="flex items-center gap-2">
@@ -386,7 +403,9 @@ function McpEnvironmentSettings({
           <DialogPopup className="max-w-2xl">
             <DialogHeader>
               <DialogTitle>{t("settingsE.mcp.s7")}</DialogTitle>
-              <DialogDescription>{t("settingsE.mcp.s15")}</DialogDescription>
+              <DialogDescription>
+                {t("settingsE.mcp.s15")} {t("settingsE.mcp.importAgents")}
+              </DialogDescription>
             </DialogHeader>
             <DialogPanel>
               {imports.map((entry) => (
@@ -466,6 +485,7 @@ function McpEnvironmentSettings({
       {editing && (
         <McpEditor
           key={editing.id}
+          environmentId={environmentId}
           editing={editing}
           localAllowed={localAllowed}
           busy={busy}
@@ -561,6 +581,7 @@ function McpStatusLine({ dot, text }: { dot: string; text: string }) {
 }
 
 function McpEditor({
+  environmentId,
   editing,
   localAllowed,
   busy,
@@ -568,6 +589,7 @@ function McpEditor({
   onSave,
   onCancel,
 }: {
+  environmentId: EnvironmentId;
   editing: { id: string; config?: McpServerConfig };
   localAllowed: boolean;
   busy: boolean;
@@ -603,6 +625,13 @@ function McpEditor({
   const [error, setError] = useState("");
   const [idError, setIdError] = useState("");
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [agents, setAgents] = useState<readonly ProviderDriverKind[] | null>(
+    editing.config?.providers ?? null,
+  );
+  const installedDrivers = (useEnvironmentProviders().get(environmentId) ?? [])
+    .filter((provider) => provider.installed)
+    .map((provider) => provider.driver);
+  const agentChoices = [...new Set([...installedDrivers, ...(agents ?? [])])];
 
   async function submit() {
     setError("");
@@ -624,8 +653,10 @@ function McpEditor({
         return;
       }
       const secrets = Object.fromEntries(rows.map((r) => [r.key, r.draft || r.value]));
+      const { providers: _providers, ...previous } = editing.config ?? {};
       config = decodeMcpConfig({
-        ...editing.config,
+        ...previous,
+        ...(agents === null ? {} : { providers: agents }),
         name: name.trim() || id,
         enabled: editing.config?.enabled ?? false,
         transport:
@@ -723,6 +754,43 @@ function McpEditor({
                 />
               </div>
             )}
+            <div className="grid gap-2">
+              <Label htmlFor="mcp-agents">{t("settingsE.mcp.agents")}</Label>
+              <Select
+                value={agents === null ? "all" : "selected"}
+                disabled={busy}
+                onValueChange={(value) => setAgents(value === "selected" ? (agents ?? []) : null)}
+              >
+                <SelectTrigger id="mcp-agents">
+                  <SelectValue>
+                    {agents === null
+                      ? t("settingsE.mcp.agentsAll")
+                      : t("settingsE.mcp.agentsSelected")}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectPopup>
+                  <SelectItem value="all">{t("settingsE.mcp.agentsAll")}</SelectItem>
+                  <SelectItem value="selected">{t("settingsE.mcp.agentsSelected")}</SelectItem>
+                </SelectPopup>
+              </Select>
+              {agents !== null &&
+                agentChoices.map((driver) => (
+                  <label key={driver} className="flex cursor-pointer items-center gap-2 text-sm">
+                    <Checkbox
+                      checked={agents.includes(driver)}
+                      disabled={busy}
+                      onCheckedChange={(checked) =>
+                        setAgents(
+                          checked === true
+                            ? [...agents, driver]
+                            : agents.filter((entry) => entry !== driver),
+                        )
+                      }
+                    />
+                    {driverName(driver)}
+                  </label>
+                ))}
+            </div>
             <div className="grid gap-2">
               <Label>{type === "stdio" ? t("settingsE.mcp.s32") : t("settingsE.mcp.s33")}</Label>
               {rows.map((row, index) => (

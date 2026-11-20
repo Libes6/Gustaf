@@ -3,6 +3,7 @@ import {
   type ManagedPolicyDocument,
   McpServerId,
   ProjectId,
+  ProviderDriverKind,
   SecretProviderId,
   ServerSettings as ServerSettingsSchema,
 } from "@t3tools/contracts";
@@ -40,6 +41,7 @@ const resolve = (
   settings: unknown,
   options: {
     readonly projectId?: ProjectId;
+    readonly driver?: string;
     readonly secrets?: Readonly<Record<string, string>>;
     readonly policy?: ManagedPolicyDocument;
     readonly platform?: NodeJS.Platform;
@@ -54,6 +56,7 @@ const resolve = (
     const service = yield* McpUserServers.McpUserServers;
     return yield* service.resolveForThread({
       projectId: options.projectId ?? projectId,
+      driver: ProviderDriverKind.make(options.driver ?? "codex"),
       cwd: threadCwd,
       ...(options.native === undefined ? {} : { native: options.native.sources }),
     });
@@ -103,6 +106,29 @@ it.effect("applies a project's switches over each server's own, and nothing else
     assert.deepEqual(ids(yield* resolve(settings, { projectId: otherProjectId })), [
       "on",
       "flipped",
+    ]);
+  }),
+);
+
+it.effect("gives a server only to the providers it is limited to", () =>
+  Effect.gen(function* () {
+    const settings = {
+      mcpServers: {
+        everyone: http(true),
+        "codex-only": { ...stdio(true), providers: ["codex"] },
+        "two-agents": { ...http(true), providers: ["claudeAgent", "antigravity"] },
+        nobody: { ...http(true), providers: [] },
+      },
+    };
+    const ids = (servers: ReadonlyArray<McpUserServers.ResolvedMcpServer>) =>
+      servers.map((server) => server.id);
+    assert.deepEqual(ids(yield* resolve(settings, { driver: "codex" })), [
+      "everyone",
+      "codex-only",
+    ]);
+    assert.deepEqual(ids(yield* resolve(settings, { driver: "antigravity" })), [
+      "everyone",
+      "two-agents",
     ]);
   }),
 );

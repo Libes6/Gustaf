@@ -2649,8 +2649,8 @@ it.effect(
         });
         assert.deepEqual((yield* mcpSessions.read(joiner))?.userServers, opened?.userServers);
         assert.deepEqual(yield* Ref.get(requests), [
-          { projectId, cwd: runtimePolicy.cwd, native },
-          { projectId, cwd: "/projects/user-mcp", native },
+          { projectId, driver: CODEX_DRIVER, cwd: runtimePolicy.cwd, native },
+          { projectId, driver: CODEX_DRIVER, cwd: "/projects/user-mcp", native },
         ]);
 
         // A reused credential still carries the servers enabled now.
