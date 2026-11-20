@@ -16,8 +16,11 @@ const RECENT_TEXT_CHARS = 4_096;
 // tool call or follows its warning sign; a model quoting one mid-sentence is not stopped.
 const HARNESS_ERROR = /(?:^|⚠\uFE0F?\s*)(Error \d{3}, Message: [\s\S]*)$/;
 const FLAGGED_HARNESS_ERROR = /⚠\uFE0F?\s*(Error \d{3}, Message: [\s\S]*)$/;
-// The harness's whole answer when an MCP server in the session did not start.
-const MCP_SERVER_FAILED = /^The MCP server '([^']+)' failed to initialize/;
+// The harness's whole answer when an MCP server in the session did not start (agy 1.4.5).
+const MCP_SERVER_FAILED =
+  /^The MCP server '([^']+)' failed to initialize: [\s\S]*?Fix the MCP server, or remove it from your configuration and start a new session, to continue\.\s*$/;
+// Longer than any harness refusal; past it the reply is the model's.
+const MAX_REFUSAL_CHARS = 4_096;
 
 const STREAM_LOOP_FAILURE = makeProviderFailure({
   class: "provider_error",
@@ -38,12 +41,15 @@ export function makeAntigravityPromptGuard(): (
   let recent = "";
   // Once the window drops older text, its start is no longer where the message began.
   let trimmed = false;
+  // The harness refuses before the model runs, so its refusal is the reply's first message.
+  let firstMessage: string | undefined = "";
   return (notification) => {
     const update = notification.update;
     if (update.sessionUpdate === "tool_call") {
       interruptions = 0;
       recent = "";
       trimmed = false;
+      firstMessage = undefined;
       return undefined;
     }
     if (
@@ -64,7 +70,14 @@ export function makeAntigravityPromptGuard(): (
     }
     if (interruptions >= MAX_INTERRUPTIONS_IN_A_ROW) return STREAM_LOOP_FAILURE;
     if (update.sessionUpdate !== "agent_message_chunk") return undefined;
-    const mcpServer = trimmed ? undefined : MCP_SERVER_FAILED.exec(recent.trimStart())?.[1];
+    if (firstMessage !== undefined) {
+      firstMessage += update.content.text;
+      if (firstMessage.length > MAX_REFUSAL_CHARS) firstMessage = undefined;
+    }
+    const mcpServer =
+      firstMessage === undefined
+        ? undefined
+        : MCP_SERVER_FAILED.exec(firstMessage.trimStart())?.[1];
     if (mcpServer !== undefined) return antigravityMcpServerFailure(mcpServer);
     const harnessError = (trimmed ? FLAGGED_HARNESS_ERROR : HARNESS_ERROR).exec(
       recent.trimStart(),

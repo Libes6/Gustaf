@@ -4,6 +4,8 @@ import type * as EffectAcpSchema from "effect-acp/compat";
 import { makeAntigravityPromptGuard } from "./AntigravityPromptGuard.ts";
 import { antigravityFailedMcpServer } from "./AntigravityTurnOutcome.ts";
 
+const REFUSAL = (server: string) =>
+  `The MCP server '${server}' failed to initialize: spawn ENOENT. Fix the MCP server, or remove it from your configuration and start a new session, to continue.`;
 const NOTICE = "The stream was interrupted. Please continue the task you were working on.";
 
 const message = (text: string): EffectAcpSchema.SessionNotification => ({
@@ -53,6 +55,31 @@ it("stops when the harness refuses the session over an MCP server, not on a quot
   assert.isUndefined(
     quoting(message("The log said The MCP server 'spline' failed to initialize: ENOENT.")),
   );
+
+  const user: EffectAcpSchema.SessionNotification = {
+    sessionId: "session-1",
+    update: {
+      sessionUpdate: "user_message_chunk",
+      content: { type: "text", text: `${REFUSAL("spline")} What does this mean?` },
+    },
+  };
+  for (const notifications of [
+    // The model quotes the whole refusal, mid-answer or after a tool call.
+    [message(`Here is what the log says: ${REFUSAL("spline")}`)],
+    [message("Checking the log."), toolCall, message(REFUSAL("spline"))],
+    [toolCall, message(REFUSAL("spline"))],
+    // The user pastes it; the model's answer starts with it and goes on.
+    [user, message("That means")],
+    [message(`${REFUSAL("spline")} I will fix it.`)],
+    // Only part of the harness phrase.
+    [message("The MCP server 'spline' failed to initialize: ENOENT.")],
+  ]) {
+    const quoted = makeAntigravityPromptGuard();
+    assert.deepEqual(
+      notifications.map((notification) => quoted(notification)),
+      notifications.map(() => undefined),
+    );
+  }
 
   const guard = makeAntigravityPromptGuard();
   assert.isUndefined(guard(message("The MCP server 'computer-")));

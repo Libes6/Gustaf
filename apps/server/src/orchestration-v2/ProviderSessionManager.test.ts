@@ -2876,6 +2876,7 @@ it.effect(
         const failTurn = Effect.fnUntraced(function* (
           runtime: ProviderAdapter.ProviderAdapterV2SessionRuntime,
           nativeTurnId: string,
+          failure = serverFailure,
         ) {
           const subscriber = yield* runtime.subscribeEvents!;
           const queue = (yield* Ref.get(state)).eventQueues.get(String(providerSessionId));
@@ -2887,7 +2888,7 @@ it.effect(
             runOrdinal: 1,
             failureItemOrdinal: 1,
             status: "failed",
-            failure: serverFailure,
+            failure,
             threadDisposition: "reusable",
           });
           yield* subscriber.events.pipe(Stream.runHead);
@@ -2901,6 +2902,12 @@ it.effect(
 
         const second = yield* open;
         assert.equal((yield* Ref.get(state)).openCount, 2);
+        // A configured server this session was not given is not the one that failed.
+        yield* failTurn(second, "native-turn-other-server", {
+          ...serverFailure,
+          code: "OTHER_SERVER_FAILED",
+        });
+        assert.equal((yield* Ref.get(scenario.unusable)).size, 0);
         yield* failTurn(second, "native-turn-new-token");
         assert.deepEqual(
           [...(yield* Ref.get(scenario.unusable)).keys()],
@@ -2926,7 +2933,11 @@ it.effect(
             capabilities: ExclusiveCapabilities,
             abortsOnFailedMcpServer: true,
             failedMcpServerOf: (failure) =>
-              failure.code === "MCP_SERVER_FAILED" ? "jam" : undefined,
+              failure.code === "MCP_SERVER_FAILED"
+                ? "jam"
+                : failure.code === "OTHER_SERVER_FAILED"
+                  ? "spline"
+                  : undefined,
             mcpUserServersLayer: scenario.mcpUserServersLayer,
             mcpServerChecksLayer: scenario.mcpServerChecksLayer,
           }),
