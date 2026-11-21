@@ -2830,7 +2830,7 @@ it.effect.each([
           { openCount, closeCount },
           reopens ? { openCount: 2, closeCount: 1 } : { openCount: 1, closeCount: 0 },
         );
-        const { headers: _headers, ...jamWithoutLogin } = jamServer("one");
+        const jamWithoutLogin = { ...jamServer("one"), headers: {} };
         yield* Ref.set(scenario.enabled, [jamWithoutLogin]);
         yield* open;
         const afterSignOut = yield* Ref.get(state);
