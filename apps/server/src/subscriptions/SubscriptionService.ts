@@ -62,18 +62,6 @@ const make = Effect.gen(function* () {
   const upsert = Effect.fn("SubscriptionService.upsert")(function* (
     input: SubscriptionUpsertInput,
   ) {
-    if (input.id !== undefined) {
-      const existing = yield* sql`SELECT 1 FROM subscriptions WHERE id = ${input.id}`.pipe(
-        Effect.mapError(failWith("Could not read subscriptions.", input.id)),
-      );
-      // An edit of something deleted elsewhere, or an invented id, must not create a new row.
-      if (existing.length === 0) {
-        return yield* new SubscriptionError({
-          message: `No subscription has id ${input.id}.`,
-          subscriptionId: input.id,
-        });
-      }
-    }
     const id =
       input.id ??
       SubscriptionId.make(
@@ -84,13 +72,24 @@ const make = Effect.gen(function* () {
       Effect.mapError(failWith("Could not save the subscription.", id)),
     );
     const now = DateTime.formatIso(DateTime.makeUnsafe(yield* Clock.currentTimeMillis));
-    yield* sql`
-      INSERT INTO subscriptions (id, subscription_json, created_at, updated_at)
-      VALUES (${id}, ${json}, ${now}, ${now})
-      ON CONFLICT (id) DO UPDATE SET
-        subscription_json = excluded.subscription_json,
-        updated_at = excluded.updated_at
-    `.pipe(Effect.mapError(failWith("Could not save the subscription.", id)));
+    if (input.id === undefined) {
+      yield* sql`
+        INSERT INTO subscriptions (id, subscription_json, created_at, updated_at)
+        VALUES (${id}, ${json}, ${now}, ${now})
+      `.pipe(Effect.mapError(failWith("Could not save the subscription.", id)));
+    } else {
+      const updated = yield* sql`
+        UPDATE subscriptions SET subscription_json = ${json}, updated_at = ${now}
+        WHERE id = ${id}
+        RETURNING id
+      `.pipe(Effect.mapError(failWith("Could not save the subscription.", id)));
+      if (updated.length === 0) {
+        return yield* new SubscriptionError({
+          message: `No subscription has id ${id}.`,
+          subscriptionId: id,
+        });
+      }
+    }
     return subscription;
   });
 

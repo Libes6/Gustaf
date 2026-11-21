@@ -178,7 +178,7 @@ it.effect("refuses to remove a runtime that an instance path points into", () =>
   }).pipe(Effect.scoped, Effect.provide(services)),
 );
 
-it.effect("links a Claude already on PATH instead of downloading, and removal keeps it", () =>
+it.effect("links Claude from PATH on first setup and downloads on reinstall after restart", () =>
   Effect.gen(function* () {
     const h = yield* makeHarness({ localVersion: "2.0.9" });
     expect(yield* h.installation.start).toMatchObject({
@@ -191,7 +191,19 @@ it.effect("links a Claude already on PATH instead of downloading, and removal ke
     expect(yield* h.fs.realPath(h.installation.executablePath)).toBe(
       yield* h.fs.realPath(h.localBinaryPath),
     );
-    yield* h.installation.remove();
+    const restarted = yield* makeHarness({ baseDir: h.baseDir, localVersion: "2.0.9" });
+    yield* restarted.installation.start;
+    expect(yield* terminalState(restarted.installation)).toMatchObject({
+      phase: "succeeded",
+      source: "managed",
+      installedVersion: VERSION,
+    });
+    expect(restarted.requests).toEqual([
+      "/latest",
+      `/${VERSION}/manifest.json`,
+      `/${VERSION}/darwin-arm64/claude`,
+    ]);
+    yield* restarted.installation.remove();
     expect(yield* h.fs.exists(h.localBinaryPath)).toBe(true);
   }).pipe(Effect.scoped, Effect.provide(services)),
 );

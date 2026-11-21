@@ -741,10 +741,16 @@ const make = Effect.gen(function* () {
       await tab.page.emulateMedia({ colorScheme: colorScheme === "system" ? null : colorScheme });
     }
     const zoomFactor = snapshot.zoomFactor ?? 1;
-    if (zoomFactor !== tab.zoomFactor && !tab.desktop) {
+    if (zoomFactor !== tab.zoomFactor) {
       tab.zoomFactor = zoomFactor;
-      await applyZoom(tab);
-      await broadcastViewport(tab);
+      if (tab.desktop) {
+        await runPromise(
+          desktopChannel.setZoom({ threadId: tab.threadId, tabId: tab.tabId }, zoomFactor),
+        );
+      } else {
+        await applyZoom(tab);
+        await broadcastViewport(tab);
+      }
     }
   };
 

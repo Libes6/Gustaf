@@ -1,4 +1,5 @@
 import {
+  IsoCalendarDate,
   ProviderInstanceId,
   type Subscription,
   type SubscriptionPeriodUnit,
@@ -28,6 +29,7 @@ export type SubscriptionDraftField =
   | "currency"
   | "periodCount"
   | "anchorDate"
+  | "activeUntil"
   | "reminderDaysBefore";
 
 export function emptySubscriptionDraft(today: string): SubscriptionDraft {
@@ -68,6 +70,7 @@ export function subscriptionDraft(subscription: Subscription): SubscriptionDraft
   };
 }
 
+const isCalendarDate = Schema.is(IsoCalendarDate);
 const decodeInput = Schema.decodeUnknownResult(SubscriptionUpsertInput);
 const isWhole = (value: string, minimum: number) =>
   /^\d+$/.test(value.trim()) && Number(value) >= minimum;
@@ -86,7 +89,10 @@ export function parseSubscriptionDraft(
   if (draft.amount.trim() === "" || !Number.isFinite(amount) || amount < 0) errors.add("amount");
   if (!/^[A-Z]{3}$/.test(currency)) errors.add("currency");
   if (draft.recurring && !isWhole(draft.periodCount, 1)) errors.add("periodCount");
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(draft.anchorDate)) errors.add("anchorDate");
+  if (!isCalendarDate(draft.anchorDate)) errors.add("anchorDate");
+  if (draft.cancelled && draft.activeUntil !== "" && !isCalendarDate(draft.activeUntil)) {
+    errors.add("activeUntil");
+  }
   const reminder = draft.reminderDaysBefore.trim();
   if (reminder !== "" && !isWhole(reminder, 0)) errors.add("reminderDaysBefore");
   if (errors.size > 0) return { ok: false, errors };

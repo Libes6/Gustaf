@@ -174,6 +174,13 @@ const withSecrets = Effect.fnUntraced(function* (
   };
 });
 
+function sameValues(left: Record<string, string>, right: Readonly<Record<string, string>>) {
+  return (
+    Object.keys(left).length === Object.keys(right).length &&
+    Object.entries(left).every(([key, value]) => right[key] === value)
+  );
+}
+
 const make = Effect.gen(function* () {
   const settings = yield* ServerSettings.ServerSettingsService;
   const secrets = yield* SecretResolver.SecretResolver;
@@ -186,7 +193,7 @@ const make = Effect.gen(function* () {
       ? auth.accessToken(id, server.transport.url, { force })
       : Effect.undefined;
 
-  const nativeDuplicateFilter = Effect.fn("McpUserServers.nativeDuplicateFilter")(function* (
+  const readNativeServers = Effect.fn("McpUserServers.readNativeServers")(function* (
     native: NativeMcpSources,
     cwd: string,
   ) {
@@ -200,16 +207,9 @@ const make = Effect.gen(function* () {
         paths: errors.map((error) => error.sourcePath),
       });
     }
-    const loaded = nativeServersForProvider(native.provider, servers, cwd, {
+    return nativeServersForProvider(native.provider, servers, cwd, {
       includeProjectMcpJson: native.includeProjectMcpJson ?? false,
     }).map((server) => ({ ...server, name: toMcpServerName(server.name) }));
-    return ([id, { transport }]: readonly [McpServerId, McpServerConfig]) =>
-      findNativeDuplicate(
-        transport.type === "stdio"
-          ? { name: id, transport: "stdio", command: transport.command, args: transport.args }
-          : { name: id, transport: "http", url: transport.url },
-        loaded,
-      ) !== undefined;
   });
 
   const enabledFor = (
@@ -242,13 +242,10 @@ const make = Effect.gen(function* () {
       }),
     );
     if (current === undefined) return none;
-    let enabled = enabledFor(current, input);
+    const enabled = enabledFor(current, input);
     if (enabled.length === 0) return none;
-    if (input.native !== undefined) {
-      const isDuplicate = yield* nativeDuplicateFilter(input.native, input.cwd);
-      enabled = enabled.filter((entry) => !isDuplicate(entry));
-      if (enabled.length === 0) return none;
-    }
+    const nativeServers =
+      input.native === undefined ? [] : yield* readNativeServers(input.native, input.cwd);
 
     const references = enabled.flatMap(([, server]) =>
       Object.values(slotsOf(server)).filter(isSecretReference),
@@ -283,6 +280,31 @@ const make = Effect.gen(function* () {
         });
         skipped.push({ id, reason: result.reason });
         continue;
+      }
+      const { transport } = server;
+      const duplicate = findNativeDuplicate(
+        transport.type === "http"
+          ? { name: id, transport: "http", url: transport.url }
+          : { name: id, transport: "stdio", command: transport.command, args: transport.args },
+        nativeServers,
+      );
+      if (result.disabledTools === undefined) {
+        if (
+          result.type === "http" &&
+          duplicate?.transport === "http" &&
+          duplicate.bearerTokenEnvVar === undefined &&
+          sameValues(result.headers, duplicate.headers)
+        )
+          continue;
+        if (
+          transport.type === "stdio" &&
+          duplicate?.transport === "stdio" &&
+          Object.keys(transport.env).length === Object.keys(duplicate.env).length &&
+          Object.entries(transport.env).every(
+            ([key, value]) => duplicate.env[key] === literal(value),
+          )
+        )
+          continue;
       }
       servers.push(result);
     }

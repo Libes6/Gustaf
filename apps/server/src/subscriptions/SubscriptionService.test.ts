@@ -4,6 +4,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as SecureRandom from "effect/crypto/SecureRandom";
 import * as SqlClient from "effect/sql/SqlClient";
+import * as Statement from "effect/sql/Statement";
 
 import * as SqlitePersistence from "../persistence/Sqlite.ts";
 import * as SubscriptionService from "./SubscriptionService.ts";
@@ -56,6 +57,25 @@ it.effect("creates, edits, lists, and deletes subscriptions", () =>
   }).pipe(Effect.provide(layer)),
 );
 
+it.effect("does not recreate a subscription deleted just before an edit writes", () =>
+  Effect.gen(function* () {
+    const service = yield* SubscriptionService.SubscriptionService;
+    const { id } = yield* service.upsert(antigravity);
+    const result = yield* service.upsert({ ...antigravity, id, amount: 6 }).pipe(
+      Effect.provideService(Statement.CurrentTransformer, (statement) => {
+        const [query] = statement.compile();
+        return /^(INSERT INTO|UPDATE) subscriptions\b/i.test(query.trim())
+          ? service.delete({ id }).pipe(Effect.orDie, Effect.as(statement))
+          : Effect.succeed(statement);
+      }),
+      Effect.result,
+    );
+
+    expect(result).toMatchObject({ _tag: "Failure", failure: { subscriptionId: id } });
+    expect(yield* service.list()).toEqual([]);
+  }).pipe(Effect.provide(layer)),
+);
+
 it.effect("skips a stored row that no longer decodes", () =>
   Effect.gen(function* () {
     const service = yield* SubscriptionService.SubscriptionService;
@@ -65,6 +85,17 @@ it.effect("skips a stored row that no longer decodes", () =>
       INSERT INTO subscriptions (id, subscription_json, created_at, updated_at)
       VALUES (${SubscriptionId.make("broken")}, '{"name":1}', '2000-01-01', '2000-01-01')
     `;
+    const invalidDates = [
+      { anchorDate: "2026-02-29" },
+      { status: { _tag: "Cancelled", activeUntil: "2026-13-02" } },
+    ];
+    for (const [index, fields] of invalidDates.entries()) {
+      const id = SubscriptionId.make(`invalid-date-${index}`);
+      yield* sql`
+        INSERT INTO subscriptions (id, subscription_json, created_at, updated_at)
+        VALUES (${id}, ${JSON.stringify({ ...kept, id, ...fields })}, '2000-01-01', '2000-01-01')
+      `;
+    }
     expect(yield* service.list()).toEqual([kept]);
   }).pipe(Effect.provide(layer)),
 );
