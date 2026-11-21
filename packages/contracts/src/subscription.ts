@@ -1,3 +1,5 @@
+import * as DateTime from "effect/DateTime";
+import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 
 import {
@@ -14,13 +16,13 @@ export type SubscriptionId = typeof SubscriptionId.Type;
 /** A calendar day, `YYYY-MM-DD`, with no time zone. */
 export const IsoCalendarDate = TrimmedString.check(
   Schema.isPattern(/^\d{4}-\d{2}-\d{2}$/),
-  Schema.makeFilter((value) => {
-    const date = new Date(`${value}T00:00:00Z`);
-    return (
-      (Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value) ||
-      "Expected a valid calendar date."
-    );
-  }),
+  Schema.makeFilter(
+    (value) =>
+      Option.exists(
+        DateTime.make(`${value}T00:00:00Z`),
+        (date) => DateTime.formatIsoDateUtc(date) === value,
+      ) || "Expected a valid calendar date.",
+  ),
 );
 export type IsoCalendarDate = typeof IsoCalendarDate.Type;
 
