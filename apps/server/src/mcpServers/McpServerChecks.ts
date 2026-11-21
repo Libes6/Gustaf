@@ -35,6 +35,8 @@ import { McpServerAuth } from "./McpServerAuth.ts";
 import * as McpUserServers from "./McpUserServers.ts";
 
 const CHECK_TIMEOUT = Duration.seconds(15);
+const PACKAGE_LAUNCHER_TIMEOUT = Duration.seconds(45);
+const PACKAGE_LAUNCHER_COMMAND = /(?:^|[\\/])(?:npx|uvx|bunx)(?:\.(?:bat|cmd|exe))?$/i;
 const CHECK_CONCURRENCY = 4;
 const PROTOCOL_VERSION = "2025-06-18";
 const MAX_LIST_PAGES = 20;
@@ -368,6 +370,10 @@ const make = Effect.gen(function* () {
     cwd: string,
     refreshToken: boolean,
   ) {
+    const timeout =
+      server.transport.type === "stdio" && PACKAGE_LAUNCHER_COMMAND.test(server.transport.command)
+        ? PACKAGE_LAUNCHER_TIMEOUT
+        : CHECK_TIMEOUT;
     const stderr = { text: "" };
     // Resolving may refresh a sign-in's token over the network, so it shares the timeout.
     const connect = userServers
@@ -385,14 +391,11 @@ const make = Effect.gen(function* () {
       Effect.flatMap(inspect),
       Effect.scoped,
       Effect.timeoutOrElse({
-        duration: CHECK_TIMEOUT,
+        duration: timeout,
         orElse: () =>
           Effect.fail(
             failed(
-              [
-                `No answer in ${Duration.toSeconds(CHECK_TIMEOUT)} seconds.`,
-                firstLines(stderr.text),
-              ]
+              [`No answer in ${Duration.toSeconds(timeout)} seconds.`, firstLines(stderr.text)]
                 .filter(Boolean)
                 .join("\n"),
             ),

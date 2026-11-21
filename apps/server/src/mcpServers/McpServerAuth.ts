@@ -247,7 +247,7 @@ const make = Effect.gen(function* () {
   const revisions = new Map<McpServerId, number>();
   const pending = new Map<string, PendingSignIn>();
   // One refresh per server at a time; others join it, and other servers never wait on it.
-  const refreshing = new Map<McpServerId, Deferred.Deferred<string | undefined>>();
+  const refreshing = new Map<McpServerId, Deferred.Deferred<void>>();
   // Orders a server's writes, so a refresh or sign-in that lands after a sign-out is dropped.
   const writes = yield* KeyedLock.make<McpServerId>();
 
@@ -265,6 +265,8 @@ const make = Effect.gen(function* () {
       Effect.option,
       Effect.map(Option.flatten),
     );
+    const current = logins.get(id);
+    if (current !== undefined) return current ?? undefined;
     const login = Option.isSome(stored)
       ? Option.getOrUndefined(decodeLogin(new TextDecoder().decode(stored.value)))
       : undefined;
@@ -362,16 +364,20 @@ const make = Effect.gen(function* () {
     } satisfies Login;
   });
 
-  const refresh = Effect.fnUntraced(function* (id: McpServerId, login: Login) {
-    if (login.refreshToken === undefined) return login;
-    const revision = revisions.get(id) ?? 0;
+  const refresh = Effect.fnUntraced(function* (id: McpServerId, login: Login, revision: number) {
+    if (login.refreshToken === undefined || logins.get(id) !== login) return;
     const tokens = yield* tokenRequest(login, {
       grant_type: "refresh_token",
       refresh_token: login.refreshToken,
     });
     const next = yield* toLogin(login.serverUrl, login, tokens, login.refreshToken);
-    return (yield* storeIfCurrent(id, next, revision)) ? next : yield* loginOf(id);
+    yield* storeIfCurrent(id, next, revision);
   });
+
+  const validToken = (login: Login | null | undefined, url: string, now: number) =>
+    login?.serverUrl === url && (login.expiresAt === undefined || login.expiresAt > now)
+      ? login.accessToken
+      : undefined;
 
   const refreshDue = (login: Login, now: number) =>
     login.refreshToken !== undefined &&
@@ -384,30 +390,35 @@ const make = Effect.gen(function* () {
     const login = yield* loginOf(id);
     if (login === undefined || login.serverUrl !== url) return undefined;
     const now = yield* Clock.currentTimeMillis;
+    if (logins.get(id) !== login) return validToken(logins.get(id), url, now);
     const stale = options?.force === true || refreshDue(login, now);
-    if (!stale || login.refreshToken === undefined) return login.accessToken;
-    const inFlight = refreshing.get(id);
-    if (inFlight !== undefined) return yield* Deferred.await(inFlight);
-    const refreshed = Deferred.makeUnsafe<string | undefined>();
-    refreshing.set(id, refreshed);
-    // Forked so a caller that gives up does not leave the others waiting.
-    yield* refresh(id, login).pipe(
-      Effect.tapError((error) =>
-        Effect.logWarning("MCP server token could not be refreshed", {
-          mcpServerId: id,
-          detail: error.detail,
-        }),
-      ),
-      Effect.orElseSucceed(() => login),
-      Effect.flatMap((next) => Deferred.succeed(refreshed, next?.accessToken)),
-      Effect.ensuring(
-        Effect.sync(() => refreshing.delete(id)).pipe(
-          Effect.andThen(Deferred.succeed(refreshed, login.accessToken)),
-        ),
-      ),
-      Effect.forkIn(serviceScope),
+    if (!stale || login.refreshToken === undefined) return validToken(login, url, now);
+    const refreshed = yield* Effect.uninterruptible(
+      Effect.gen(function* () {
+        const existing = refreshing.get(id);
+        if (existing !== undefined) return existing;
+        const pendingRefresh = Deferred.makeUnsafe<void>();
+        refreshing.set(id, pendingRefresh);
+        // Register and fork atomically so cancellation cannot strand the other callers.
+        yield* refresh(id, login, revisions.get(id) ?? 0).pipe(
+          Effect.tapError(() =>
+            Effect.logWarning("MCP server token could not be refreshed", { mcpServerId: id }),
+          ),
+          Effect.ignore,
+          Effect.interruptible,
+          Effect.ensuring(
+            Effect.sync(() => refreshing.delete(id)).pipe(
+              Effect.andThen(Deferred.succeed(pendingRefresh, undefined)),
+            ),
+          ),
+          Effect.forkIn(serviceScope),
+        );
+        return pendingRefresh;
+      }),
     );
-    return yield* Deferred.await(refreshed);
+    yield* Deferred.await(refreshed);
+    const finishedAt = yield* Clock.currentTimeMillis;
+    return validToken(logins.get(id), url, finishedAt);
   });
 
   const httpServer = Effect.fnUntraced(function* (id: McpServerId) {
@@ -565,6 +576,7 @@ const make = Effect.gen(function* () {
   const signIn: McpServerAuth["Service"]["signIn"] = Effect.fn("McpServerAuth.signIn")(function* ({
     id,
   }) {
+    const revision = revisions.get(id) ?? 0;
     const serverUrl = yield* httpServer(id);
     const { metadata, resource, scope } = yield* discover(serverUrl);
     if (metadata.registration_endpoint === undefined) {
@@ -580,6 +592,9 @@ const make = Effect.gen(function* () {
       .digest(Digest.sha256, new TextEncoder().encode(verifier))
       .pipe(Effect.orDie, Effect.map(base64UrlEncode));
     const now = yield* Clock.currentTimeMillis;
+    if ((revisions.get(id) ?? 0) !== revision) {
+      return yield* authError("The server sign-in changed while it was being started.");
+    }
     for (const [key, entry] of pending) {
       if (entry.expiresAt <= now || entry.id === id) pending.delete(key);
     }
@@ -611,8 +626,8 @@ const make = Effect.gen(function* () {
       catch: () => authError("Paste the whole address the browser opened after signing in."),
     });
     const state = url.searchParams.get("state");
-    const flow = state === null ? undefined : pending.get(state);
     const now = yield* Clock.currentTimeMillis;
+    const flow = state === null ? undefined : pending.get(state);
     if (state === null || flow === undefined || flow.expiresAt <= now) {
       return yield* authError("This sign-in has expired or was started elsewhere. Sign in again.");
     }
@@ -649,6 +664,7 @@ const make = Effect.gen(function* () {
             Effect.sync(() => {
               logins.set(id, null);
               bump(id);
+              for (const [state, entry] of pending) if (entry.id === id) pending.delete(state);
             }),
           ),
         ),
@@ -714,14 +730,11 @@ const make = Effect.gen(function* () {
     }),
     // Read per server before every turn; a span each would be noise.
     tokenState: Effect.fnUntraced(function* (id, url) {
-      const login = yield* loginOf(id);
-      if (login === undefined || login.serverUrl !== url) {
-        return { token: undefined, refreshDue: false };
-      }
-      return {
-        token: login.accessToken,
-        refreshDue: refreshDue(login, yield* Clock.currentTimeMillis),
-      };
+      yield* loginOf(id);
+      const now = yield* Clock.currentTimeMillis;
+      const login = logins.get(id);
+      if (login?.serverUrl !== url) return { token: undefined, refreshDue: false };
+      return { token: validToken(login, url, now), refreshDue: refreshDue(login, now) };
     }),
     // Read per server on every status list; a span each would be noise.
     revision: Effect.fnUntraced(function* (id) {

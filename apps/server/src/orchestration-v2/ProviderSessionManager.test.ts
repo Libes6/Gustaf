@@ -2820,6 +2820,7 @@ it.effect.each([
         yield* open;
         yield* open;
         assert.equal((yield* Ref.get(state)).openCount, 1);
+        assert.deepEqual((yield* Ref.get(mcpConfigs)).at(-1)?.userServers, [jamServer("one")]);
 
         // Signing in again hands the server a new token the live agent never saw.
         yield* Ref.set(scenario.enabled, [jamServer("two")]);
@@ -2829,9 +2830,20 @@ it.effect.each([
           { openCount, closeCount },
           reopens ? { openCount: 2, closeCount: 1 } : { openCount: 1, closeCount: 0 },
         );
-        if (reopens) {
-          assert.deepEqual((yield* Ref.get(mcpConfigs)).at(-1)?.userServers, [jamServer("two")]);
-        }
+        const { headers: _headers, ...jamWithoutLogin } = jamServer("one");
+        yield* Ref.set(scenario.enabled, [jamWithoutLogin]);
+        yield* open;
+        const afterSignOut = yield* Ref.get(state);
+        assert.equal(afterSignOut.openCount, reopens ? 3 : 1);
+        assert.equal(afterSignOut.closeCount, reopens ? 2 : 0);
+
+        const providerConfigs = yield* Ref.get(mcpConfigs);
+        assert.deepEqual(
+          providerConfigs.map((config) => config?.userServers),
+          reopens
+            ? [[jamServer("one")], [jamServer("two")], [jamWithoutLogin]]
+            : [[jamServer("one")]],
+        );
       });
 
       yield* effect.pipe(

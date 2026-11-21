@@ -5,11 +5,14 @@ import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, it } from "@effect/vitest";
 import { McpServerId, ServerSettings as ServerSettingsSchema } from "@t3tools/contracts";
 import * as SecretResolver from "@t3tools/secret-provider-core/server/SecretResolver";
+import { SpawnExecutableResolution } from "@t3tools/shared/shell";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
 import * as Layer from "effect/Layer";
+import * as Queue from "effect/Queue";
 import * as Schema from "effect/Schema";
 import { FetchHttpClient } from "effect/http";
+import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
 import * as TestClock from "effect/testing/TestClock";
 
 import * as ManagedPolicy from "../policy/ManagedPolicy.ts";
@@ -55,7 +58,11 @@ const signedOut = Layer.mock(McpServerAuth)({
   revision: () => Effect.succeed(0),
 });
 
-const layer = (settings: unknown, auth = signedOut) =>
+const layer = (
+  settings: unknown,
+  auth = signedOut,
+  nodeServices: Layer.Layer<ChildProcessSpawner.ChildProcessSpawner> = NodeServices.layer,
+) =>
   McpServerChecks.layer.pipe(
     Layer.provideMerge(McpUserServers.layer),
     Layer.provide([
@@ -70,7 +77,7 @@ const layer = (settings: unknown, auth = signedOut) =>
         list: () => Effect.succeed({ servers: [], errors: [] }),
       }),
       auth,
-      NodeServices.layer,
+      nodeServices,
       FetchHttpClient.layer,
     ]),
   );
@@ -115,6 +122,39 @@ it.effect("reports a server that cannot start with its stderr or the spawn error
       status: "failed",
       error: "Command not found: gustaf-test-no-such-mcp-server",
     });
+  }),
+);
+
+it.effect("allows package launchers longer to answer than other stdio servers", () =>
+  Effect.gen(function* () {
+    const started = yield* Queue.unbounded<void>();
+    const spawner = ChildProcessSpawner.make(() =>
+      Queue.offer(started, undefined).pipe(Effect.andThen(Effect.never)),
+    );
+    const nodeServices = Layer.succeed(ChildProcessSpawner.ChildProcessSpawner, spawner);
+    const servers = {
+      npx: { ...node(""), transport: { type: "stdio", command: "npx" } },
+      uvx: { ...node(""), transport: { type: "stdio", command: "/usr/bin/uvx" } },
+      bunx: { ...node(""), transport: { type: "stdio", command: "C:/bun/BUNX.EXE" } },
+      stdio: node(""),
+    };
+    yield* Effect.gen(function* () {
+      const checks = yield* McpServerChecks.McpServerChecks;
+      const pending = yield* checks.list({}).pipe(Effect.forkChild);
+      yield* Queue.takeN(started, 4);
+      yield* TestClock.adjust("45 seconds");
+      assert.deepEqual(
+        (yield* Fiber.join(pending)).servers,
+        Object.keys(servers).map((name) => ({
+          id: McpServerId.make(name),
+          status: "failed",
+          error: `No answer in ${name === "stdio" ? 15 : 45} seconds.`,
+        })),
+      );
+    }).pipe(
+      Effect.provide(layer({ mcpServers: servers }, signedOut, nodeServices)),
+      Effect.provideService(SpawnExecutableResolution, (command) => command),
+    );
   }),
 );
 
@@ -247,6 +287,41 @@ it.effect("a token refresh that hangs counts against the check's timeout", () =>
       ),
     );
   }),
+);
+
+it.effect("a timed-out stdio check closes its descendant's connection", () =>
+  Effect.gen(function* () {
+    const accepted = Promise.withResolvers<{ closed: Promise<void> }>();
+    const server = yield* Effect.acquireRelease(
+      Effect.callback<NodeHttp.Server>((resume) => {
+        const server = NodeHttp.createServer((request) => {
+          const closed = new Promise<void>((resolve) => request.socket.once("close", resolve));
+          accepted.resolve({ closed });
+        });
+        server.listen(0, "127.0.0.1", () => resume(Effect.succeed(server)));
+      }),
+      (server) =>
+        Effect.callback<void>((resume) => {
+          server.closeAllConnections();
+          server.close(() => resume(Effect.void));
+        }),
+    );
+    const address = server.address();
+    if (address === null || typeof address === "string") {
+      return yield* Effect.die("Expected a TCP address for the test server");
+    }
+    const descendant = `require("node:http").get("http://127.0.0.1:${address.port}", () => {}).on("error", () => {});`;
+    const processTree = node(
+      `require("node:child_process").spawn(process.execPath, ["-e", ${JSON.stringify(descendant)}], { stdio: "ignore" });`,
+    );
+    const listed = yield* list({ mcpServers: { silent: processTree } }).pipe(Effect.forkChild);
+    const { closed } = yield* Effect.promise(() => accepted.promise);
+    yield* TestClock.adjust("17 seconds");
+    assert.deepEqual((yield* Fiber.join(listed)).servers, [
+      { id: McpServerId.make("silent"), status: "failed", error: "No answer in 15 seconds." },
+    ]);
+    yield* Effect.promise(() => closed);
+  }).pipe(Effect.scoped),
 );
 
 it.effect("a check in the home folder never keeps a thread-folder server out of sessions", () =>

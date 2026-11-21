@@ -284,7 +284,21 @@ function McpEnvironmentSettings({
   }
   function statusLine(id: McpServerId) {
     if (!canCheck) return undefined;
+    const projectId = projectIds[0];
+    const projectEnabled = projectId
+      ? settings.projectSettingsOverrides[projectId]?.mcpServers?.[id]?.enabled
+      : undefined;
+    if (projectEnabled === false) {
+      return (
+        <McpStatusLine
+          dot="bg-muted-foreground/40"
+          text={t("settingsE.mcp.connectors.status.disabled")}
+        />
+      );
+    }
     const status = currentStatus(id);
+    // The environment does not probe globally disabled servers.
+    if (projectEnabled === true && !settings.mcpServers[id]?.enabled) return undefined;
     if (status === undefined) {
       return checkFailed && !refreshing ? undefined : (
         <McpStatusLine dot="bg-muted-foreground/40" text={t("settingsE.mcp.status.checking")} />
