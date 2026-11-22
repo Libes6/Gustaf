@@ -64,7 +64,7 @@ const make = Effect.gen(function* () {
   const controlFd = config.desktopBrowserControlFd;
   const socketPath = config.desktopBrowserSocket;
   const changes = yield* PubSub.unbounded<{ key: DesktopTabKey; attached: boolean }>();
-  const attachedTabs = new Set<string>();
+  const attachedTabs = new Map<string, DesktopTabKey>();
   // Missing reports protect desktop tabs until the renderer explicitly marks them hidden.
   const shownTabs = new Map<string, boolean>();
   const inbound = new Map<string, Queue.Queue<string>>();
@@ -139,7 +139,7 @@ const make = Effect.gen(function* () {
           return queue ? Queue.offer(queue, event.message).pipe(Effect.asVoid) : Effect.void;
         }
         case "attached":
-          attachedTabs.add(id);
+          attachedTabs.set(id, key);
           return PubSub.publish(changes, { key, attached: true });
         case "detached": {
           attachedTabs.delete(id);
@@ -155,7 +155,18 @@ const make = Effect.gen(function* () {
       }
     }),
     Effect.catchCause((cause) => Effect.logWarning("desktop browser channel stopped", { cause })),
-    Effect.ensuring(Effect.sync(() => shownTabs.clear())),
+    Effect.ensuring(
+      Effect.gen(function* () {
+        const keys = [...attachedTabs.values()];
+        attachedTabs.clear();
+        shownTabs.clear();
+        yield* Effect.forEach(inbound.values(), Queue.shutdown, { discard: true });
+        yield* PubSub.publishAll(
+          changes,
+          keys.map((key) => ({ key, attached: false })),
+        );
+      }),
+    ),
     Effect.forkScoped,
   );
 

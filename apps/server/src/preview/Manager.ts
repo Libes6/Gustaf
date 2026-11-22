@@ -10,6 +10,7 @@ import {
   type PreviewResizeInput,
   type PreviewAdjustInput,
   FILL_PREVIEW_VIEWPORT,
+  type ThreadId,
   PreviewSessionLookupError,
   type PreviewSessionSnapshot,
 } from "@t3tools/contracts";
@@ -46,6 +47,11 @@ export class PreviewManager extends Context.Service<
     readonly markHeadless: (
       input: PreviewCloseInput & { readonly tabId: string },
     ) => Effect.Effect<void, PreviewError>;
+    readonly setDesktopAttached: (input: {
+      readonly threadId: ThreadId;
+      readonly tabId: string;
+      readonly attached: boolean;
+    }) => Effect.Effect<void, PreviewError>;
     readonly requestReveal: (
       input: PreviewCloseInput & { readonly tabId: string; readonly force: boolean },
     ) => Effect.Effect<void, PreviewError>;
@@ -298,6 +304,39 @@ export const make = Effect.gen(function* PreviewManagerMake() {
     );
   });
 
+  const setDesktopAttached: PreviewManager["Service"]["setDesktopAttached"] = Effect.fn(
+    "PreviewManager.setDesktopAttached",
+  )(function* ({ threadId, tabId, attached }) {
+    yield* mutateExistingSession(
+      threadId,
+      tabId,
+      Effect.fn("PreviewManager.updateDesktopAttachment")(function* (session) {
+        if (
+          session.snapshot.runtime === "server" ||
+          (session.snapshot.desktopAttached === true) === attached
+        ) {
+          return { next: session, emit: null, result: undefined };
+        }
+        const snapshot = {
+          ...session.snapshot,
+          desktopAttached: attached,
+          updatedAt: yield* currentIsoTimestamp,
+        };
+        return {
+          next: { ...session, snapshot },
+          emit: {
+            type: "navigated" as const,
+            threadId,
+            tabId,
+            createdAt: snapshot.updatedAt,
+            snapshot,
+          },
+          result: undefined,
+        };
+      }),
+    );
+  });
+
   const resize: PreviewManager["Service"]["resize"] = Effect.fn("PreviewManager.resize")(
     function* (input) {
       return yield* mutateExistingSession(
@@ -452,6 +491,7 @@ export const make = Effect.gen(function* PreviewManagerMake() {
     requestReveal,
     reportStatus,
     markHeadless,
+    setDesktopAttached,
     resize,
     adjust,
     close,

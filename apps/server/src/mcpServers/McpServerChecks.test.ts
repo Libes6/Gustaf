@@ -241,7 +241,7 @@ it.effect("asks for sign-in on HTTP 401, checks again on refresh, and after sign
       });
       yield* checks.markFailed({ id, error: "Antigravity could not start it.", needsAuth: false });
       assert.deepEqual((yield* checks.list({})).servers, [
-        { id, status: "failed", error: "Antigravity could not start it." },
+        { id, status: "failed", error: "Antigravity could not start it.", signedIn: true },
       ]);
       // Thread notices show these reasons, so no server output reaches them.
       assert.deepEqual(yield* checks.knownUnusable, new Map([[id, "Did not start."]]));

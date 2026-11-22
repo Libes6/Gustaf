@@ -414,6 +414,11 @@ const make = Effect.gen(function* () {
     );
   });
 
+  const isSignedIn = (id: McpServerId, server: McpServerConfig) =>
+    server.transport.type === "http" && McpUserServers.usesGustafSignIn(server)
+      ? auth.isSignedIn(id, server.transport.url)
+      : Effect.succeed(false);
+
   const check = Effect.fn("McpServerChecks.check")(function* (
     id: McpServerId,
     server: McpServerConfig,
@@ -423,10 +428,7 @@ const make = Effect.gen(function* () {
       "mcp_server.transport": server.transport.type,
     });
     const cwd = yield* HostProcess.HomeDirectory;
-    const signedIn =
-      server.transport.type === "http" &&
-      McpUserServers.usesGustafSignIn(server) &&
-      (yield* auth.isSignedIn(id, server.transport.url));
+    const signedIn = yield* isSignedIn(id, server);
     const first = yield* attempt(id, server, cwd, false);
     // A rejected token may only have expired early; one refresh decides.
     const status =
@@ -527,6 +529,7 @@ const make = Effect.gen(function* () {
     const server = Option.isSome(current) ? current.value.mcpServers[id] : undefined;
     if (server === undefined) return;
     const fingerprint = yield* fingerprintOf(id, server);
+    const signedIn = yield* isSignedIn(id, server);
     const running = checks.get(id);
     if (
       running !== undefined &&
@@ -537,7 +540,7 @@ const make = Effect.gen(function* () {
     }
     const status = needsAuth && server.transport.type === "http" ? "needs-auth" : "failed";
     const result = yield* Deferred.make<McpServerStatus>();
-    yield* Deferred.succeed(result, { id, status, error });
+    yield* Deferred.succeed(result, { id, status, error, ...(signedIn ? { signedIn } : {}) });
     checks.set(id, { fingerprint, result, fromSession: true });
   });
 

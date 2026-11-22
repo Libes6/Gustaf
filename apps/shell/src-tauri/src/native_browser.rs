@@ -33,7 +33,7 @@ pub(crate) struct CreateInput {
     tab_id: String,
     url: Option<String>,
     profile_id: Option<String>,
-    /// A tab of the server's browser, which the server drives as well.
+    /// The owning environment’s preview session key for the desktop browser channel.
     server_tab: Option<ServerTabKey>,
 }
 

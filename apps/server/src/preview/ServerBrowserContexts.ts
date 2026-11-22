@@ -235,14 +235,19 @@ export class ServerBrowserContexts {
   async scratchPage() {
     if (this.closing) throw new Error("The preview browser is closed.");
     const context = await this.sharedContext();
-    const page = await context.newPage();
-    page.once("close", () => void context.close().catch(constVoid));
-    return page;
+    try {
+      const page = await context.newPage();
+      page.once("close", () => void context.close().catch(constVoid));
+      return page;
+    } catch (cause) {
+      await context.close().catch(constVoid);
+      throw cause;
+    }
   }
 
-  async connectDesktopPage(endpoint: string) {
+  async connectDesktopPage(endpoint: string, options: { readonly noDefaults: boolean }) {
     const { chromium } = loadPlaywright();
-    const browser = await chromium.connectOverCDP(endpoint, { timeout: 15_000 });
+    const browser = await chromium.connectOverCDP(endpoint, { timeout: 15_000, ...options });
     const page = browser.contexts().flatMap((context) => context.pages())[0];
     if (!page) {
       await browser.close().catch(constVoid);

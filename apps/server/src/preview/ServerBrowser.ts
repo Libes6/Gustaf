@@ -297,6 +297,7 @@ interface Recording {
 }
 
 interface ServerTab {
+  readonly desktopOwned: boolean;
   readonly threadId: ThreadId;
   readonly tabId: string;
   readonly page: Page;
@@ -496,9 +497,14 @@ const make = Effect.gen(function* () {
   const launchersDir = NodePath.join(config.stateDir, "server-browser", "launchers");
 
   const tabs = new Map<string, ServerTab>();
+  const desktopOwnedTabs = new Map<string, ServerTab>();
   const pendingTabs = new Map<
     string,
-    { readonly agentId: string | null; promise?: Promise<ServerTab> }
+    {
+      readonly agentId: string | null;
+      readonly desktopOwned?: boolean;
+      promise?: Promise<ServerTab>;
+    }
   >();
 
   const closedPendingTabs = new Set<string>();
@@ -593,6 +599,7 @@ const make = Effect.gen(function* () {
       .send("Page.getNavigationHistory")
       .catch(() => null)
       .then((history) => {
+        if (tab.desktopOwned && tab.closing) return;
         const index = history?.currentIndex ?? 0;
         const count = history?.entries.length ?? 0;
         runFork(
@@ -758,8 +765,9 @@ const make = Effect.gen(function* () {
 
   const dropTab = (tab: ServerTab, closeSession: boolean) => {
     const key = tabKey(tab.threadId, tab.tabId);
-    if (tabs.get(key) !== tab) return;
-    tabs.delete(key);
+    const registry = tab.desktopOwned ? desktopOwnedTabs : tabs;
+    if (registry.get(key) !== tab) return;
+    registry.delete(key);
     tab.closing = true;
     clearAbortedNavigation(tab);
     // A desktop page outlives the connection unless its session closed with it.
@@ -772,7 +780,7 @@ const make = Effect.gen(function* () {
     void tab.recording?.encoder.close().catch(constVoid);
     void NodeFSP.rm(downloadDir(tab), { recursive: true, force: true }).catch(constVoid);
     reportLiveTabs();
-    if (closeSession) {
+    if (closeSession && !tab.desktopOwned) {
       runFork(manager.close({ threadId: tab.threadId, tabId: tab.tabId }).pipe(Effect.ignore));
     }
   };
@@ -795,7 +803,9 @@ const make = Effect.gen(function* () {
           .endpoint({ threadId: snapshot.threadId, tabId: snapshot.tabId })
           .pipe(Scope.provide(scope)),
       );
-      const connected = await contexts.connectDesktopPage(endpoint);
+      const connected = await contexts.connectDesktopPage(endpoint, {
+        noDefaults: snapshot.runtime !== "server",
+      });
       return {
         page: connected.page,
         close: async () => {
@@ -826,10 +836,17 @@ const make = Effect.gen(function* () {
   ): Promise<ServerTab> => {
     const adopted = adoptedPages.get(tabKey(snapshot.threadId, snapshot.tabId));
     adoptedPages.delete(tabKey(snapshot.threadId, snapshot.tabId));
-    const desktop =
-      adopted === undefined && (await desktopRenders(snapshot))
-        ? await connectDesktop(snapshot)
-        : null;
+    const desktopOwned = snapshot.runtime !== "server";
+    const desktopAttached = desktopOwned
+      ? await runPromise(desktopChannel.isAttached(snapshot))
+      : adopted === undefined && (await desktopRenders(snapshot));
+    if (desktopOwned && !desktopAttached) {
+      throw new ServerBrowserTabNotFoundError({
+        threadId: snapshot.threadId,
+        tabId: snapshot.tabId,
+      });
+    }
+    const desktop = desktopAttached ? await connectDesktop(snapshot) : null;
     if (desktop) opened.push(desktop.close);
     // Otherwise a desktop that attaches late shows its own page, and the agent drives another.
     if (!desktop && desktopChannel.available) {
@@ -857,7 +874,7 @@ const make = Effect.gen(function* () {
     const page = adopted?.page ?? desktop?.page ?? (await context.newPage());
     if (!desktop) opened.push(() => page.close());
     const cdp = await context.newCDPSession(page);
-    await installPdfDocumentNavigation(cdp);
+    if (!desktopOwned) await installPdfDocumentNavigation(cdp);
     // The desktop's page is already a normal browser. A popup's first request
     // went out before it became a tab; everything after presents as Chrome.
     if (!desktop) await presentAsChrome(cdp, host);
@@ -869,6 +886,7 @@ const make = Effect.gen(function* () {
     );
     let pendingFileChooserOffer = Promise.resolve();
     const tab: ServerTab = {
+      desktopOwned,
       threadId: ThreadId.make(snapshot.threadId),
       tabId: snapshot.tabId,
       page,
@@ -914,7 +932,7 @@ const make = Effect.gen(function* () {
     if (!desktop) {
       await page.setViewportSize(fixedViewportSize(tab.setting) ?? UNATTACHED_FILL_VIEWPORT);
     }
-    await applyRendering(tab, snapshot);
+    if (!desktopOwned) await applyRendering(tab, snapshot);
     if (desktop) {
       // The desktop resizes and zooms its webview itself; viewers map input with the new size.
       const remeasure = () => {
@@ -1017,14 +1035,16 @@ const make = Effect.gen(function* () {
         timestamp: new Date().toISOString(),
       });
     });
-    page.on("dialog", (dialog) => {
-      tab.dialog = dialog;
-      broadcastControl(tab);
-    });
-    page.on("download", (download) => void saveDownload(tab, download));
-    updateFileChooserInterception(tab);
-    // Popups become tabs and keep `window.opener`, so sign-in popups can report back.
-    page.on("popup", (popup) => void adoptPopup(tab, popup));
+    if (!desktopOwned) {
+      page.on("dialog", (dialog) => {
+        tab.dialog = dialog;
+        broadcastControl(tab);
+      });
+      page.on("download", (download) => void saveDownload(tab, download));
+      updateFileChooserInterception(tab);
+      // Popups become tabs and keep `window.opener`, so sign-in popups can report back.
+      page.on("popup", (popup) => void adoptPopup(tab, popup));
+    }
     // Playwright cannot reload a crashed page, so it must leave the tab list.
     const key = tabKey(tab.threadId, tab.tabId);
     if (closedPendingTabs.delete(key)) {
@@ -1033,12 +1053,13 @@ const make = Effect.gen(function* () {
     }
     page.on("close", () => dropTab(tab, true));
     page.on("crash", () => dropTab(tab, true));
-    tabs.set(key, tab);
+    (desktopOwned ? desktopOwnedTabs : tabs).set(key, tab);
     reportLiveTabs();
     // A desktop page navigates on its own and can finish loading before these listeners attach.
     if (desktop) void page.waitForLoadState("load").then(() => reportLoaded(tab), constVoid);
     // Existing desktop and popup PDFs can start loading before interception attaches.
     if (
+      !desktopOwned &&
       snapshot.navStatus._tag === "Loading" &&
       ((!adopted && !desktop) || isPdfAssetUrl(snapshot.navStatus.url))
     ) {
@@ -1389,7 +1410,8 @@ const make = Effect.gen(function* () {
     const key = tabKey(snapshot.threadId, snapshot.tabId);
     const pending = pendingTabs.get(key);
     if (pending?.promise) return pending.promise;
-    const existing = tabs.get(key);
+    const desktopOwned = snapshot.runtime !== "server";
+    const existing = (desktopOwned ? desktopOwnedTabs : tabs).get(key);
     if (existing) return Promise.resolve(existing);
     const opening = createTab(snapshot)
       .catch((cause: unknown) => {
@@ -1405,18 +1427,31 @@ const make = Effect.gen(function* () {
         pendingTabs.delete(key);
         closedPendingTabs.delete(key);
       });
-    pendingTabs.set(key, { agentId: snapshot.automationOwner ?? null, promise: opening });
+    pendingTabs.set(key, {
+      agentId: snapshot.automationOwner ?? null,
+      desktopOwned,
+      promise: opening,
+    });
     return opening;
   };
 
-  const findTab = Effect.fn("ServerBrowser.findTab")(function* (threadId: string, tabId: string) {
+  const findTab = Effect.fn("ServerBrowser.findTab")(function* (
+    threadId: string,
+    tabId: string,
+    viewer = false,
+  ) {
     const existing = tabs.get(tabKey(threadId, tabId));
     if (existing) return existing;
     const { sessions } = yield* manager.list({ threadId: ThreadId.make(threadId) });
     const snapshot = sessions.find(
-      (session) => session.tabId === tabId && session.runtime === "server",
+      (session) => session.tabId === tabId && (session.runtime === "server" || viewer),
     );
-    if (!snapshot) return yield* new ServerBrowserTabNotFoundError({ threadId, tabId });
+    if (
+      !snapshot ||
+      (snapshot.runtime !== "server" && !(yield* desktopChannel.isAttached(snapshot)))
+    ) {
+      return yield* new ServerBrowserTabNotFoundError({ threadId, tabId });
+    }
     return yield* Effect.tryPromise({
       try: () => ensureTab(snapshot),
       catch: (cause) => (isTabNotFound(cause) ? cause : new ServerBrowserLaunchError({ cause })),
@@ -1424,7 +1459,9 @@ const make = Effect.gen(function* () {
   });
 
   const openingReservations = () =>
-    [...pendingTabs.entries()].filter(([key]) => !tabs.has(key)).map(([, pending]) => pending);
+    [...pendingTabs.entries()]
+      .filter(([key, pending]) => !pending.desktopOwned && !tabs.has(key))
+      .map(([, pending]) => pending);
   const serverAtTabLimit = () => tabs.size + openingReservations().length >= SERVER_TAB_LIMIT;
   const agentAtTabLimit = (agentSessionId: string) =>
     [...tabs.values()].filter((tab) => tab.control.agentId === agentSessionId).length +
@@ -2349,7 +2386,7 @@ const make = Effect.gen(function* () {
         return;
       }
       const key = tabKey(event.threadId, event.tabId);
-      const tab = tabs.get(key);
+      const tab = tabs.get(key) ?? desktopOwnedTabs.get(key);
       if (event.type === "closed" && !tab && pendingTabs.has(key)) closedPendingTabs.add(key);
       if (!tab) return;
       if (event.type === "closed") {
@@ -2358,7 +2395,7 @@ const make = Effect.gen(function* () {
         closedSessions.delete(key);
         return;
       }
-      if (event.type === "resized") {
+      if (event.type === "resized" && !tab.desktopOwned) {
         await tab.control
           .system(async () => {
             if (
@@ -2536,7 +2573,7 @@ const make = Effect.gen(function* () {
   const attachViewer: ServerBrowser["Service"]["attachViewer"] = Effect.fn(
     "ServerBrowser.attachViewer",
   )(function* (input) {
-    const tab = yield* findTab(input.threadId, input.tabId);
+    const tab = yield* findTab(input.threadId, input.tabId, true);
     const output = yield* Queue.make<ServerBrowserViewerOutput>({
       capacity: VIEWER_OUTPUT_LIMIT,
       strategy: "dropping",
@@ -2591,9 +2628,15 @@ const make = Effect.gen(function* () {
       });
       return screencastParams;
     };
+    if (tab.desktopOwned && tab.closing) {
+      return yield* new ServerBrowserTabNotFoundError({
+        threadId: input.threadId,
+        tabId: input.tabId,
+      });
+    }
     const viewer: ViewerState = {
       id: NodeCrypto.randomUUID(),
-      canOperate: input.canOperate,
+      canOperate: input.canOperate && !tab.desktopOwned,
       pressedKeys: new Map(),
       pressedButtons: new Map(),
       push: (next) => {
@@ -2641,7 +2684,7 @@ const make = Effect.gen(function* () {
           reportLiveTabs();
         }),
     );
-    if (input.canOperate && tab.control.agentId === null && tab.control.controller === null) {
+    if (viewer.canOperate && tab.control.agentId === null && tab.control.controller === null) {
       yield* Effect.promise(() => tab.control.take(viewer.id));
     }
     broadcastControl(tab);
@@ -2783,9 +2826,18 @@ const make = Effect.gen(function* () {
 
   yield* desktopChannel.detached.pipe(
     Stream.runForEach((key) =>
-      Effect.sync(() => {
-        const tab = tabs.get(tabKey(key.threadId, key.tabId));
+      Effect.gen(function* () {
+        const id = tabKey(key.threadId, key.tabId);
+        const tab = tabs.get(id) ?? desktopOwnedTabs.get(id);
         if (tab?.desktop) dropTab(tab, false);
+        if (pendingTabs.get(id)?.desktopOwned) closedPendingTabs.add(id);
+        yield* manager
+          .setDesktopAttached({
+            ...key,
+            threadId: ThreadId.make(key.threadId),
+            attached: yield* desktopChannel.isAttached(key),
+          })
+          .pipe(Effect.ignore);
       }),
     ),
     Effect.forkScoped,
@@ -2801,10 +2853,17 @@ const make = Effect.gen(function* () {
       Effect.gen(function* () {
         if (tabs.has(tabKey(key.threadId, key.tabId))) return;
         const { sessions } = yield* manager.list({ threadId: ThreadId.make(key.threadId) });
-        const snapshot = sessions.find(
-          (session) => session.tabId === key.tabId && session.runtime === "server",
-        );
-        if (snapshot) yield* Effect.promise(() => ensureTab(snapshot).catch(constVoid));
+        const snapshot = sessions.find((session) => session.tabId === key.tabId);
+        if (!snapshot) return;
+        if (snapshot.runtime === "server") {
+          yield* Effect.promise(() => ensureTab(snapshot).catch(constVoid));
+        } else {
+          yield* manager.setDesktopAttached({
+            ...key,
+            threadId: ThreadId.make(key.threadId),
+            attached: yield* desktopChannel.isAttached(key),
+          });
+        }
       }).pipe(Effect.ignore),
     ),
     Effect.forkScoped,
@@ -2848,6 +2907,7 @@ const make = Effect.gen(function* () {
   );
   yield* Effect.addFinalizer(() =>
     Effect.promise(async () => {
+      await Promise.allSettled([...desktopOwnedTabs.values()].map((tab) => tab.desktop?.close()));
       await contexts.close();
     }),
   );

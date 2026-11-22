@@ -311,6 +311,7 @@ let desktopPageUrl = "about:blank";
 /** Replaces the answer to the desktop page's size reads. */
 let desktopSizeAnswer: (() => Promise<Record<string, unknown>>) | null = null;
 const desktopDetaches = new NodeEvents.EventEmitter();
+let desktopAttachReady = Promise.withResolvers<void>();
 let desktopDetachReady = Promise.withResolvers<void>();
 let desktopReleased = Promise.withResolvers<void>();
 const desktopTabs = new Set<string>();
@@ -375,6 +376,7 @@ const dependencies = Layer.mergeAll(
           const onAttach = (key: { threadId: string; tabId: string }) =>
             Queue.offerUnsafe(queue, key);
           desktopDetaches.on("attach", onAttach);
+          desktopAttachReady.resolve();
           return onAttach;
         }),
         (onAttach) => Effect.sync(() => desktopDetaches.off("attach", onAttach)),
@@ -465,6 +467,7 @@ beforeEach(() => {
   desktopRendersNext = false;
   desktopPageUrl = "about:blank";
   desktopSizeAnswer = null;
+  desktopAttachReady = Promise.withResolvers<void>();
   desktopDetachReady = Promise.withResolvers<void>();
   desktopReleased = Promise.withResolvers<void>();
   releasedDesktopTabs.length = 0;
@@ -611,6 +614,60 @@ it.live.each(["desktop" as const, undefined])(
           input: { open: false },
         });
         expect(reused.tabId).toBe(tabId);
+      }),
+    ).pipe(Effect.provide(layer)),
+);
+
+it.effect(
+  "streams an attached desktop-owned tab only for its thread, without granting control",
+  () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const browser = yield* ServerBrowser.ServerBrowser;
+        const manager = yield* Manager.PreviewManager;
+        const { tabId } = yield* manager.open({ threadId: testThread.threadId });
+        const input = viewerInput(tabId, true);
+        const events = yield* manager.subscribeEvents;
+        yield* Effect.promise(() =>
+          Promise.all([desktopAttachReady.promise, desktopDetachReady.promise]),
+        );
+
+        expect(yield* browser.attachViewer(input).pipe(Effect.flip)).toMatchObject({
+          _tag: "ServerBrowserTabNotFoundError",
+        });
+        desktopTabs.add(tabId);
+        desktopDetaches.emit("attach", input);
+        expect(yield* PubSub.take(events)).toMatchObject({
+          threadId: input.threadId,
+          tabId,
+          snapshot: { desktopAttached: true },
+        });
+        expect(desktopConnections).toHaveLength(0);
+        expect(
+          yield* browser.attachViewer({ ...input, threadId: "other-thread" }).pipe(Effect.flip),
+        ).toMatchObject({ _tag: "ServerBrowserTabNotFoundError" });
+
+        const viewer = yield* browser.attachViewer(input);
+        yield* viewer.input({ type: "takeControl" });
+        const outputs = yield* Queue.takeAll(viewer.output);
+        expect(outputs).toContainEqual(expect.objectContaining({ _tag: "frame" }));
+        expect(outputs).toContainEqual(
+          expect.objectContaining({ _tag: "control", canOperate: false, controller: "unclaimed" }),
+        );
+        expect(desktopConnections).toHaveLength(1);
+        expect(contexts).toHaveLength(0);
+
+        desktopTabs.delete(tabId);
+        desktopDetaches.emit("detach", input);
+        expect(yield* PubSub.take(events)).toMatchObject({
+          threadId: input.threadId,
+          tabId,
+          snapshot: { desktopAttached: false },
+        });
+        expect(yield* Queue.take(viewer.output)).toMatchObject({ _tag: "reconnect" });
+        expect(yield* browser.attachViewer(input).pipe(Effect.flip)).toMatchObject({
+          _tag: "ServerBrowserTabNotFoundError",
+        });
       }),
     ).pipe(Effect.provide(layer)),
 );

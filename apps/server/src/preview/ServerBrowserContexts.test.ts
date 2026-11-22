@@ -109,6 +109,22 @@ describe("ServerBrowserContexts", () => {
     }
   });
 
+  it("releases the scratch context if creating its page fails", async () => {
+    const browser = makeBrowser();
+    const context = makeContext();
+    const failure = new Error("Could not create page");
+    context.newPage.mockRejectedValueOnce(failure);
+    browser.newContext.mockResolvedValueOnce(context as unknown as BrowserContext);
+    launches.launch.mockResolvedValueOnce(browser as unknown as Browser);
+    const pool = new ServerBrowserContexts(options());
+    try {
+      await expect(pool.scratchPage()).rejects.toBe(failure);
+      expect(context.isClosed()).toBe(true);
+    } finally {
+      await pool.close();
+    }
+  });
+
   it("lazily shares one browser across concurrent isolated sessions and reuses each context", async () => {
     const browser = makeBrowser();
     const launch = Promise.withResolvers<Browser>();
