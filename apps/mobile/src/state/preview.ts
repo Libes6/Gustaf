@@ -123,7 +123,7 @@ const threadPreviewTabsAtom = Atom.family((threadKey: string) => {
   }).pipe(Atom.setIdleTTL(1_000), Atom.withLabel(`mobile-preview-tabs:${threadKey}`));
 });
 
-export function useThreadServerBrowserTabs(input: {
+export function useThreadBrowserTabs(input: {
   readonly environmentId: EnvironmentId;
   readonly threadId: ThreadId;
   readonly enabled: boolean;
@@ -135,7 +135,9 @@ export function useThreadServerBrowserTabs(input: {
         )
       : emptyTabsAtom,
   );
-  const sessions = tabs.sessions.filter((session) => session.runtime === "server");
+  const sessions = tabs.sessions.filter(
+    (session) => session.runtime === "server" || session.desktopAttached === true,
+  );
   return { tabs: sessions, loaded: tabs.listed };
 }
 

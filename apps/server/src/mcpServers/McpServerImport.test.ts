@@ -2,6 +2,7 @@ import { assert, it } from "@effect/vitest";
 import {
   type ManagedPolicyDocument,
   McpServerId,
+  ProviderDriverKind,
   ServerSettings as ServerSettingsSchema,
 } from "@t3tools/contracts";
 import * as HostProcess from "@t3tools/shared/HostProcess";
@@ -26,6 +27,7 @@ const figma: NativeMcpServer = {
   command: "npx",
   args: ["-y", "figma-mcp"],
   env: { FIGMA_TOKEN: "figma-secret-value" },
+  cwd: "/opt/figma",
 };
 const linear: NativeMcpServer = {
   source: "claude",
@@ -37,6 +39,16 @@ const linear: NativeMcpServer = {
   url: "https://mcp.linear.test/mcp",
   headers: { Authorization: "Bearer linear-secret-value" },
 };
+const projectDocs: NativeMcpServer = {
+  source: "project-mcp-json",
+  sourcePath: "/work/app/.mcp.json",
+  projectDir: "/work/app",
+  name: "docs",
+  enabled: true,
+  transport: "http",
+  url: "https://mcp.docs.test/mcp",
+  headers: {},
+};
 
 const run = <A, E>(
   program: (service: McpServerImport.McpServerImport["Service"]) => Effect.Effect<A, E>,
@@ -44,6 +56,7 @@ const run = <A, E>(
     readonly settings?: unknown;
     readonly policy?: ManagedPolicyDocument;
     readonly locations?: Array<NativeMcpConfigLocations>;
+    readonly natives?: ReadonlyArray<NativeMcpServer>;
   } = {},
 ) =>
   Effect.gen(function* () {
@@ -61,7 +74,7 @@ const run = <A, E>(
             list: (locations) =>
               Effect.sync(() => {
                 options.locations?.push(locations);
-                return { servers: [figma, linear], errors: [] };
+                return { servers: options.natives ?? [figma, linear], errors: [] };
               }),
           }),
         ]),
@@ -121,30 +134,40 @@ it.effect("lists importable servers with key names only, never env or header val
   }),
 );
 
-it.effect("imports chosen entries turned off, with their values as literal secrets", () =>
+it.effect("imports chosen entries turned off, for their source's provider only", () =>
   Effect.gen(function* () {
-    const { result, settings } = yield* run((service) =>
-      service.importServers({
-        entries: [
-          {
-            source: "codex",
-            name: "Figma Desktop",
-            id: McpServerId.make("figma"),
-            transport: "stdio",
-          },
-          {
-            source: "claude",
-            name: "linear",
-            projectDir: "/work/app",
-            id: McpServerId.make("linear"),
-            transport: "http",
-          },
-        ],
-      }),
+    const { result, settings } = yield* run(
+      (service) =>
+        service.importServers({
+          entries: [
+            {
+              source: "codex",
+              name: "Figma Desktop",
+              id: McpServerId.make("figma"),
+              transport: "stdio",
+            },
+            {
+              source: "claude",
+              name: "linear",
+              projectDir: "/work/app",
+              id: McpServerId.make("linear"),
+              transport: "http",
+            },
+            {
+              source: "project-mcp-json",
+              name: "docs",
+              projectDir: "/work/app",
+              id: McpServerId.make("docs"),
+              transport: "http",
+            },
+          ],
+        }),
+      { natives: [figma, linear, projectDocs] },
     );
     assert.deepStrictEqual(result.imported, [
       McpServerId.make("figma"),
       McpServerId.make("linear"),
+      McpServerId.make("docs"),
     ]);
     assert.deepStrictEqual(settings.mcpServers, {
       [McpServerId.make("figma")]: {
@@ -155,8 +178,9 @@ it.effect("imports chosen entries turned off, with their values as literal secre
           command: "npx",
           args: ["-y", "figma-mcp"],
           env: { FIGMA_TOKEN: "figma-secret-value" },
-          cwd: "thread",
+          cwd: "/opt/figma",
         },
+        providers: [ProviderDriverKind.make("codex")],
       },
       [McpServerId.make("linear")]: {
         name: "linear",
@@ -166,6 +190,12 @@ it.effect("imports chosen entries turned off, with their values as literal secre
           url: "https://mcp.linear.test/mcp",
           headers: { Authorization: "Bearer linear-secret-value" },
         },
+        providers: [ProviderDriverKind.make("claudeAgent")],
+      },
+      [McpServerId.make("docs")]: {
+        name: "docs",
+        enabled: false,
+        transport: { type: "http", url: "https://mcp.docs.test/mcp", headers: {} },
       },
     });
   }),

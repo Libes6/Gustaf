@@ -920,6 +920,12 @@ pub fn reload(tab_id: &str, hard: bool) {
     }
 }
 
+pub fn zoom_factor(tab_id: &str) -> f64 {
+    browser_of(tab_id)
+        .and_then(|browser| browser.host())
+        .map_or(1.0, |host| 1.2f64.powf(host.zoom_level()))
+}
+
 pub fn set_zoom(tab_id: &str, zoom_factor: f64) {
     if let Some(host) = browser_of(tab_id).and_then(|browser| browser.host()) {
         // CEF's zoom level is logarithmic: each step of 1.0 is a factor of 1.2.

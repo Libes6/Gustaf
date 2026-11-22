@@ -24,6 +24,7 @@ import {
   type ServerSettingsPatch,
   withIdleCompaction,
 } from "@t3tools/contracts";
+import * as Equal from "effect/Equal";
 import * as Option from "effect/Option";
 import * as Predicate from "effect/Predicate";
 import * as Schema from "effect/Schema";
@@ -245,6 +246,28 @@ function mergeSettingsEntries<Value>(
     }
   }
   return Object.fromEntries(next);
+}
+
+function mergeMcpServers(
+  current: ServerSettings["mcpServers"],
+  patch: NonNullable<ServerSettingsPatch["mcpServers"]>,
+) {
+  const previousById = new Map(Object.entries(current));
+  const entries = Object.entries(patch).map(([id, config]) => {
+    const previous = previousById.get(id);
+    if (
+      config === null ||
+      previous === undefined ||
+      config.enabled === previous.enabled ||
+      config.name !== previous.name ||
+      !Equal.equals(config.transport, previous.transport)
+    ) {
+      return [id, config] as const;
+    }
+    // Older clients omit restrictions when sending back the config with its switch flipped.
+    return [id, { ...previous, ...config }] as const;
+  });
+  return mergeSettingsEntries(current, Object.fromEntries(entries));
 }
 
 // Secret persistence keys tokens by trimmed, lowercased host, so merge on the same key.
@@ -631,7 +654,7 @@ export function applyServerSettingsPatch(
       ? { secretProviders: mergeSettingsEntries(current.secretProviders, secretProvidersPatch) }
       : {}),
     ...(mcpServersPatch !== undefined
-      ? { mcpServers: mergeSettingsEntries(current.mcpServers, mcpServersPatch) }
+      ? { mcpServers: mergeMcpServers(current.mcpServers, mcpServersPatch) }
       : {}),
     ...(usagePriceOverridesPatch !== undefined
       ? {

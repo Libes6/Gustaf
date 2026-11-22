@@ -19,6 +19,7 @@ import {
   ProviderDriverKind,
   ProviderInstanceId,
   type ProviderSessionId,
+  ProviderThreadId,
   ThreadId,
   TurnItemId,
 } from "@t3tools/contracts";
@@ -43,6 +44,7 @@ import * as ProjectService from "../project/ProjectService.ts";
 import * as McpProviderSession from "@t3tools/provider-core/server/mcpSession";
 import * as McpProviderSessions from "@t3tools/provider-core/server/McpProviderSessions";
 import * as McpSessionRegistry from "../mcp/McpSessionRegistry.ts";
+import * as McpServerChecks from "../mcpServers/McpServerChecks.ts";
 import * as McpUserServers from "../mcpServers/McpUserServers.ts";
 import * as SqlitePersistence from "../persistence/Sqlite.ts";
 import * as ServerSettings from "../serverSettings.ts";
@@ -465,6 +467,8 @@ const makeProviderAdapter = Effect.fnUntraced(function* (
     readonly spawnBeforeOpen?: boolean;
     readonly scopeCloseReached?: Deferred.Deferred<void>;
     readonly nativeMcpSources?: McpProviderSession.NativeMcpSources;
+    readonly abortsOnFailedMcpServer?: boolean;
+    readonly failedMcpServerOf?: ProviderAdapter.ProviderAdapterV2["Service"]["failedMcpServerOf"];
   } = {},
 ) {
   const mcpSessions = yield* McpProviderSessions.McpProviderSessions;
@@ -487,6 +491,12 @@ const makeProviderAdapter = Effect.fnUntraced(function* (
     ...(options.nativeMcpSources === undefined
       ? {}
       : { nativeMcpSources: options.nativeMcpSources }),
+    ...(options.abortsOnFailedMcpServer === undefined
+      ? {}
+      : { abortsOnFailedMcpServer: options.abortsOnFailedMcpServer }),
+    ...(options.failedMcpServerOf === undefined
+      ? {}
+      : { failedMcpServerOf: options.failedMcpServerOf }),
     getCapabilities: () => Effect.succeed(options.capabilities ?? CodexCapabilities),
     planSelectionTransition: () => Effect.succeed({ type: "apply_on_next_turn" }),
     openSession: (input) =>
@@ -638,7 +648,10 @@ function layerTest(input: {
   readonly serverSettingsLayer?: ReturnType<typeof ServerSettings.layerTest>;
   readonly projectServiceLayer?: Layer.Layer<ProjectService.ProjectService>;
   readonly mcpUserServersLayer?: Layer.Layer<McpUserServers.McpUserServers>;
+  readonly mcpServerChecksLayer?: Layer.Layer<McpServerChecks.McpServerChecks>;
   readonly nativeMcpSources?: McpProviderSession.NativeMcpSources;
+  readonly abortsOnFailedMcpServer?: boolean;
+  readonly failedMcpServerOf?: ProviderAdapter.ProviderAdapterV2["Service"]["failedMcpServerOf"];
 }) {
   const layerConfiguredEventSink =
     input.flakyReleaseWrites !== undefined
@@ -685,6 +698,12 @@ function layerTest(input: {
         ? {}
         : { scopeCloseReached: input.scopeCloseReached }),
       ...(input.nativeMcpSources === undefined ? {} : { nativeMcpSources: input.nativeMcpSources }),
+      ...(input.abortsOnFailedMcpServer === undefined
+        ? {}
+        : { abortsOnFailedMcpServer: input.abortsOnFailedMcpServer }),
+      ...(input.failedMcpServerOf === undefined
+        ? {}
+        : { failedMcpServerOf: input.failedMcpServerOf }),
     }).pipe(Effect.map(ProviderAdapterRegistry.layerSingle)),
   );
   const layerConfiguredMcpRegistry =
@@ -731,6 +750,7 @@ function layerTest(input: {
           ...(input.serverSettingsLayer === undefined ? [] : [input.serverSettingsLayer]),
           ...(input.projectServiceLayer === undefined ? [] : [input.projectServiceLayer]),
           ...(input.mcpUserServersLayer === undefined ? [] : [input.mcpUserServersLayer]),
+          ...(input.mcpServerChecksLayer === undefined ? [] : [input.mcpServerChecksLayer]),
         ),
       ),
     ),
@@ -2576,7 +2596,7 @@ it.effect(
 );
 
 it.effect(
-  "ProviderSessionManagerV2 hands each session the thread's user MCP servers without the provider's native ones",
+  "ProviderSessionManagerV2 hands each session the thread's user MCP servers without the provider's native ones or known failures",
   () =>
     Effect.gen(function* () {
       const state = yield* Ref.make(emptyState);
@@ -2599,14 +2619,28 @@ it.effect(
       const requests = yield* Ref.make<
         ReadonlyArray<Parameters<McpUserServers.McpUserServers["Service"]["resolveForThread"]>[0]>
       >([]);
-      const mcpUserServersLayer = Layer.succeed(McpUserServers.McpUserServers, {
+      const jam = McpServerId.make("jam");
+      const unusable = new Map([[jam, "Needs sign-in."]]);
+      const serverFailure = makeProviderFailure({
+        class: "provider_error",
+        code: "MCP_SERVER_FAILED",
+        message: "figma did not start.",
+        retryable: false,
+      });
+      const markedFailed =
+        yield* Deferred.make<
+          Parameters<McpServerChecks.McpServerChecks["Service"]["markFailed"]>[0]
+        >();
+      const mcpUserServersLayer = Layer.mock(McpUserServers.McpUserServers)({
         resolveForThread: (request) =>
           Ref.update(requests, (current) => [...current, request]).pipe(
             Effect.andThen(Ref.get(enabled)),
-            Effect.map((servers) =>
-              servers.map((server) => ({ ...server, id: McpServerId.make(server.id) })),
-            ),
+            Effect.map((servers) => ({
+              servers: servers.map((server) => ({ ...server, id: McpServerId.make(server.id) })),
+              skipped: [...(request.unusable ?? [])].map(([id, reason]) => ({ id, reason })),
+            })),
           ),
+        sessionKey: () => Ref.get(enabled).pipe(Effect.map((servers) => JSON.stringify(servers))),
       });
       const effect = Effect.gen(function* () {
         const eventSink = yield* EventSink.EventSinkV2;
@@ -2639,6 +2673,29 @@ it.effect(
         });
         const opened = (yield* Ref.get(mcpConfigs))[0];
         assert.deepEqual(opened?.userServers, [{ ...figma, id: McpServerId.make("figma") }]);
+        assert.deepEqual(opened?.skippedUserServers, [{ id: jam, reason: "Needs sign-in." }]);
+
+        // A turn the agent refused over a server marks that server failed.
+        const queue = (yield* Ref.get(state)).eventQueues.get(String(sessionId));
+        yield* Queue.offer(queue!, {
+          type: "turn.terminal",
+          driver: CODEX_DRIVER,
+          providerThreadId: ProviderThreadId.make("native-user-mcp-owner"),
+          providerTurnId: idAllocator.derive.providerTurn({
+            driver: CODEX_DRIVER,
+            nativeTurnId: "native-turn-user-mcp",
+          }),
+          runOrdinal: 1,
+          failureItemOrdinal: 1,
+          status: "failed",
+          failure: serverFailure,
+          threadDisposition: "reusable",
+        });
+        assert.deepEqual(yield* Deferred.await(markedFailed), {
+          id: McpServerId.make("figma"),
+          error: serverFailure.message,
+          needsAuth: true,
+        });
 
         // An attach has no runtime policy, so the cwd falls back to the project checkout.
         yield* manager.open({
@@ -2649,8 +2706,8 @@ it.effect(
         });
         assert.deepEqual((yield* mcpSessions.read(joiner))?.userServers, opened?.userServers);
         assert.deepEqual(yield* Ref.get(requests), [
-          { projectId, cwd: runtimePolicy.cwd, native },
-          { projectId, cwd: "/projects/user-mcp", native },
+          { projectId, driver: CODEX_DRIVER, cwd: runtimePolicy.cwd, native, unusable },
+          { projectId, driver: CODEX_DRIVER, cwd: "/projects/user-mcp", native, unusable },
         ]);
 
         // A reused credential still carries the servers enabled now.
@@ -2673,7 +2730,14 @@ it.effect(
             idleTimeoutMs: 60_000,
             mcpConfigs,
             nativeMcpSources: native,
+            abortsOnFailedMcpServer: true,
+            failedMcpServerOf: (failure) =>
+              failure.code === "MCP_SERVER_FAILED" ? { id: "figma", needsAuth: true } : undefined,
             mcpUserServersLayer,
+            mcpServerChecksLayer: Layer.mock(McpServerChecks.McpServerChecks)({
+              knownUnusable: Effect.succeed(unusable),
+              markFailed: (input) => Deferred.succeed(markedFailed, input).pipe(Effect.asVoid),
+            }),
             projectServiceLayer: Layer.mock(ProjectService.ProjectService)({
               getById: (requestedProjectId) =>
                 Effect.succeedSome({
@@ -2681,6 +2745,221 @@ it.effect(
                   workspaceRoot: "/projects/user-mcp",
                 }),
             }),
+          }),
+        ),
+      );
+    }),
+);
+
+const jamServer = (token: string) =>
+  ({
+    type: "http",
+    id: McpServerId.make("jam"),
+    url: "https://mcp.jam.test/mcp",
+    headers: { Authorization: `Bearer ${token}` },
+  }) satisfies McpProviderSession.McpUserServer;
+
+/** User MCP servers come from a Ref; servers the checks call unusable are skipped. */
+const userMcpScenario = Effect.fnUntraced(function* () {
+  const enabled = yield* Ref.make<ReadonlyArray<McpProviderSession.McpUserServer>>([
+    jamServer("one"),
+  ]);
+  const unusable = yield* Ref.make<ReadonlyMap<McpServerId, string>>(new Map());
+  const mcpUserServersLayer = Layer.mock(McpUserServers.McpUserServers)({
+    resolveForThread: (request) =>
+      Ref.get(enabled).pipe(
+        Effect.map((servers) => ({
+          servers: servers
+            .filter((server) => !request.unusable?.has(McpServerId.make(server.id)))
+            .map((server) => ({ ...server, id: McpServerId.make(server.id) })),
+          skipped: [...(request.unusable ?? [])].map(([id, reason]) => ({ id, reason })),
+        })),
+      ),
+    sessionKey: (request) =>
+      Ref.get(enabled).pipe(
+        Effect.map((servers) => JSON.stringify([servers, [...(request.unusable?.keys() ?? [])]])),
+      ),
+  });
+  const mcpServerChecksLayer = Layer.mock(McpServerChecks.McpServerChecks)({
+    knownUnusable: Ref.get(unusable),
+    markFailed: ({ id, error }) =>
+      Ref.update(unusable, (current) => new Map(current).set(id, error)),
+  });
+  return { enabled, unusable, mcpUserServersLayer, mcpServerChecksLayer };
+});
+
+it.effect.each([
+  { abortsOnFailedMcpServer: true, capabilities: ExclusiveCapabilities, reopens: true },
+  { abortsOnFailedMcpServer: false, capabilities: ExclusiveCapabilities, reopens: true },
+  { abortsOnFailedMcpServer: false, capabilities: CodexCapabilities, reopens: false },
+] as const)(
+  "ProviderSessionManagerV2 reopens an idle session whose user MCP servers changed unless other threads share it (%#)",
+  ({ abortsOnFailedMcpServer, capabilities, reopens }) =>
+    Effect.gen(function* () {
+      const state = yield* Ref.make(emptyState);
+      const mcpConfigs = yield* Ref.make<
+        ReadonlyArray<McpProviderSession.McpProviderSessionConfig | undefined>
+      >([]);
+      const scenario = yield* userMcpScenario();
+      const effect = Effect.gen(function* () {
+        const eventSink = yield* EventSink.EventSinkV2;
+        const idAllocator = yield* IdAllocator.IdAllocatorV2;
+        const manager = yield* ProviderSessionManager.ProviderSessionManagerV2;
+        const threadId = ThreadId.make("thread-provider-session-manager-user-mcp-change");
+        const providerSessionId = yield* idAllocator.allocate.providerSession({
+          providerInstanceId: modelSelection.instanceId,
+          threadId,
+        });
+        yield* eventSink.write({
+          events: [
+            yield* makeThreadCreatedEvent({ idAllocator, threadId, now: yield* DateTime.now }),
+          ],
+        });
+        const open = manager.open({ threadId, providerSessionId, modelSelection, runtimePolicy });
+
+        yield* open;
+        yield* open;
+        assert.equal((yield* Ref.get(state)).openCount, 1);
+        assert.deepEqual((yield* Ref.get(mcpConfigs)).at(-1)?.userServers, [jamServer("one")]);
+
+        // Signing in again hands the server a new token the live agent never saw.
+        yield* Ref.set(scenario.enabled, [jamServer("two")]);
+        yield* open;
+        const { openCount, closeCount } = yield* Ref.get(state);
+        assert.deepEqual(
+          { openCount, closeCount },
+          reopens ? { openCount: 2, closeCount: 1 } : { openCount: 1, closeCount: 0 },
+        );
+        const jamWithoutLogin = { ...jamServer("one"), headers: {} };
+        yield* Ref.set(scenario.enabled, [jamWithoutLogin]);
+        yield* open;
+        const afterSignOut = yield* Ref.get(state);
+        assert.equal(afterSignOut.openCount, reopens ? 3 : 1);
+        assert.equal(afterSignOut.closeCount, reopens ? 2 : 0);
+
+        const providerConfigs = yield* Ref.get(mcpConfigs);
+        assert.deepEqual(
+          providerConfigs.map((config) => config?.userServers),
+          reopens
+            ? [[jamServer("one")], [jamServer("two")], [jamWithoutLogin]]
+            : [[jamServer("one")]],
+        );
+      });
+
+      yield* effect.pipe(
+        Effect.provide(
+          layerTest({
+            state,
+            idleTimeoutMs: 60_000,
+            mcpConfigs,
+            capabilities,
+            abortsOnFailedMcpServer,
+            mcpUserServersLayer: scenario.mcpUserServersLayer,
+            mcpServerChecksLayer: scenario.mcpServerChecksLayer,
+          }),
+        ),
+      );
+    }),
+);
+
+it.effect(
+  "ProviderSessionManagerV2 drops a server the agent failed on from the next session, unless it changed since open",
+  () =>
+    Effect.gen(function* () {
+      const state = yield* Ref.make(emptyState);
+      const mcpConfigs = yield* Ref.make<
+        ReadonlyArray<McpProviderSession.McpProviderSessionConfig | undefined>
+      >([]);
+      const scenario = yield* userMcpScenario();
+      const serverFailure = makeProviderFailure({
+        class: "provider_error",
+        code: "MCP_SERVER_FAILED",
+        message: "jam did not start.",
+        retryable: false,
+      });
+      const effect = Effect.gen(function* () {
+        const eventSink = yield* EventSink.EventSinkV2;
+        const idAllocator = yield* IdAllocator.IdAllocatorV2;
+        const manager = yield* ProviderSessionManager.ProviderSessionManagerV2;
+        const threadId = ThreadId.make("thread-provider-session-manager-user-mcp-failed");
+        const providerSessionId = yield* idAllocator.allocate.providerSession({
+          providerInstanceId: modelSelection.instanceId,
+          threadId,
+        });
+        yield* eventSink.write({
+          events: [
+            yield* makeThreadCreatedEvent({ idAllocator, threadId, now: yield* DateTime.now }),
+          ],
+        });
+        const open = manager.open({ threadId, providerSessionId, modelSelection, runtimePolicy });
+        // Subscribers see the terminal event only after the failed server was handled.
+        const failTurn = Effect.fnUntraced(function* (
+          runtime: ProviderAdapter.ProviderAdapterV2SessionRuntime,
+          nativeTurnId: string,
+          failure = serverFailure,
+        ) {
+          const subscriber = yield* runtime.subscribeEvents!;
+          const queue = (yield* Ref.get(state)).eventQueues.get(String(providerSessionId));
+          yield* Queue.offer(queue!, {
+            type: "turn.terminal",
+            driver: CODEX_DRIVER,
+            providerThreadId: ProviderThreadId.make("native-user-mcp-failed"),
+            providerTurnId: idAllocator.derive.providerTurn({ driver: CODEX_DRIVER, nativeTurnId }),
+            runOrdinal: 1,
+            failureItemOrdinal: 1,
+            status: "failed",
+            failure,
+            threadDisposition: "reusable",
+          });
+          yield* subscriber.events.pipe(Stream.runHead);
+        });
+
+        // A sign-in during the turn: the failure came from the old token, so jam stays usable.
+        const first = yield* open;
+        yield* Ref.set(scenario.enabled, [jamServer("two")]);
+        yield* failTurn(first, "native-turn-old-token");
+        assert.equal((yield* Ref.get(scenario.unusable)).size, 0);
+
+        const second = yield* open;
+        assert.equal((yield* Ref.get(state)).openCount, 2);
+        // A configured server this session was not given is not the one that failed.
+        yield* failTurn(second, "native-turn-other-server", {
+          ...serverFailure,
+          code: "OTHER_SERVER_FAILED",
+        });
+        assert.equal((yield* Ref.get(scenario.unusable)).size, 0);
+        yield* failTurn(second, "native-turn-new-token");
+        assert.deepEqual(
+          [...(yield* Ref.get(scenario.unusable)).keys()],
+          [McpServerId.make("jam")],
+        );
+
+        // Sending again reopens the agent without the failed server.
+        yield* open;
+        assert.equal((yield* Ref.get(state)).openCount, 3);
+        const reopened = (yield* Ref.get(mcpConfigs)).at(-1);
+        assert.isUndefined(reopened?.userServers);
+        assert.deepEqual(reopened?.skippedUserServers, [
+          { id: McpServerId.make("jam"), reason: serverFailure.message },
+        ]);
+      });
+
+      yield* effect.pipe(
+        Effect.provide(
+          layerTest({
+            state,
+            idleTimeoutMs: 60_000,
+            mcpConfigs,
+            capabilities: ExclusiveCapabilities,
+            abortsOnFailedMcpServer: true,
+            failedMcpServerOf: (failure) =>
+              failure.code === "MCP_SERVER_FAILED"
+                ? { id: "jam", needsAuth: false }
+                : failure.code === "OTHER_SERVER_FAILED"
+                  ? { id: "spline", needsAuth: false }
+                  : undefined,
+            mcpUserServersLayer: scenario.mcpUserServersLayer,
+            mcpServerChecksLayer: scenario.mcpServerChecksLayer,
           }),
         ),
       );

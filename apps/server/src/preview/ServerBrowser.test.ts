@@ -311,6 +311,7 @@ let desktopPageUrl = "about:blank";
 /** Replaces the answer to the desktop page's size reads. */
 let desktopSizeAnswer: (() => Promise<Record<string, unknown>>) | null = null;
 const desktopDetaches = new NodeEvents.EventEmitter();
+let desktopAttachReady = Promise.withResolvers<void>();
 let desktopDetachReady = Promise.withResolvers<void>();
 let desktopReleased = Promise.withResolvers<void>();
 const desktopTabs = new Set<string>();
@@ -324,6 +325,7 @@ const desktopRenders = (tabId: string) => {
 const shownDesktopTabs = new Set<string>();
 const releasedDesktopTabs: Array<string> = [];
 const desktopTurns = new NodeEvents.EventEmitter();
+const desktopZoomChanges: Array<[string, number]> = [];
 const desktopConnections: Array<{ endpoint: string; context: ReturnType<typeof makeContext> }> = [];
 const testThread = {
   threadId: ThreadId.make("browser-test-thread"),
@@ -374,6 +376,7 @@ const dependencies = Layer.mergeAll(
           const onAttach = (key: { threadId: string; tabId: string }) =>
             Queue.offerUnsafe(queue, key);
           desktopDetaches.on("attach", onAttach);
+          desktopAttachReady.resolve();
           return onAttach;
         }),
         (onAttach) => Effect.sync(() => desktopDetaches.off("attach", onAttach)),
@@ -390,6 +393,8 @@ const dependencies = Layer.mergeAll(
         }),
       ),
     pointer: () => Effect.void,
+    setZoom: ({ tabId }, zoomFactor) =>
+      Effect.sync(() => void desktopZoomChanges.push([tabId, zoomFactor])),
     turn: (threadId, active) => Effect.sync(() => desktopTurns.emit("turn", threadId, active)),
   }),
   PreviewAgentActivity.layer,
@@ -462,10 +467,12 @@ beforeEach(() => {
   desktopRendersNext = false;
   desktopPageUrl = "about:blank";
   desktopSizeAnswer = null;
+  desktopAttachReady = Promise.withResolvers<void>();
   desktopDetachReady = Promise.withResolvers<void>();
   desktopReleased = Promise.withResolvers<void>();
   releasedDesktopTabs.length = 0;
   desktopConnections.length = 0;
+  desktopZoomChanges.length = 0;
 });
 
 it("spaces screencast acks so a page repainting nonstop streams at a capped rate", () => {
@@ -607,6 +614,60 @@ it.live.each(["desktop" as const, undefined])(
           input: { open: false },
         });
         expect(reused.tabId).toBe(tabId);
+      }),
+    ).pipe(Effect.provide(layer)),
+);
+
+it.effect(
+  "streams an attached desktop-owned tab only for its thread, without granting control",
+  () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const browser = yield* ServerBrowser.ServerBrowser;
+        const manager = yield* Manager.PreviewManager;
+        const { tabId } = yield* manager.open({ threadId: testThread.threadId });
+        const input = viewerInput(tabId, true);
+        const events = yield* manager.subscribeEvents;
+        yield* Effect.promise(() =>
+          Promise.all([desktopAttachReady.promise, desktopDetachReady.promise]),
+        );
+
+        expect(yield* browser.attachViewer(input).pipe(Effect.flip)).toMatchObject({
+          _tag: "ServerBrowserTabNotFoundError",
+        });
+        desktopTabs.add(tabId);
+        desktopDetaches.emit("attach", input);
+        expect(yield* PubSub.take(events)).toMatchObject({
+          threadId: input.threadId,
+          tabId,
+          snapshot: { desktopAttached: true },
+        });
+        expect(desktopConnections).toHaveLength(0);
+        expect(
+          yield* browser.attachViewer({ ...input, threadId: "other-thread" }).pipe(Effect.flip),
+        ).toMatchObject({ _tag: "ServerBrowserTabNotFoundError" });
+
+        const viewer = yield* browser.attachViewer(input);
+        yield* viewer.input({ type: "takeControl" });
+        const outputs = yield* Queue.takeAll(viewer.output);
+        expect(outputs).toContainEqual(expect.objectContaining({ _tag: "frame" }));
+        expect(outputs).toContainEqual(
+          expect.objectContaining({ _tag: "control", canOperate: false, controller: "unclaimed" }),
+        );
+        expect(desktopConnections).toHaveLength(1);
+        expect(contexts).toHaveLength(0);
+
+        desktopTabs.delete(tabId);
+        desktopDetaches.emit("detach", input);
+        expect(yield* PubSub.take(events)).toMatchObject({
+          threadId: input.threadId,
+          tabId,
+          snapshot: { desktopAttached: false },
+        });
+        expect(yield* Queue.take(viewer.output)).toMatchObject({ _tag: "reconnect" });
+        expect(yield* browser.attachViewer(input).pipe(Effect.flip)).toMatchObject({
+          _tag: "ServerBrowserTabNotFoundError",
+        });
       }),
     ).pipe(Effect.provide(layer)),
 );
@@ -1895,6 +1956,45 @@ it.effect(
         ]);
       }),
     ).pipe(Effect.provide(layer)),
+);
+
+it.effect("sends a desktop preview the new zoom level and reset from its snapshot", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const { broker } = yield* ready;
+      const manager = yield* Manager.PreviewManager;
+      desktopRendersNext = true;
+      const opened = yield* broker.invoke<PreviewAutomationStatus>({
+        scope,
+        operation: "open",
+        input: { reuseExistingTab: false, show: false },
+      });
+      const tabId = PreviewTabId.make(opened.tabId!);
+      const cdp = desktopConnections[0]!.context.sessions[0]!;
+      const reloads = yield* Queue.unbounded<void>();
+      const send = cdp.send.getMockImplementation()!;
+      cdp.send.mockImplementation(async (method, input) => {
+        if (method === "Page.reload") Queue.offerUnsafe(reloads, undefined);
+        return send(method, input);
+      });
+
+      for (const zoomFactor of [1.5, 1] as const) {
+        yield* manager.adjust({
+          threadId: scope.thread.threadId,
+          tabId,
+          zoomFactor,
+          hardReload: true,
+        });
+        // The reload runs after the resize event applies the zoom.
+        yield* Queue.take(reloads);
+      }
+
+      expect(desktopZoomChanges).toEqual([
+        [tabId, 1.5],
+        [tabId, 1],
+      ]);
+    }),
+  ).pipe(Effect.provide(layer)),
 );
 
 it.effect("a stalled desktop viewer still gets its size, control and reconnect", () =>

@@ -273,11 +273,35 @@ local work, resolve it yourself before automatic pulls can resume.
 
 ## MCP servers
 
-Add an MCP server once in **Settings → MCP** on web or desktop to give Claude,
-Codex, Cursor, OpenCode and ACP agents access to its tools. You can enter its
-configuration or import it from a native agent config. Review imported commands
-before enabling them. A server a provider already loads from its native config
-is not started a second time.
+Add an MCP server once in **Settings → MCP** on web or desktop to share its
+tools with your agents: Claude, Codex, Cursor, OpenCode and ACP agents. You can
+enter its configuration or import it from a native agent config. Review imported
+commands before enabling them. A server a provider already loads from its native
+config is not started a second time.
+
+By default a server goes to every agent. To give it to some agents only, select
+**Edit**, choose **Selected agents** under **Agents** and tick them. A server
+imported from an agent's config goes only to that agent; change it the same way.
+
+Each enabled server shows whether it works: how many tools it offers, that it
+needs a sign-in, or the error it stopped with. Gustaf checks when you open the
+section and after you change a server, and keeps the answer until you select
+**Refresh**. A check starts local servers briefly, so a `npx` server may first
+download its package.
+
+A local server whose command does not exist on the environment is left out of
+every agent's sessions. Antigravity refuses to answer at all while one of its
+servers fails to start, so it also leaves out servers whose last check failed or
+needs a sign-in. An Antigravity thread names the servers Gustaf sent it and those it left out, and a turn
+it refused over a server fails with that server's name and marks the server as
+failed here until you select **Refresh**.
+
+To switch off single tools of a connected server, select **Tools** next to it.
+Tools are grouped into reads and writes by what the server declares, and a tool
+the server adds later starts switched on. While the server is not connected,
+**Tools** lists only the tools you switched off, so you can switch them back on. Only Claude and Codex hide switched-off
+tools; other agents still get every tool, and the window names them. Running
+threads may keep the old list until their next session.
 
 Enable servers for the whole environment or override their enabled state for a
 project. Mobile Settings lists each environment's servers and lets you switch
@@ -289,6 +313,25 @@ Tool approvals remain each agent's own, and full-access mode does not ask for
 approval.
 
 Pi, OpenCode 1.x and external OpenCode servers are not supported.
+
+### Signing in to an http server
+
+When an http server needs a sign-in, select **Sign in** next to it on web or
+desktop and finish in the browser. Gustaf keeps the sign-in on the environment
+and sends its token to the agents that get the server; a header named
+`Authorization` that you set yourself takes its place. If the browser runs on
+another device than the environment, the page it lands on cannot load: copy that
+page's address into the field Gustaf shows and select **Finish**.
+
+An agent gets the token when its session opens, renewed first if it is about to
+expire, and keeps that token while the session runs. Before your next message,
+an idle thread of Claude, Antigravity, Cursor and other agents with one session
+per thread reopens its session to pick up a new sign-in or a renewed token. Codex
+shares one session between threads, so it keeps the token until that session
+closes, normally after 30 minutes in which none of its threads is used; if the
+server starts refusing a long-running Codex thread, start a new thread. The same applies to servers you switch on or off. **Sign out**, or removing
+the server, deletes the sign-in. Gustaf can sign in only where the server lets apps register themselves
+(OAuth dynamic client registration); otherwise add its token as a header.
 
 ### Signing in to Claude Code connectors
 

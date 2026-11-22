@@ -337,6 +337,17 @@ export interface AcpAdapterV2Flavor {
   readonly mcpOverHttp?: boolean;
   /** The agent refuses client stdio MCP servers, so the user's stdio servers are left out. */
   readonly rejectsStdioMcpServers?: boolean;
+  /** See `ProviderAdapterV2.abortsOnFailedMcpServer`. */
+  readonly abortsOnFailedMcpServer?: boolean;
+  /** The agent's own CLI loads another MCP list, so a thread names the user servers Gustaf sent. */
+  readonly namesSentMcpServers?: boolean;
+  /** See `ProviderAdapterV2.failedMcpServerOf`. */
+  readonly failedMcpServerOf?: ProviderAdapter.ProviderAdapterV2["Service"]["failedMcpServerOf"];
+  /**
+   * Tool updates carry the model's own one-line description of an MCP call in place of its
+   * result, so `t3-code` items show the result the server kept instead.
+   */
+  readonly replacesMcpResults?: boolean;
   readonly normalizeSessionUpdate?: (
     notification: EffectAcpSchema.SessionNotification,
   ) => EffectAcpSchema.SessionNotification;
@@ -861,6 +872,7 @@ interface AcpMcpContext {
   readonly httpServers: ReadonlyArray<EffectAcpSchema.McpServer>;
   /** Plain stdio or http entries whichever way `t3-code` travels; never via the MCP-over-ACP bridge. */
   readonly userServers: ReadonlyArray<EffectAcpSchema.McpServer>;
+  readonly skippedUserServers?: McpProviderSession.McpProviderSessionConfig["skippedUserServers"];
   readonly processEnvironment?: NodeJS.ProcessEnv;
   readonly endpoint?: string;
   readonly authorization?: string;
@@ -901,6 +913,9 @@ function acpMcpContext(
           ]
         : [],
     userServers: (session.userServers ?? []).map(acpUserMcpServer),
+    ...(session.skippedUserServers === undefined
+      ? {}
+      : { skippedUserServers: session.skippedUserServers }),
     endpoint: session.endpoint,
     authorization: session.authorizationHeader,
     processEnvironment: {
@@ -1805,6 +1820,10 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
   return ProviderAdapter.ProviderAdapterV2.of({
     instanceId: options.instanceId,
     driver,
+    ...(flavor.abortsOnFailedMcpServer === true ? { abortsOnFailedMcpServer: true } : {}),
+    ...(flavor.failedMcpServerOf === undefined
+      ? {}
+      : { failedMcpServerOf: flavor.failedMcpServerOf }),
     getCapabilities: Effect.fn("AcpAdapter.getCapabilities")(function () {
       return Effect.succeed(flavor.capabilities);
     }),
@@ -1847,6 +1866,8 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
           itemIdentityVersion = thread.nativeMetadata?.itemIdentityVersion;
         };
         const terminalEnvironmentBySessionId = new Map<string, NodeJS.ProcessEnv>();
+        // The user MCP servers last reported as sent or left out, so each change is named once.
+        let reportedMcpServers = "";
         interface PendingTerminalEnvironment {
           readonly environment: NodeJS.ProcessEnv | undefined;
           readonly claimUnknownSession: boolean;
@@ -4227,11 +4248,43 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
             const toolName = `${mcpIdentity.server}.${mcpIdentity.tool}`;
             const input =
               mcpIdentity.input ?? unknownRecord(rawInputRecord?.arguments) ?? rawInputRecord ?? {};
-            let output = rawOutput === undefined ? undefined : acpMcpToolCallOutput(rawOutput);
-            const isHtmlRender = resolveT3McpToolId(toolName) === HTML_RENDER_TOOL_NAME;
+            const t3ToolId = resolveT3McpToolId(toolName);
+            const isHtmlRender = t3ToolId === HTML_RENDER_TOOL_NAME;
+            let mcpRawOutput = rawOutput;
+            if (
+              flavor.replacesMcpResults === true &&
+              t3ToolId !== null &&
+              !isHtmlRender &&
+              (status === "completed" || status === "failed")
+            ) {
+              const kept = yield* mcpSessions.takeToolResult(
+                context.input.threadId,
+                t3ToolId,
+                input,
+              );
+              // A repeated completion carries the description again.
+              const recovered =
+                kept === undefined
+                  ? previous?.data.rawOutput !== undefined &&
+                    unknownRecord(previous.data.rawOutput)?.result !== undefined &&
+                    unknownRecord(rawOutput)?.result === undefined
+                    ? previous.data.rawOutput
+                    : undefined
+                  : { result: kept.result };
+              if (recovered !== undefined) {
+                mcpRawOutput = recovered;
+                context.tools.set(toolCall.toolCallId, {
+                  ...toolCall,
+                  data: { ...toolCall.data, rawOutput: recovered },
+                });
+              }
+            }
+            const mcpRawOutputRecord = unknownRecord(mcpRawOutput);
+            let output =
+              mcpRawOutput === undefined ? undefined : acpMcpToolCallOutput(mcpRawOutput);
             const isError =
               compactDynamicToolOutput(output)?.isError === true ||
-              compactDynamicToolOutput(rawOutputRecord?.result)?.isError === true;
+              compactDynamicToolOutput(mcpRawOutputRecord?.result)?.isError === true;
             if (
               isHtmlRender &&
               (status === "failed" || (status === "completed" && isError)) &&
@@ -4271,7 +4324,7 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
                 serverName: mcpIdentity.server,
                 toolName: mcpIdentity.tool,
                 source: unknownRecord(
-                  (unknownRecord(rawOutputRecord?.result) ?? rawOutputRecord)?._meta,
+                  (unknownRecord(mcpRawOutputRecord?.result) ?? mcpRawOutputRecord)?._meta,
                 )?.source,
               }),
               type: "dynamic_tool",
@@ -8063,6 +8116,9 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
         ) {
           const prompt: Array<EffectAcpSchema.ContentBlock> = [];
           const mcpSession = yield* mcpSessions.read(turnInput.threadId);
+          if (mcpSession !== undefined && flavor.replacesMcpResults === true) {
+            yield* mcpSessions.keepToolResults(turnInput.threadId);
+          }
           const instructionState = {
             interactionMode: turnInput.runtimePolicy.interactionMode,
             hasT3Mcp: mcpSession !== undefined,
@@ -8503,6 +8559,33 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
                 }
               }
               return;
+            }
+            const mcpSession = yield* mcpSessions.read(context.input.threadId);
+            const skippedMcpServers = mcpSession?.skippedUserServers ?? [];
+            const sentMcpServers =
+              flavor.namesSentMcpServers === true
+                ? (mcpSession?.userServers ?? []).map((server) => server.id).join(", ")
+                : "";
+            const sentLine =
+              sentMcpServers === "" ? "" : `Gustaf sent MCP servers: ${sentMcpServers}.`;
+            const skippedKey = skippedMcpServers
+              .map(({ id, reason }) => `- ${id}: ${reason}`)
+              .join("\n");
+            if (`${sentLine}\n${skippedKey}` !== reportedMcpServers) {
+              reportedMcpServers = `${sentLine}\n${skippedKey}`;
+              if (skippedMcpServers.length > 0) {
+                yield* runtimeCallbackPermit.withPermit(
+                  emitNotice(context, {
+                    title:
+                      skippedMcpServers.length === 1
+                        ? `MCP server ${skippedMcpServers[0]!.id} was left out`
+                        : `${skippedMcpServers.length} MCP servers were left out`,
+                    description: `${skippedKey}\n\nFix or turn them off in Settings → MCP.${sentLine === "" ? "" : `\n\n${sentLine}`}`,
+                  }),
+                );
+              } else if (sentLine !== "") {
+                yield* runtimeCallbackPermit.withPermit(emitNotice(context, { title: sentLine }));
+              }
             }
             // `backgroundReattach` re-sends the prompt; each send gets its own outcome watch.
             let checkPromptOutcome =

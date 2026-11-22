@@ -554,6 +554,35 @@ describe("serverSettings helpers", () => {
     });
   });
 
+  it("preserves agent and tool restrictions when a legacy client toggles an MCP server", () => {
+    const id = McpServerId.make("figma");
+    const legacy = {
+      enabled: true,
+      transport: { type: "http" as const, url: "https://example.test/mcp", headers: {} },
+    };
+    const providers = [ProviderDriverKind.make("codex")];
+    const disabledTools = ["write"];
+    const current = decodeServerSettings({
+      mcpServers: { [id]: { ...legacy, providers, disabledTools } },
+    });
+    const toggled = applyServerSettingsPatch(
+      current,
+      decodeServerSettingsPatch({ mcpServers: { [id]: { ...legacy, enabled: false } } }),
+    );
+    expect(toggled.mcpServers[id]).toEqual({ ...legacy, enabled: false, providers, disabledTools });
+    expect(
+      applyServerSettingsPatch(toggled, { mcpServers: { [id]: legacy } }).mcpServers[id],
+    ).toEqual({ ...legacy, providers, disabledTools });
+    expect(
+      applyServerSettingsPatch(current, { mcpServers: { [id]: legacy } }).mcpServers[id],
+    ).toEqual(legacy);
+    expect(
+      applyServerSettingsPatch(current, {
+        mcpServers: { [id]: { ...legacy, enabled: false, providers: [], disabledTools: [] } },
+      }).mcpServers[id],
+    ).toEqual({ ...legacy, enabled: false, providers: [], disabledTools: [] });
+  });
+
   it("keeps a project's per-entry overrides when a patch entry omits their keys", () => {
     const instanceId = ProviderInstanceId.make("codex_work");
     const serverId = McpServerId.make("figma");

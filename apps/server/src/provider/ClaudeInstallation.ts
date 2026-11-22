@@ -361,7 +361,7 @@ export const makeClaudeInstallation = Effect.fn("makeClaudeInstallation")(functi
         const current = yield* SubscriptionRef.get(state);
         if (isRunning(current)) return current;
         const releasePlatformName = yield* releasePlatform();
-        if (current.source !== "managed" && (yield* reuseLocal()))
+        if (current.source === null && (yield* reuseLocal()))
           return yield* SubscriptionRef.get(state);
         const operationId = yield* random.uuidV4();
         const next: ProviderInstallState = {

@@ -1,12 +1,14 @@
 import {
   McpServerConfig,
   type McpImportInput,
+  type McpImportSource,
   type McpImportableServer,
   type McpListImportableInput,
   type McpListImportableResult,
   type McpImportResult,
   McpServerImportError,
   type McpServerId,
+  ProviderDriverKind,
 } from "@t3tools/contracts";
 import * as HostProcess from "@t3tools/shared/HostProcess";
 import * as Context from "effect/Context";
@@ -36,6 +38,15 @@ export class McpServerImport extends Context.Service<
 >()("t3/mcpServers/McpServerImport") {}
 
 const decodeConfig = Schema.decodeUnknownEffect(McpServerConfig);
+
+/** A server from one agent's own config was set up for that agent, so only it gets the import. */
+const importedFor: Record<McpImportSource, ProviderDriverKind | undefined> = {
+  codex: ProviderDriverKind.make("codex"),
+  claude: ProviderDriverKind.make("claudeAgent"),
+  cursor: ProviderDriverKind.make("cursor"),
+  gemini: ProviderDriverKind.make("antigravity"),
+  "project-mcp-json": undefined,
+};
 
 const sameEntry = (
   native: NativeMcpServer,
@@ -138,13 +149,21 @@ const make = Effect.gen(function* () {
       const native = servers.find((server) => sameEntry(server, entry));
       if (native === undefined) return yield* fail("entry-not-found");
       if (native.transport !== entry.transport) return yield* fail("transport-mismatch");
+      const provider = importedFor[native.source];
       // Literal values here become stored secrets when settings are written, like typed ones.
       patch[entry.id] = yield* decodeConfig({
         name: native.name,
         enabled: false,
+        ...(provider === undefined ? {} : { providers: [provider] }),
         transport:
           native.transport === "stdio"
-            ? { type: "stdio", command: native.command, args: native.args, env: native.env }
+            ? {
+                type: "stdio",
+                command: native.command,
+                args: native.args,
+                env: native.env,
+                ...(native.cwd === undefined ? {} : { cwd: native.cwd }),
+              }
             : { type: "http", url: native.url, headers: native.headers },
       }).pipe(Effect.mapError((cause) => fail("invalid-entry", cause)));
     }

@@ -2224,6 +2224,8 @@ export const CLAUDE_READ_ONLY_T3_MCP_ALLOWED_TOOLS: ReadonlyArray<string> = [
 // T3 waits can block for an hour; exceed Claude's default 60 s timeout.
 export const CLAUDE_T3_MCP_TOOL_TIMEOUT_MS = 65 * 60 * 1_000;
 
+const claudeMcpNamePart = (name: string) => name.replaceAll(/[^a-zA-Z0-9_-]/g, "_");
+
 // allowedTools pre-approves calls; tools controls availability. Pre-approve T3 tools for headless modes,
 // limited to annotated read-only tools in read-only sandboxes.
 
@@ -2233,6 +2235,7 @@ export function claudeMcpQueryOverrides(input: {
   readonly allowedTools?: ReadonlyArray<string>;
 }): {
   readonly allowedTools?: ReadonlyArray<string>;
+  readonly disallowedTools?: ReadonlyArray<string>;
   readonly mcpServers?: ClaudeQueryOptions["mcpServers"];
 } {
   const session = input.mcpSession;
@@ -2251,8 +2254,15 @@ export function claudeMcpQueryOverrides(input: {
         : { type: "http", url: server.url, headers: { ...server.headers } },
     ],
   );
+  // Claude Code drops denied tools from the model's toolset; it names MCP tools like this.
+  const disallowedTools = (session.userServers ?? []).flatMap((server) =>
+    (server.disabledTools ?? []).map(
+      (tool) => `mcp__${claudeMcpNamePart(server.id)}__${claudeMcpNamePart(tool)}`,
+    ),
+  );
   return {
     allowedTools: Array.from(new Set([...(input.allowedTools ?? []), ...mcpAllowedTools])),
+    ...(disallowedTools.length === 0 ? {} : { disallowedTools }),
     mcpServers: {
       // Listed first so `t3-code` always wins a name clash.
       ...Object.fromEntries(userServers),
@@ -3292,6 +3302,7 @@ export function claudeEffectiveQueryPolicyKey(
   queryPolicy: ClaudeRuntimeQueryPolicy,
   mcpOverrides: {
     readonly allowedTools?: ReadonlyArray<string>;
+    readonly disallowedTools?: ReadonlyArray<string>;
     readonly mcpServers?: ClaudeQueryOptions["mcpServers"];
   },
 ): string {
@@ -3303,6 +3314,7 @@ export function claudeEffectiveQueryPolicyKey(
         : { allowedTools: mcpOverrides.allowedTools }),
     }),
     mcpServers: mcpOverrides.mcpServers,
+    disallowedTools: mcpOverrides.disallowedTools,
   });
 }
 
@@ -5443,6 +5455,7 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
     instanceId: adapterOptions.instanceId,
     driver: CLAUDE_PROVIDER,
     ...(nativeMcpSources === undefined ? {} : { nativeMcpSources }),
+    filtersMcpTools: true,
     getCapabilities: Effect.fn("ClaudeAdapterV2.getCapabilities")(function () {
       return Effect.succeed(ClaudeProviderCapabilitiesV2);
     }),
@@ -11826,6 +11839,9 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
             ...(mcpOverrides.mcpServers === undefined
               ? {}
               : { mcpServers: mcpOverrides.mcpServers }),
+            ...(mcpOverrides.disallowedTools === undefined
+              ? {}
+              : { disallowedTools: mcpOverrides.disallowedTools }),
             deviceToolsAvailable: mcpSession?.capabilities?.has("device") === true,
             permissionMode: queryPolicy.permissionMode,
             ...(queryPolicy.allowDangerouslySkipPermissions === undefined

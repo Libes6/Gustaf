@@ -1,7 +1,7 @@
 import type { EnvironmentId, ProviderInstanceId, ThreadId } from "@t3tools/contracts";
 
 /** A user MCP server the provider starts itself, resolved for one thread (secrets read). */
-export type McpUserServer =
+export type McpUserServer = (
   | {
       readonly type: "stdio";
       readonly id: string;
@@ -16,7 +16,11 @@ export type McpUserServer =
       readonly id: string;
       readonly url: string;
       readonly headers: Readonly<Record<string, string>>;
-    };
+    }
+) & {
+  /** Tool names the provider must not offer, for providers that can filter them. */
+  readonly disabledTools?: ReadonlyArray<string>;
+};
 
 /**
  * MCP config a provider instance loads by itself. Gustaf leaves a user server out of the session
@@ -45,6 +49,8 @@ export interface McpProviderSessionConfig {
   readonly agentDeviceEnvironment?: Readonly<Record<string, string>>;
   /** User MCP servers to start next to `t3-code`, already filtered for this provider. */
   readonly userServers?: ReadonlyArray<McpUserServer>;
+  /** Enabled user servers left out because they cannot start, with the reason. */
+  readonly skippedUserServers?: ReadonlyArray<{ readonly id: string; readonly reason: string }>;
 }
 
 export function withAgentDeviceEnvironment(

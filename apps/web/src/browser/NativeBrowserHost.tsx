@@ -145,12 +145,13 @@ function NativeBrowserTab({
     let cancelled = false;
     void (async () => {
       const defaults = await resolveBrowserDefaults();
+      if (cancelled) return;
       await tabs.createTab(runtimeTabId, {
         url: initialSrc,
         profileId,
         zoomFactor: defaults.zoomFactor,
         colorScheme: defaults.appearance,
-        ...(serverTab ? { serverTab: { threadId: threadRef.threadId, tabId } } : {}),
+        serverTab: { threadId: threadRef.threadId, tabId },
       });
       if (!cancelled) setCreated(true);
     })().catch(() => undefined);
@@ -159,7 +160,7 @@ function NativeBrowserTab({
       setCreated(false);
       void tabs.closeTab(runtimeTabId).catch(() => undefined);
     };
-  }, [hydrated, initialSrc, profileId, runtimeTabId, serverTab, tabId, tabs, threadRef.threadId]);
+  }, [hydrated, initialSrc, profileId, runtimeTabId, tabId, tabs, threadRef.threadId]);
 
   const shown = created && visible && rect !== null && !covered;
   const x = rect?.x ?? 0;

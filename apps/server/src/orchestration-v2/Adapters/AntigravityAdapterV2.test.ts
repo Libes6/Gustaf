@@ -3,6 +3,7 @@ import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, describe, it } from "@effect/vitest";
 import {
   ChatFileAttachment,
+  EnvironmentId,
   MessageId,
   NodeId,
   ProjectId,
@@ -589,8 +590,8 @@ describe("AntigravityAdapterV2 workspace changes", () => {
   );
 });
 
-describe("AntigravityAdapterV2 html_render pages", () => {
-  it.effect("shows the page html_render published when the agent reports only a summary", () =>
+describe("AntigravityAdapterV2 t3-code results", () => {
+  it.effect("shows what t3-code returned when the agent reports only a summary", () =>
     Effect.gen(function* () {
       const childProcessSpawner = yield* ChildProcessSpawner.ChildProcessSpawner;
       const path = yield* Path.Path;
@@ -613,6 +614,12 @@ describe("AntigravityAdapterV2 html_render pages", () => {
       const report = { html: `<table>${rows.join("")}</table>`, title: "Revenue", height: 240 };
       const failed = { ...report, html: "<p>Revenue</p>" };
       const errored = { ...report, html: "<p>Revenue error</p>" };
+      const tab = { url: "http://localhost:5173/", tabId: "tab-1" };
+      const opened = {
+        content: [{ type: "text", text: JSON.stringify({ tabId: "tab-1" }) }],
+        structuredContent: { tabId: "tab-1" },
+        isError: false,
+      };
       const adapter = yield* makeAntigravityAdapterV2({
         instanceId,
         selfInvocation: yield* resolveSelfInvocation(),
@@ -729,6 +736,36 @@ describe("AntigravityAdapterV2 html_render pages", () => {
                     status: "completed",
                     rawOutput: "Summary of published",
                   });
+                  // agy 1.5 names MCP calls "<server>_<tool>" and completes them with the
+                  // toolSummary the model wrote for the call.
+                  for (const [toolCallId, tool] of [
+                    ["open", "preview_open"],
+                    ["status", "preview_status"],
+                  ] as const) {
+                    yield* send({
+                      sessionUpdate: "tool_call",
+                      toolCallId,
+                      title: `t3-code_${tool}`,
+                      kind: "other",
+                      status: "pending",
+                      rawInput: { arguments: tab, ...tab },
+                      _meta: { mcp: { tool, server: "t3-code" }, is_mcp_tool_call: true },
+                    });
+                  }
+                  yield* mcpSessions.recordToolResult(
+                    threadId,
+                    "preview_open",
+                    { tabId: "tab-1", url: tab.url },
+                    () => opened,
+                  );
+                  for (const toolCallId of ["open", "open", "status"]) {
+                    yield* send({
+                      sessionUpdate: "tool_call_update",
+                      toolCallId,
+                      status: "completed",
+                      rawOutput: `Summary of ${toolCallId}`,
+                    });
+                  }
                   return { stopReason: "end_turn" as const };
                 }),
             })),
@@ -752,6 +789,19 @@ describe("AntigravityAdapterV2 html_render pages", () => {
         threadId,
         modelSelection,
         runtimePolicy,
+      });
+      yield* mcpSessions.set({
+        environmentId: EnvironmentId.make("environment-antigravity-html-render"),
+        threadId,
+        providerSessionId: "mcp-session-antigravity-html-render",
+        providerInstanceId: instanceId,
+        endpoint: "http://127.0.0.1:43123/mcp",
+        authorizationHeader: "Bearer token",
+        browserToolsAvailable: false,
+        userServers: [
+          { type: "http", id: "figma", url: "https://mcp.figma.test/mcp", headers: {} },
+        ],
+        skippedUserServers: [{ id: "spline", reason: "Command not found: spline" }],
       });
       const now = yield* DateTime.now;
       yield* session.startTurn({
@@ -862,9 +912,38 @@ describe("AntigravityAdapterV2 html_render pages", () => {
           output: { htmlRender: page(name) },
         });
       }
+      assert.deepEqual(
+        events.flatMap((event) =>
+          event.type === "turn_item.updated" &&
+          event.turnItem.type === "dynamic_tool" &&
+          event.turnItem.status === "completed" &&
+          ["open", "status"].includes(event.turnItem.nativeItemRef?.nativeId ?? "")
+            ? [[event.turnItem.toolName, event.turnItem.output]]
+            : [],
+        ),
+        [
+          ["t3-code.preview_open", { tabId: "tab-1" }],
+          ["t3-code.preview_open", { tabId: "tab-1" }],
+          ["t3-code.preview_status", "Summary of status"],
+        ],
+      );
+      assert.strictEqual(
+        yield* mcpSessions.takeToolResult(threadId, "preview_open", tab),
+        undefined,
+      );
       assert.strictEqual(yield* mcpSessions.takeHtmlRender(threadId, report), undefined);
       assert.strictEqual(yield* mcpSessions.takeHtmlRender(threadId, failed), undefined);
       assert.strictEqual(yield* mcpSessions.takeHtmlRender(threadId, errored), undefined);
+      assert.deepEqual(
+        events.flatMap((event) =>
+          event.type === "turn_item.updated" && event.turnItem.type === "system_notice"
+            ? [event.turnItem.message]
+            : [],
+        ),
+        [
+          "MCP server spline was left out\n\n- spline: Command not found: spline\n\nFix or turn them off in Settings → MCP.\n\nGustaf sent MCP servers: figma.",
+        ],
+      );
     }).pipe(Effect.provide(layerSession), Effect.scoped),
   );
 });

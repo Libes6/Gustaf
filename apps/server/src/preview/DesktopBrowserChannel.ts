@@ -6,6 +6,7 @@ import {
   DesktopBrowserCommand,
   DesktopBrowserEvent,
   type DesktopBrowserCommand as DesktopBrowserCommandType,
+  type PreviewZoomFactor,
 } from "@t3tools/contracts";
 import * as Context from "effect/Context";
 import * as Duration from "effect/Duration";
@@ -47,6 +48,7 @@ export class DesktopBrowserChannel extends Context.Service<
     /** Whether a desktop window draws the tab on screen, which no streamed viewer counts. */
     readonly isShown: (key: DesktopTabKey) => boolean;
     readonly endpoint: (key: DesktopTabKey) => Effect.Effect<string, never, Scope.Scope>;
+    readonly setZoom: (key: DesktopTabKey, zoomFactor: PreviewZoomFactor) => Effect.Effect<void>;
     readonly pointer: (
       key: DesktopTabKey,
       pointer: { readonly phase: "move" | "click"; readonly x: number; readonly y: number },
@@ -62,7 +64,7 @@ const make = Effect.gen(function* () {
   const controlFd = config.desktopBrowserControlFd;
   const socketPath = config.desktopBrowserSocket;
   const changes = yield* PubSub.unbounded<{ key: DesktopTabKey; attached: boolean }>();
-  const attachedTabs = new Set<string>();
+  const attachedTabs = new Map<string, DesktopTabKey>();
   // Missing reports protect desktop tabs until the renderer explicitly marks them hidden.
   const shownTabs = new Map<string, boolean>();
   const inbound = new Map<string, Queue.Queue<string>>();
@@ -83,6 +85,9 @@ const make = Effect.gen(function* () {
         return Effect.die("No desktop app is attached to this server.");
       }),
       turn: Effect.fn("DesktopBrowserChannel.turn")(function () {
+        return Effect.void;
+      }),
+      setZoom: Effect.fn("DesktopBrowserChannel.setZoom")(function () {
         return Effect.void;
       }),
       pointer: Effect.fn("DesktopBrowserChannel.pointer")(function () {
@@ -134,7 +139,7 @@ const make = Effect.gen(function* () {
           return queue ? Queue.offer(queue, event.message).pipe(Effect.asVoid) : Effect.void;
         }
         case "attached":
-          attachedTabs.add(id);
+          attachedTabs.set(id, key);
           return PubSub.publish(changes, { key, attached: true });
         case "detached": {
           attachedTabs.delete(id);
@@ -150,7 +155,18 @@ const make = Effect.gen(function* () {
       }
     }),
     Effect.catchCause((cause) => Effect.logWarning("desktop browser channel stopped", { cause })),
-    Effect.ensuring(Effect.sync(() => shownTabs.clear())),
+    Effect.ensuring(
+      Effect.gen(function* () {
+        const keys = [...attachedTabs.values()];
+        attachedTabs.clear();
+        shownTabs.clear();
+        yield* Effect.forEach(inbound.values(), Queue.shutdown, { discard: true });
+        yield* PubSub.publishAll(
+          changes,
+          keys.map((key) => ({ key, attached: false })),
+        );
+      }),
+    ),
     Effect.forkScoped,
   );
 
@@ -245,6 +261,9 @@ const make = Effect.gen(function* () {
     endpoint,
     turn: Effect.fn("DesktopBrowserChannel.turn")(function (threadId, active) {
       return command({ type: "turn", threadId, active });
+    }),
+    setZoom: Effect.fn("DesktopBrowserChannel.setZoom")(function (key, zoomFactor) {
+      return command({ type: "zoom", ...key, zoomFactor });
     }),
     pointer: Effect.fn("DesktopBrowserChannel.pointer")(function (key, pointer) {
       return command({ type: "pointer", ...key, ...pointer });

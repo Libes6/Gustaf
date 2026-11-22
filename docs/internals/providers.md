@@ -42,6 +42,13 @@ otherwise be shared across instances. The launch environment removes ambient Goo
 so an instance cannot silently use another account or billing project. The agent also resolves
 its user-global skill directories under that profile, so the profile links those two directories
 back to the user's real `~/.gemini`; MCP servers, hooks, and rules there stay out of the profile.
+The agent merges `session/new` MCP servers with `$GEMINI_HOME/config/mcp_config.json`, and a client
+server replaces a config server of the same name, so the profile must not hold that file or its
+servers load beside Gustaf's list unseen.
+The agent keeps the servers and headers from `session/new` or `session/load`, connects on the
+first prompt, and reconnects with those same headers whenever a server rejects a request; one
+server that cannot start refuses every prompt. So a refreshed sign-in token or a server marked
+failed reaches it only through a new session, which the session manager opens between turns.
 See [profile isolation](../../apps/server/src/provider/antigravityAuthSupport.ts).
 
 The [Antigravity installer](../../apps/server/src/provider/AntigravityInstallation.ts) outlives

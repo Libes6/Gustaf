@@ -406,6 +406,15 @@ import {
   McpConnectorSubmitCallbackInput,
   McpConnectorsListInput,
   McpConnectorsListResult,
+  McpServerAuthError,
+  McpServerSignInCallbackInput,
+  McpServerSignInCallbackResult,
+  McpServerSignInInput,
+  McpServerSignInResult,
+  McpServerSignOutInput,
+  McpServerStatusError,
+  McpServerStatusListInput,
+  McpServerStatusListResult,
   McpImportInput,
   McpImportResult,
   McpListImportableInput,
@@ -601,6 +610,10 @@ export const WS_METHODS = {
 
   mcpServersListImportable: "mcpServers.listImportable",
   mcpServersImport: "mcpServers.import",
+  mcpServersStatus: "mcpServers.status",
+  mcpServersSignIn: "mcpServers.signIn",
+  mcpServersSubmitSignInCallback: "mcpServers.submitSignInCallback",
+  mcpServersSignOut: "mcpServers.signOut",
   mcpConnectorsList: "mcpConnectors.list",
   mcpConnectorsAuthorize: "mcpConnectors.authorize",
   mcpConnectorsSubmitCallback: "mcpConnectors.submitCallback",
@@ -2134,6 +2147,31 @@ const WsMcpServersImportRpc = Rpc.make(WS_METHODS.mcpServersImport, {
   error: Schema.Union([McpServerImportError, EnvironmentAuthorizationError]),
 });
 
+const WsMcpServersStatusRpc = Rpc.make(WS_METHODS.mcpServersStatus, {
+  payload: McpServerStatusListInput,
+  success: McpServerStatusListResult,
+  error: Schema.Union([McpServerStatusError, EnvironmentAuthorizationError]),
+});
+
+const McpServerAuthRpcError = Schema.Union([McpServerAuthError, EnvironmentAuthorizationError]);
+
+const WsMcpServersSignInRpc = Rpc.make(WS_METHODS.mcpServersSignIn, {
+  payload: McpServerSignInInput,
+  success: McpServerSignInResult,
+  error: McpServerAuthRpcError,
+});
+
+const WsMcpServersSubmitSignInCallbackRpc = Rpc.make(WS_METHODS.mcpServersSubmitSignInCallback, {
+  payload: McpServerSignInCallbackInput,
+  success: McpServerSignInCallbackResult,
+  error: McpServerAuthRpcError,
+});
+
+const WsMcpServersSignOutRpc = Rpc.make(WS_METHODS.mcpServersSignOut, {
+  payload: McpServerSignOutInput,
+  error: McpServerAuthRpcError,
+});
+
 const McpConnectorRpcError = Schema.Union([McpConnectorError, EnvironmentAuthorizationError]);
 
 const WsMcpConnectorsListRpc = Rpc.make(WS_METHODS.mcpConnectorsList, {
@@ -2275,6 +2313,10 @@ export const WsRpcGroup = RpcGroup.make(
   WsSubscriptionsDeleteRpc,
   WsMcpServersListImportableRpc,
   WsMcpServersImportRpc,
+  WsMcpServersStatusRpc,
+  WsMcpServersSignInRpc,
+  WsMcpServersSubmitSignInCallbackRpc,
+  WsMcpServersSignOutRpc,
   WsMcpConnectorsListRpc,
   WsMcpConnectorsAuthorizeRpc,
   WsMcpConnectorsSubmitCallbackRpc,

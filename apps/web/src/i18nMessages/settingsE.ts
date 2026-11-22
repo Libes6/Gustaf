@@ -11,6 +11,17 @@ export const settingsEMessages = {
     "settingsE.mcp.name": "Name",
     "settingsE.mcp.secretValue": "Secret value",
     "settingsE.mcp.advanced": "Advanced settings",
+    "settingsE.mcp.agents": "Agents",
+    "settingsE.mcp.agentsAll": "All agents",
+    "settingsE.mcp.agentsSelected": "Selected agents",
+    "settingsE.mcp.agentsNone": "No agents",
+    "settingsE.mcp.agentsPick":
+      "Select at least one agent. To keep the server from every agent, turn it off instead.",
+    "settingsE.mcp.agentsOnly": "Only {names}",
+    "settingsE.mcp.importAgents":
+      "A server imported from an agent's config goes to that agent only; change it in Edit.",
+    "settingsE.mcp.importAgentsProject":
+      "A server imported from an agent's config goes to that agent only; change it in the environment's MCP settings.",
     "settingsE.mcp.idHint":
       "Use 1–32 lowercase letters, digits or hyphens, starting with a letter or digit.",
     "settingsE.mcp.idTaken": "This server ID is already in use.",
@@ -48,6 +59,37 @@ export const settingsEMessages = {
     "settingsE.mcp.connectors.status.pending": "Connecting",
     "settingsE.mcp.connectors.status.disabled": "Turned off",
     "settingsE.mcp.connectors.status.authorizing": "Waiting for sign-in",
+    "settingsE.mcp.status.checking": "Checking…",
+    "settingsE.mcp.status.refresh": "Refresh",
+    "settingsE.mcp.status.tools": "Tools: {tools}",
+    "settingsE.mcp.status.toolsAndResources": "Tools: {tools}, resources: {resources}",
+    "settingsE.mcp.status.listFailed": "Could not check the MCP servers.",
+    "settingsE.mcp.tools.open": "Tools",
+    "settingsE.mcp.tools.title": "{name} tools",
+    "settingsE.mcp.tools.count": "{enabled} of {total} enabled",
+    "settingsE.mcp.tools.unknown":
+      "The server is not connected, so its tools are unknown. Switched-off tools stay off until you switch them back on here.",
+    "settingsE.mcp.tools.none": "This server has no tools.",
+    "settingsE.mcp.tools.switchedOff": "Switched off",
+    "settingsE.mcp.tools.offCount": " ({count} off)",
+    "settingsE.mcp.tools.reads": "Reads",
+    "settingsE.mcp.tools.writes": "Writes",
+    "settingsE.mcp.tools.allowAll": "Allow all",
+    "settingsE.mcp.tools.allowNone": "Don't allow",
+    "settingsE.mcp.tools.custom": "Custom",
+    "settingsE.mcp.tools.unsupported":
+      "{names} cannot switch off single tools and will get all of them.",
+    "settingsE.mcp.tools.done": "Done",
+    "settingsE.mcp.signIn.start": "Sign in",
+    "settingsE.mcp.signIn.signOut": "Sign out",
+    "settingsE.mcp.signIn.pasteHint":
+      "Finish signing in in the browser. On this computer Gustaf picks it up by itself; if the browser then shows a page that cannot be opened, copy that page's address here.",
+    "settingsE.mcp.signIn.pasteHintRemote":
+      "Finish signing in in the browser. It then shows a page that cannot be opened: copy that page's address here.",
+    "settingsE.mcp.signIn.openPage": "Open the sign-in page",
+    "settingsE.mcp.signIn.pasteLabel": "Address after signing in",
+    "settingsE.mcp.signIn.finish": "Finish",
+    "settingsE.mcp.signIn.cancel": "Cancel",
     "settingsE.mcp.s2":
       "Servers belong to this environment. Changes apply to new provider sessions.",
     "settingsE.mcp.s3": "Requires settings:write and providers:manage.",
@@ -627,6 +669,17 @@ export const settingsEMessages = {
     "settingsE.mcp.name": "Название",
     "settingsE.mcp.secretValue": "Значение секрета",
     "settingsE.mcp.advanced": "Дополнительные настройки",
+    "settingsE.mcp.agents": "Агенты",
+    "settingsE.mcp.agentsAll": "Все агенты",
+    "settingsE.mcp.agentsSelected": "Выбранные агенты",
+    "settingsE.mcp.agentsNone": "Ни одному агенту",
+    "settingsE.mcp.agentsPick":
+      "Отметьте хотя бы одного агента. Чтобы сервер не получал никто, выключите его.",
+    "settingsE.mcp.agentsOnly": "Только {names}",
+    "settingsE.mcp.importAgents":
+      "Сервер из настроек агента получает только этот агент; изменить можно в «Изменить».",
+    "settingsE.mcp.importAgentsProject":
+      "Сервер из настроек агента получает только этот агент; изменить это можно в настройках MCP окружения.",
     "settingsE.mcp.idHint":
       "От 1 до 32 строчных латинских букв, цифр и дефисов. Начните с буквы или цифры.",
     "settingsE.mcp.idTaken": "Этот идентификатор сервера уже занят.",
@@ -664,6 +717,37 @@ export const settingsEMessages = {
     "settingsE.mcp.connectors.status.pending": "Подключается",
     "settingsE.mcp.connectors.status.disabled": "Выключен",
     "settingsE.mcp.connectors.status.authorizing": "Ждём входа",
+    "settingsE.mcp.status.checking": "Проверяем…",
+    "settingsE.mcp.status.refresh": "Обновить",
+    "settingsE.mcp.status.tools": "Инструментов: {tools}",
+    "settingsE.mcp.status.toolsAndResources": "Инструментов: {tools}, ресурсов: {resources}",
+    "settingsE.mcp.status.listFailed": "Не удалось проверить серверы MCP.",
+    "settingsE.mcp.tools.open": "Инструменты",
+    "settingsE.mcp.tools.title": "Инструменты {name}",
+    "settingsE.mcp.tools.count": "Включено {enabled} из {total}",
+    "settingsE.mcp.tools.unknown":
+      "Сервер не подключён, поэтому список инструментов неизвестен. Выключенные инструменты остаются выключенными, пока вы не включите их здесь.",
+    "settingsE.mcp.tools.none": "У этого сервера нет инструментов.",
+    "settingsE.mcp.tools.switchedOff": "Выключены",
+    "settingsE.mcp.tools.offCount": " ({count} выкл.)",
+    "settingsE.mcp.tools.reads": "Чтение",
+    "settingsE.mcp.tools.writes": "Запись",
+    "settingsE.mcp.tools.allowAll": "Разрешить все",
+    "settingsE.mcp.tools.allowNone": "Запретить все",
+    "settingsE.mcp.tools.custom": "Выборочно",
+    "settingsE.mcp.tools.unsupported":
+      "{names}: выключение отдельных инструментов не поддерживается, эти агенты получат все инструменты.",
+    "settingsE.mcp.tools.done": "Готово",
+    "settingsE.mcp.signIn.start": "Войти",
+    "settingsE.mcp.signIn.signOut": "Выйти",
+    "settingsE.mcp.signIn.pasteHint":
+      "Завершите вход в браузере. На этом компьютере Gustaf подхватит его сам; если браузер затем покажет страницу, которая не открывается, скопируйте сюда её адрес.",
+    "settingsE.mcp.signIn.pasteHintRemote":
+      "Завершите вход в браузере. После этого он покажет страницу, которая не открывается: скопируйте сюда её адрес.",
+    "settingsE.mcp.signIn.openPage": "Открыть страницу входа",
+    "settingsE.mcp.signIn.pasteLabel": "Адрес после входа",
+    "settingsE.mcp.signIn.finish": "Готово",
+    "settingsE.mcp.signIn.cancel": "Отмена",
     "settingsE.mcp.s2":
       "Серверы принадлежат этому окружению. Изменения применяются к новым сессиям.",
     "settingsE.mcp.s3": "Нужны права settings:write и providers:manage.",

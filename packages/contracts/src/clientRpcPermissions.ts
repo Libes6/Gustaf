@@ -93,6 +93,12 @@ export const CLIENT_GUARDED_RPC_SCOPES = {
   [WS_METHODS.computerUseAllowThread]: AuthOrchestrationOperateScope,
   [WS_METHODS.computerUseOpenPermissionSettings]: AuthOrchestrationOperateScope,
   [WS_METHODS.computerUseStop]: AuthOrchestrationOperateScope,
+  // Checking starts each configured local server, as listing Claude's own servers does.
+  [WS_METHODS.mcpServersStatus]: AuthProvidersManageScope,
+  // Signing in stores a credential every provider is sent, as Claude's connector sign-in does.
+  [WS_METHODS.mcpServersSignIn]: AuthProvidersManageScope,
+  [WS_METHODS.mcpServersSubmitSignInCallback]: AuthProvidersManageScope,
+  [WS_METHODS.mcpServersSignOut]: AuthProvidersManageScope,
 } as const;
 export type ClientGuardedRpcTag = keyof typeof CLIENT_GUARDED_RPC_SCOPES;
 

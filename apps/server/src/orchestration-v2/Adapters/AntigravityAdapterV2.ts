@@ -37,7 +37,10 @@ import {
 import { watchAntigravityBackgroundWake } from "../../provider/acp/AntigravityBackgroundWake.ts";
 import { readAntigravityClientTextFile } from "../../provider/acp/AntigravityClientFiles.ts";
 import { makeAntigravityPromptGuard } from "../../provider/acp/AntigravityPromptGuard.ts";
-import { watchAntigravityPromptOutcome } from "../../provider/acp/AntigravityTurnOutcome.ts";
+import {
+  antigravityFailedMcpServer,
+  watchAntigravityPromptOutcome,
+} from "../../provider/acp/AntigravityTurnOutcome.ts";
 import {
   antigravityApprovalOptions,
   antigravityBackgroundWorkHoldsTurn,
@@ -262,6 +265,12 @@ export function makeAntigravityAcpAdapterFlavor(
     capabilities: AntigravityProviderCapabilitiesV2,
     // Agents that advertise HTTP MCP skip the stdio bridge process; others keep stdio.
     mcpOverHttp: true,
+    // agy answers every prompt with "The MCP server 'X' failed to initialize" instead.
+    abortsOnFailedMcpServer: true,
+    failedMcpServerOf: antigravityFailedMcpServer,
+    // agy outside Gustaf reads ~/.gemini's MCP config, so threads say what Gustaf sent.
+    namesSentMcpServers: true,
+    replacesMcpResults: true,
     sessionCarriesPullRequestLinking: antigravityAppendsSystemPrompt,
     makeRuntime,
     buildPrompt: ({

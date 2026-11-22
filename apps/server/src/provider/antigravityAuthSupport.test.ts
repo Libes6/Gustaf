@@ -12,6 +12,7 @@ import { describe, expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
+import * as Logger from "effect/Logger";
 import * as Path from "effect/Path";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
@@ -594,6 +595,36 @@ it.layer(NodeServices.layer)("Antigravity profile preparation", (it) => {
       expect(yield* fs.readFileString(profile.tokenPath)).toBe("synthetic-token-fixture");
     }),
   );
+
+  it.effect("warns about, but keeps, an MCP config inside the profile", () => {
+    const warnings: Array<{ readonly message: string; readonly path: unknown }> = [];
+    const logger = Logger.make(({ message, logLevel }) => {
+      if (logLevel !== "Warn") return;
+      const [text, details] = Array.isArray(message) ? message : [message];
+      warnings.push({
+        message: String(text),
+        path:
+          details !== null && typeof details === "object"
+            ? Reflect.get(details, "path")
+            : undefined,
+      });
+    });
+    return Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const temporaryDirectory = yield* fs.makeTempDirectoryScoped();
+      const profileDirectory = path.join(temporaryDirectory, "profile");
+      const mcpConfigPath = path.join(profileDirectory, "config", "mcp_config.json");
+      yield* prepareAntigravityProfile({ profileDirectory, userHome: temporaryDirectory });
+      expect(warnings).toEqual([]);
+
+      yield* fs.makeDirectory(path.dirname(mcpConfigPath), { recursive: true });
+      yield* fs.writeFileString(mcpConfigPath, '{"mcpServers":{}}');
+      yield* prepareAntigravityProfile({ profileDirectory, userHome: temporaryDirectory });
+      expect(warnings.map((warning) => warning.path)).toEqual([mcpConfigPath]);
+      expect(yield* fs.readFileString(mcpConfigPath)).toBe('{"mcpServers":{}}');
+    }).pipe(Effect.provide(Logger.layer([logger], { mergeWithExisting: false })));
+  });
 
   it.effect.skipIf(!symlinksSupported)(
     "links only the user's existing global skill directories without touching real content",

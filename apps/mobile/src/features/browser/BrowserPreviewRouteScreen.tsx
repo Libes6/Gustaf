@@ -13,7 +13,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ControlPill } from "../../components/ui/ControlPill";
 import { useAppForeground } from "../../lib/appState";
 
-import { useThreadServerBrowserTabs } from "../../state/preview";
+import { useThreadBrowserTabs } from "../../state/preview";
 import { usePreparedConnection } from "../../state/session";
 import { useAppearancePreferences } from "../settings/appearance/AppearancePreferencesProvider";
 import { BrowserTabMenu } from "./BrowserTabMenu";
@@ -67,10 +67,12 @@ function BrowserPreviewScreen({
   const [streaming, setStreaming] = useState(false);
   const [canControl, setCanControl] = useState(false);
   const streamRef = useRef<PreviewStreamRef>(null);
-  const { tabs, loaded } = useThreadServerBrowserTabs({ environmentId, threadId, enabled: true });
+  const { tabs, loaded } = useThreadBrowserTabs({ environmentId, threadId, enabled: true });
   const tab = tabs.find((entry) => entry.tabId === selectedTabId) ?? latestBrowserTab(tabs);
   const pdfUri =
-    tab?.navStatus._tag === "Success" ? previewPdfAssetUrl(tab.navStatus.url, httpBaseUrl) : null;
+    tab?.runtime === "server" && tab.navStatus._tag === "Success"
+      ? previewPdfAssetUrl(tab.navStatus.url, httpBaseUrl)
+      : null;
   const tabId = tab?.tabId ?? null;
   if (tabId !== null && tabId !== selectedTabId) {
     setPictureInPicture(NO_PICTURE_IN_PICTURE);
@@ -141,7 +143,7 @@ function BrowserPreviewScreen({
             environmentId={environmentId}
             tab={tab}
             streaming={streaming}
-            ready={streaming && canControl}
+            ready={tab.runtime === "server" && streaming && canControl}
             onCommand={(input) => streamRef.current?.command(input)}
             onPaste={() => streamRef.current?.paste()}
           />
@@ -153,7 +155,7 @@ function BrowserPreviewScreen({
               tabId={tab.tabId}
               pdfUri={pdfUri}
               ref={streamRef}
-              interactive
+              interactive={tab.runtime === "server"}
               background={themeVariables["--color-sheet-solid"]}
               onPictureInPicture={onPictureInPicture}
               onStreamingChange={setStreaming}
@@ -237,12 +239,14 @@ function BrowserAddressBar({
         disabled={!ready}
         onPress={() => onCommand({ type: "reload" })}
       />
-      <BrowserTabMenu
-        environmentId={environmentId}
-        tab={tab}
-        streaming={streaming}
-        onPaste={ready ? onPaste : undefined}
-      />
+      {tab.runtime === "server" ? (
+        <BrowserTabMenu
+          environmentId={environmentId}
+          tab={tab}
+          streaming={streaming}
+          onPaste={ready ? onPaste : undefined}
+        />
+      ) : null}
     </View>
   );
 }

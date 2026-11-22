@@ -3,7 +3,7 @@ import { makeProviderFailure } from "@t3tools/provider-core/server/failure";
 import * as DateTime from "effect/DateTime";
 import type * as EffectAcpSchema from "effect-acp/compat";
 
-import { antigravityLimitFailure } from "./AntigravityTurnOutcome.ts";
+import { antigravityLimitFailure, antigravityMcpServerFailure } from "./AntigravityTurnOutcome.ts";
 
 // The harness sends this after a model stream breaks, then asks the model again (1.4.5).
 const STREAM_INTERRUPTED =
@@ -16,6 +16,11 @@ const RECENT_TEXT_CHARS = 4_096;
 // tool call or follows its warning sign; a model quoting one mid-sentence is not stopped.
 const HARNESS_ERROR = /(?:^|⚠\uFE0F?\s*)(Error \d{3}, Message: [\s\S]*)$/;
 const FLAGGED_HARNESS_ERROR = /⚠\uFE0F?\s*(Error \d{3}, Message: [\s\S]*)$/;
+// The harness's whole answer when an MCP server in the session did not start (agy 1.4.5).
+const MCP_SERVER_FAILED =
+  /^The MCP server '([^']+)' failed to initialize: ([\s\S]*?)Fix the MCP server, or remove it from your configuration and start a new session, to continue\.\s*$/;
+// Longer than any harness refusal; past it the reply is the model's.
+const MAX_REFUSAL_CHARS = 4_096;
 
 const STREAM_LOOP_FAILURE = makeProviderFailure({
   class: "provider_error",
@@ -26,7 +31,8 @@ const STREAM_LOOP_FAILURE = makeProviderFailure({
 
 /**
  * Antigravity retries a broken model stream and a spent quota on its own, for up to an
- * hour, while the turn looks busy. This stops the turn once the session shows either.
+ * hour, while the turn looks busy. This stops the turn once the session shows either, or
+ * the harness's refusal to run a session whose MCP server did not start.
  */
 export function makeAntigravityPromptGuard(): (
   notification: EffectAcpSchema.SessionNotification,
@@ -35,12 +41,15 @@ export function makeAntigravityPromptGuard(): (
   let recent = "";
   // Once the window drops older text, its start is no longer where the message began.
   let trimmed = false;
+  // The harness refuses before the model runs, so its refusal is the reply's first message.
+  let firstMessage: string | undefined = "";
   return (notification) => {
     const update = notification.update;
     if (update.sessionUpdate === "tool_call") {
       interruptions = 0;
       recent = "";
       trimmed = false;
+      firstMessage = undefined;
       return undefined;
     }
     if (
@@ -61,6 +70,13 @@ export function makeAntigravityPromptGuard(): (
     }
     if (interruptions >= MAX_INTERRUPTIONS_IN_A_ROW) return STREAM_LOOP_FAILURE;
     if (update.sessionUpdate !== "agent_message_chunk") return undefined;
+    if (firstMessage !== undefined) {
+      firstMessage += update.content.text;
+      if (firstMessage.length > MAX_REFUSAL_CHARS) firstMessage = undefined;
+    }
+    const refusal =
+      firstMessage === undefined ? null : MCP_SERVER_FAILED.exec(firstMessage.trimStart());
+    if (refusal !== null) return antigravityMcpServerFailure(refusal[1]!, refusal[2]!);
     const harnessError = (trimmed ? FLAGGED_HARNESS_ERROR : HARNESS_ERROR).exec(
       recent.trimStart(),
     )?.[1];

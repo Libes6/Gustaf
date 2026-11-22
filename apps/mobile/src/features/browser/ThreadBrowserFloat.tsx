@@ -112,7 +112,7 @@ function FloatingBrowserPlayer(props: {
             threadId={props.threadId}
             tabId={props.tab.tabId}
             pdfUri={
-              props.tab.navStatus._tag === "Success"
+              props.tab.runtime === "server" && props.tab.navStatus._tag === "Success"
                 ? previewPdfAssetUrl(props.tab.navStatus.url, httpBaseUrl)
                 : null
             }

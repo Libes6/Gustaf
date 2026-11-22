@@ -1487,14 +1487,19 @@ function codexThreadRuntimeParams(input: {
       ...Object.fromEntries(
         (mcpSession?.userServers ?? []).map((server) => [
           `mcp_servers.${JSON.stringify(server.id)}`,
-          server.type === "stdio"
-            ? {
-                command: server.command,
-                args: [...server.args],
-                env: { ...server.env },
-                cwd: server.cwd,
-              }
-            : { url: server.url, http_headers: { ...server.headers } },
+          {
+            ...(server.type === "stdio"
+              ? {
+                  command: server.command,
+                  args: [...server.args],
+                  env: { ...server.env },
+                  cwd: server.cwd,
+                }
+              : { url: server.url, http_headers: { ...server.headers } }),
+            ...(server.disabledTools === undefined
+              ? {}
+              : { disabled_tools: [...server.disabledTools] }),
+          },
         ]),
       ),
       // One app-server serves many threads, so the id goes in per-thread shell config, not its env.
@@ -1811,6 +1816,7 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
   return ProviderAdapter.ProviderAdapterV2.of({
     instanceId: adapterOptions.instanceId,
     driver: CODEX_PROVIDER,
+    filtersMcpTools: true,
     getCapabilities: Effect.fn("CodexAdapterV2.getCapabilities")(function () {
       return Effect.succeed(CodexProviderCapabilitiesV2);
     }),

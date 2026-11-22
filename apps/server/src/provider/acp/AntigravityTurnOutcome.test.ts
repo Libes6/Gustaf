@@ -7,7 +7,10 @@ import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
 import type * as EffectAcpSchema from "effect-acp/compat";
 
-import { watchAntigravityPromptOutcome } from "./AntigravityTurnOutcome.ts";
+import {
+  antigravityFailedMcpServer,
+  watchAntigravityPromptOutcome,
+} from "./AntigravityTurnOutcome.ts";
 
 const USER_INPUT = 14;
 const PLANNER_RESPONSE = 15;
@@ -28,6 +31,9 @@ const QUOTA_ERROR = errorPayload(
 );
 const RATE_LIMIT_ERROR = errorPayload(
   "Error 429, Message: Resource has been exhausted (e.g. check quota)., Status: RESOURCE_EXHAUSTED, Details: [map[@type:type.googleapis.com/google.rpc.ErrorInfo domain:cloudcode-pa.googleapis.com reason:RATE_LIMIT_EXCEEDED] map[@type:type.googleapis.com/google.rpc.RetryInfo retryDelay:42s]]",
+);
+const MCP_LOAD_ERROR = errorPayload(
+  "failed to construct executor: MCP load failed for jam: initialize: HTTP 401",
 );
 const INVALID_ARGUMENT_ERROR = errorPayload(
   "Error 400, Message: Request contains an invalid argument., Status: INVALID_ARGUMENT, Details: []",
@@ -198,6 +204,25 @@ describe("watchAntigravityPromptOutcome", () => {
           retryable: false,
         },
       );
+      assert.deepInclude(
+        yield* turn([
+          [USER_INPUT, input],
+          [ERROR_MESSAGE, MCP_LOAD_ERROR],
+        ]),
+        { class: "provider_error", code: "ANTIGRAVITY_MCP_SERVER_NEEDS_AUTH", retryable: false },
+      );
+      const spawnFailed = yield* turn([
+        [USER_INPUT, input],
+        [
+          ERROR_MESSAGE,
+          errorPayload("failed to construct executor: MCP load failed for spline: spawn ENOENT"),
+        ],
+      ]);
+      assert.deepInclude(spawnFailed, { code: "ANTIGRAVITY_MCP_SERVER_FAILED" });
+      assert.deepEqual(antigravityFailedMcpServer(spawnFailed!), {
+        id: "spline",
+        needsAuth: false,
+      });
       // A completed tool keeps its usage, and the turn still fails.
       assert.equal(
         (yield* turn(

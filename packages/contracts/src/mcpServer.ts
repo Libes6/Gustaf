@@ -2,7 +2,11 @@ import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 
 import { TrimmedNonEmptyString } from "./baseSchemas.ts";
-import { ProviderInstanceEnvironmentVariableName, ProviderInstanceId } from "./providerInstance.ts";
+import {
+  ProviderDriverKind,
+  ProviderInstanceEnvironmentVariableName,
+  ProviderInstanceId,
+} from "./providerInstance.ts";
 import { SettingsSecretValue } from "./settingsSecretValue.ts";
 
 /** Providers see this id as the server's name; `t3-code*` and `ext` are names Gustaf passes itself. */
@@ -67,8 +71,18 @@ export const McpServerConfig = Schema.Struct({
   name: Schema.optionalKey(TrimmedNonEmptyString),
   enabled: Schema.Boolean.pipe(Schema.withDecodingDefaultKey(Effect.succeed(false))),
   transport: McpServerTransport,
+  /** Driver kinds whose sessions get this server; absent means every provider. */
+  providers: Schema.optionalKey(Schema.Array(ProviderDriverKind)),
+  /** Tool names providers must not offer; tools the server adds later stay on. */
+  disabledTools: Schema.optionalKey(Schema.Array(Schema.String)),
 });
 export type McpServerConfig = typeof McpServerConfig.Type;
+
+/** Drivers whose sessions honor `disabledTools`; the others get every tool of the server. */
+export const MCP_TOOL_FILTER_DRIVERS: ReadonlyArray<ProviderDriverKind> = [
+  ProviderDriverKind.make("claudeAgent"),
+  ProviderDriverKind.make("codex"),
+];
 
 /** A project's switch for one server; absent inherits the server's own `enabled`. */
 export const ProjectMcpServerOverride = Schema.Struct({
@@ -183,10 +197,19 @@ export class McpServerImportError extends Schema.TaggedError<McpServerImportErro
   }
 }
 
+export const McpConnectorStatus = Schema.Literals([
+  "connected",
+  "needs-auth",
+  "failed",
+  "pending",
+  "disabled",
+]);
+export type McpConnectorStatus = typeof McpConnectorStatus.Type;
+
 /** An MCP server a provider loads from its own config or account, such as a claude.ai connector. */
 export const McpConnector = Schema.Struct({
   name: Schema.String,
-  status: Schema.Literals(["connected", "needs-auth", "failed", "pending", "disabled"]),
+  status: McpConnectorStatus,
   /** `claudeai` is a claude.ai connector, signed in on claude.ai; `oauth` signs in through the provider. */
   auth: Schema.Literals(["claudeai", "oauth", "none"]),
   /** Where the provider found it, such as `user`, `project` or `claudeai`. */
@@ -234,6 +257,81 @@ export type McpConnectorSubmitCallbackInput = typeof McpConnectorSubmitCallbackI
 
 export class McpConnectorError extends Schema.TaggedError<McpConnectorError>()(
   "McpConnectorError",
+  { detail: Schema.String },
+) {
+  override get message(): string {
+    return this.detail;
+  }
+}
+
+export const McpServerStatusListInput = Schema.Struct({
+  /** Checks these servers again instead of answering from the environment's cache. */
+  refresh: Schema.optionalKey(Schema.Array(McpServerId)),
+});
+export type McpServerStatusListInput = typeof McpServerStatusListInput.Type;
+
+export const McpServerToolSummary = Schema.Struct({
+  name: Schema.String,
+  /** The tool's `annotations.readOnlyHint`, when it declares one. */
+  readOnly: Schema.optionalKey(Schema.Boolean),
+});
+export type McpServerToolSummary = typeof McpServerToolSummary.Type;
+
+/** What starting or reaching one of the user's MCP servers here showed. */
+export const McpServerStatus = Schema.Struct({
+  id: McpServerId,
+  status: McpConnectorStatus,
+  /** Set when connected. */
+  tools: Schema.optionalKey(Schema.Array(McpServerToolSummary)),
+  resourceCount: Schema.optionalKey(Schema.Number),
+  /** Why it failed: the server's first stderr lines, or the error. */
+  error: Schema.optionalKey(Schema.String),
+  /** Gustaf holds a sign-in for this http server and sends its token to every provider. */
+  signedIn: Schema.optionalKey(Schema.Boolean),
+});
+export type McpServerStatus = typeof McpServerStatus.Type;
+
+export const McpServerStatusListResult = Schema.Struct({
+  servers: Schema.Array(McpServerStatus),
+});
+export type McpServerStatusListResult = typeof McpServerStatusListResult.Type;
+
+export class McpServerStatusError extends Schema.TaggedError<McpServerStatusError>()(
+  "McpServerStatusError",
+  { cause: Schema.optional(Schema.Defect()) },
+) {
+  override get message(): string {
+    return "The MCP servers could not be read.";
+  }
+}
+
+export const McpServerSignInInput = Schema.Struct({ id: McpServerId });
+export type McpServerSignInInput = typeof McpServerSignInInput.Type;
+
+export const McpServerSignInResult = Schema.Struct({
+  authUrl: Schema.String,
+  /**
+   * The authorization server returns the browser to this environment's loopback address. A
+   * browser on another device cannot reach it, so the client offers to paste the address it
+   * landed on.
+   */
+  redirectUri: Schema.String,
+});
+export type McpServerSignInResult = typeof McpServerSignInResult.Type;
+
+export const McpServerSignInCallbackInput = Schema.Struct({
+  callbackUrl: TrimmedNonEmptyString,
+});
+export type McpServerSignInCallbackInput = typeof McpServerSignInCallbackInput.Type;
+
+export const McpServerSignInCallbackResult = Schema.Struct({ id: McpServerId });
+export type McpServerSignInCallbackResult = typeof McpServerSignInCallbackResult.Type;
+
+export const McpServerSignOutInput = Schema.Struct({ id: McpServerId });
+export type McpServerSignOutInput = typeof McpServerSignOutInput.Type;
+
+export class McpServerAuthError extends Schema.TaggedError<McpServerAuthError>()(
+  "McpServerAuthError",
   { detail: Schema.String },
 ) {
   override get message(): string {

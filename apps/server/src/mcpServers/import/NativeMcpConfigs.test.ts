@@ -56,6 +56,14 @@ Authorization = "Bearer header-secret"
 [mcp_servers.off]
 command = "must-never-run"
 enabled = false
+[mcp_servers.computer-use]
+command = "./Codex Computer Use.app/Contents/MacOS/Client"
+args = ["mcp"]
+cwd = "/Users/me/.codex/computer-use"
+enabled = false
+[mcp_servers.dot-cwd]
+command = "./bin/server"
+cwd = "."
 `,
           ],
           [
@@ -136,7 +144,7 @@ enabled = false
         const service = yield* NativeMcpConfigs.NativeMcpConfigs;
         const result = yield* service.list({ homeDir, projectDir });
         assert.deepEqual(result.errors, []);
-        assert.equal(result.servers.length, 12);
+        assert.equal(result.servers.length, 14);
         assert.deepInclude(
           result.servers.find((server) => server.name === "local"),
           {
@@ -157,6 +165,19 @@ enabled = false
           },
         );
         assert.equal(result.servers.find((server) => server.name === "off")?.enabled, false);
+        // Codex starts a relative command in the entry's cwd; only an absolute cwd says where.
+        assert.deepInclude(
+          result.servers.find((server) => server.name === "computer-use"),
+          {
+            enabled: false,
+            command: "/Users/me/.codex/computer-use/Codex Computer Use.app/Contents/MacOS/Client",
+            cwd: "/Users/me/.codex/computer-use",
+          },
+        );
+        assert.notProperty(
+          result.servers.find((server) => server.name === "dot-cwd"),
+          "cwd",
+        );
         assert.deepInclude(
           result.servers.find((server) => server.name === "geminiHttp"),
           {
