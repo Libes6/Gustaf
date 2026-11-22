@@ -51,9 +51,15 @@ account.
 
 ## Runtime installation
 
-Managed installation supports Apple Silicon macOS, Linux x64 or ARM64, and Windows
-x64 or ARM64. Intel Macs can connect to a supported remote environment. Allow
-several GB of free disk space, especially on Linux.
+Managed installation downloads the latest Antigravity CLI Google publishes for
+this machine. Choose **Install** in provider settings. **Reinstall** or **Update**
+checks that release list again and switches to the newest build. The previous
+build stays on disk until you remove the managed runtime. Allow a few hundred MB
+of free disk space.
+
+The CLI is version 1.5 or newer. It serves the agent itself, so it does not need
+the older `localharness_external` helper. Gustaf turns off the CLI's own updater
+for sessions it starts, so a newer build arrives when you reinstall here.
 
 ### Use a manual installation
 

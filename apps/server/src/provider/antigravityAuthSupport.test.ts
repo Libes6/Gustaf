@@ -119,7 +119,11 @@ describe("Antigravity process environment", () => {
     expect(spawn.command).toBe("/usr/bin/agy");
     expect(spawn.args).toEqual(["acp"]);
     expect(spawn.env).not.toHaveProperty("ANTIGRAVITY_HARNESS_PATH");
-    expect(spawn.env).toMatchObject({ GEMINI_HOME: profile.geminiHome, PATH: "/usr/bin" });
+    expect(spawn.env).toMatchObject({
+      GEMINI_HOME: profile.geminiHome,
+      PATH: "/usr/bin",
+      AGY_CLI_DISABLE_AUTO_UPDATE: "true",
+    });
   });
 
   it("passes only the configured method's credential and keeps the GCP pair out of the environment", () => {

@@ -485,7 +485,7 @@ export function buildAntigravityAcpSpawnInput(input: {
         input.runtimeTempDirectory,
       ),
       ...(input.installation.harnessPath === null
-        ? {}
+        ? { AGY_CLI_DISABLE_AUTO_UPDATE: "true" }
         : { ANTIGRAVITY_HARNESS_PATH: input.installation.harnessPath }),
     },
     extendEnv: false,

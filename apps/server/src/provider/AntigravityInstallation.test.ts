@@ -1,3 +1,5 @@
+import * as NodeZlib from "node:zlib";
+
 import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import * as Layer from "effect/Layer";
@@ -22,6 +24,7 @@ import * as ChildProcess from "effect/process/ChildProcess";
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
 
 import * as AntigravityInstallation from "./AntigravityInstallation.ts";
+import { type AntigravityCliReleaseAsset } from "./antigravityCliRelease.ts";
 import { type AntigravityReleaseAsset } from "./antigravityRelease.ts";
 
 const serverContents = "antigravity runtime\n";
@@ -126,6 +129,7 @@ interface HarnessOptions {
   readonly spawner?: ChildProcessSpawner.ChildProcessSpawner["Service"];
   readonly validate?: AntigravityInstallation.AntigravityInstallationOptions["validate"];
   readonly useDefaultValidation?: boolean;
+  readonly cliRelease?: AntigravityCliReleaseAsset;
 }
 
 const makeHarness = Effect.fn("test.makeAntigravityInstallation")(function* (
@@ -139,7 +143,11 @@ const makeHarness = Effect.fn("test.makeAntigravityInstallation")(function* (
   const arch = options.arch ?? "x64";
   const archive = options.archive ?? completeArchive;
   const asset =
-    options.asset === undefined ? yield* releaseAsset(archive, platform) : options.asset;
+    options.cliRelease !== undefined
+      ? null
+      : options.asset === undefined
+        ? yield* releaseAsset(archive, platform)
+        : options.asset;
   const managedDirectory = path.join(baseDir, "tools", "antigravity-acp", `${platform}-${arch}`);
   if (options.previous) {
     yield* writeRelease(managedDirectory, {
@@ -168,7 +176,9 @@ const makeHarness = Effect.fn("test.makeAntigravityInstallation")(function* (
   });
   const installation = yield* AntigravityInstallation.makeAntigravityInstallation({
     baseDir,
-    releaseAsset: asset,
+    ...(options.cliRelease !== undefined
+      ? { cliRelease: options.cliRelease }
+      : { releaseAsset: asset }),
     ...(options.useDefaultValidation
       ? {}
       : {
@@ -948,4 +958,77 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("Antigravity inst
       expect(requests).toEqual([]);
     }),
   );
+
+  it.effect("installs a CLI release and switches to a newer one on reinstall", () =>
+    Effect.gen(function* () {
+      const executable = hostPlatform === "win32" ? "agy.exe" : "antigravity";
+      const pack = (body: string) =>
+        hostPlatform === "win32" ? Buffer.from(body) : cliTarGz(executable, Buffer.from(body));
+      const digest = yield* Digest.Digest;
+      const release = (
+        version: string,
+        body: string,
+      ): Effect.Effect<AntigravityCliReleaseAsset, never, never> =>
+        Effect.gen(function* () {
+          const archive = pack(body);
+          return {
+            version,
+            url: `https://storage.googleapis.com/antigravity-public/antigravity-cli/${version}-1/test`,
+            sha512: Hex.encode(yield* digest.digest(Digest.sha512, archive)),
+            executable: { name: executable },
+            format: hostPlatform === "win32" ? "executable" : "tar.gz",
+          };
+        });
+      const firstArchive = pack("cli-v1");
+      const installed = yield* makeHarness({
+        cliRelease: yield* release("1.5.14", "cli-v1"),
+        archive: firstArchive,
+      });
+      yield* installed.installation.start;
+      expect(yield* terminalState(installed.installation)).toMatchObject({
+        phase: "succeeded",
+        installedVersion: "1.5.14",
+      });
+      const resolved = yield* installed.installation.resolve();
+      expect(resolved.harnessPath).toBeNull();
+      expect(resolved.version).toBe("1.5.14");
+      expect(yield* installed.fs.readFileString(resolved.executablePath)).toBe("cli-v1");
+
+      const secondArchive = pack("cli-v2");
+      const updated = yield* makeHarness({
+        baseDir: installed.baseDir,
+        cliRelease: yield* release("1.5.15", "cli-v2"),
+        archive: secondArchive,
+      });
+      yield* updated.installation.start;
+      expect(yield* terminalState(updated.installation)).toMatchObject({
+        phase: "succeeded",
+        installedVersion: "1.5.15",
+      });
+      const next = yield* updated.installation.resolve();
+      expect(next.harnessPath).toBeNull();
+      expect(next.version).toBe("1.5.15");
+      expect(yield* updated.fs.readFileString(next.executablePath)).toBe("cli-v2");
+      expect(yield* updated.fs.exists(resolved.managedVersionDirectory!)).toBe(true);
+    }),
+  );
 });
+
+function cliTarGz(name: string, body: Buffer) {
+  const header = Buffer.alloc(512);
+  header.write(name);
+  header.write("0000755\0", 100);
+  header.write("0000000\0", 108);
+  header.write("0000000\0", 116);
+  header.write(`${body.length.toString(8).padStart(11, "0")}\0`, 124);
+  header.write("00000000000\0", 136);
+  header.fill(0x20, 148, 156);
+  header.write("0", 156);
+  header.write("ustar\0", 257);
+  header.write("00", 263);
+  let sum = 0;
+  for (const byte of header) sum += byte;
+  header.write(`${sum.toString(8).padStart(6, "0")}\0 `, 148);
+  const pad = (512 - (body.length % 512)) % 512;
+  return NodeZlib.gzipSync(Buffer.concat([header, body, Buffer.alloc(pad + 1024)]));
+}
