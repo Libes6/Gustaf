@@ -6,6 +6,7 @@ import {
   DATABASE_MIGRATIONS_FINISHED_MESSAGE,
   DATABASE_MIGRATIONS_STARTED_MESSAGE,
 } from "@t3tools/shared/databaseMigrationLog";
+import { reconcileGustafSubscriptionsMigration } from "./reconcileGustafSubscriptionsMigration.ts";
 import { reconcileV2PreviewMigration } from "./reconcileV2PreviewMigration.ts";
 
 import Migration0001 from "./Migrations/001_OrchestrationEvents.ts";
@@ -119,6 +120,7 @@ import Migration0108 from "./Migrations/108_AgentFeedback.ts";
 import Migration0109 from "./Migrations/109_IssueTrackerAccounts.ts";
 import Migration0110 from "./Migrations/110_Workflows.ts";
 import Migration0111 from "./Migrations/111_SupersededRunAttemptIndex.ts";
+import Migration0112 from "./Migrations/112_Subscriptions.ts";
 
 const migrationEntries = [
   [1, "OrchestrationEvents", Migration0001],
@@ -233,6 +235,7 @@ const migrationEntries = [
   [109, "IssueTrackerAccounts", Migration0109],
   [110, "Workflows", Migration0110],
   [111, "SupersededRunAttemptIndex", Migration0111],
+  [112, "Subscriptions", Migration0112],
 ] as const;
 
 export const migrationManifest = migrationEntries.map(([id, name]) => [id, name] as const);
@@ -326,6 +329,10 @@ export const runMigrations = Effect.fn("runMigrations")(function* ({
     toMigrationInclusive === undefined || toMigrationInclusive >= FIRST_V2_MIGRATION_ID;
   // The reconcile takes the write lock; CLI startup must not contend with the server for a no-op.
   const previewMigrations = includesV2 && hasPending ? yield* reconcileV2PreviewMigration() : [];
+  if (includesV2 && hasPending) {
+    // Gustaf's Subscriptions stays the last entry; renumber it above any upstream migration.
+    yield* reconcileGustafSubscriptionsMigration(latestMigrationId);
+  }
   if (includesV2) {
     yield* assertV2MigrationsCanRun(toMigrationInclusive);
   }
