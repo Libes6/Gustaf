@@ -1,0 +1,109 @@
+@import "tailwindcss";
+
+/* Follows the system theme only; no toggle, so no boot script (the CSP forbids inline scripts). */
+@custom-variant dark (@media (prefers-color-scheme: dark));
+
+/*
+ * Same token names as apps/web/src/index.css. Values follow the admin's own content treatment:
+ * white cards on a faintly tinted page, a quieter muted layer for table heads and card footers.
+ */
+:root {
+  color-scheme: light;
+  --radius: 0.5rem;
+  --control-radius: 0.5rem;
+  --background: oklch(0.985 0.002 264);
+  --foreground: oklch(0.22 0.01 264);
+  --card: oklch(0.999 0.001 264);
+  --card-foreground: oklch(0.22 0.01 264);
+  --popover: oklch(0.999 0.001 264);
+  --popover-foreground: oklch(0.22 0.01 264);
+  --primary: oklch(0.488 0.217 264);
+  --primary-foreground: oklch(0.99 0.002 264);
+  --secondary: oklch(0.97 0.003 264);
+  --secondary-foreground: oklch(0.3 0.01 264);
+  --muted: oklch(0.975 0.003 264);
+  --muted-foreground: oklch(0.52 0.012 264);
+  --accent: oklch(0.955 0.005 264);
+  --accent-foreground: oklch(0.22 0.01 264);
+  --destructive: var(--color-red-500);
+  --destructive-foreground: var(--color-red-700);
+  --success: var(--color-emerald-500);
+  --success-foreground: var(--color-emerald-700);
+  --warning: var(--color-amber-500);
+  --warning-foreground: var(--color-amber-700);
+  --border: oklch(0.92 0.005 264);
+  --input: oklch(0.88 0.007 264);
+  --ring: var(--primary);
+
+  @variant dark {
+    color-scheme: dark;
+    --background: oklch(0.155 0.004 264);
+    --foreground: oklch(0.94 0.004 264);
+    --card: oklch(0.19 0.005 264);
+    --card-foreground: oklch(0.94 0.004 264);
+    --popover: oklch(0.21 0.005 264);
+    --popover-foreground: oklch(0.94 0.004 264);
+    --primary: oklch(0.6 0.19 264);
+    --secondary: oklch(0.23 0.005 264);
+    --secondary-foreground: oklch(0.94 0.004 264);
+    --muted: oklch(0.215 0.005 264);
+    --muted-foreground: oklch(0.7 0.01 264);
+    --accent: oklch(0.25 0.006 264);
+    --accent-foreground: oklch(0.94 0.004 264);
+    --destructive: color-mix(in srgb, var(--color-red-500) 90%, var(--color-white));
+    --destructive-foreground: var(--color-red-400);
+    --success-foreground: var(--color-emerald-400);
+    --warning-foreground: var(--color-amber-400);
+    --border: oklch(0.28 0.006 264);
+    --input: oklch(0.34 0.008 264);
+  }
+}
+
+@theme {
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, "Inter Variable", "Segoe UI", system-ui, sans-serif;
+  --font-mono:
+    ui-monospace, "SF Mono", "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-background font-sans text-foreground antialiased;
+  }
+}

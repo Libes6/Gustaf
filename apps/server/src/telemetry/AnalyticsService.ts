@@ -117,18 +117,16 @@ function serverOsFromNodePlatform(platform: string): ClientOs {
   }
 }
 
-/** @public */
-/** @public */
-export const make = Effect.gen(function* () {
-  const telemetryConfig = yield* TelemetryEnvConfig;
+export const telemetryConsent = Effect.gen(function* () {
+  const enabled = yield* Config.Boolean("T3CODE_TELEMETRY_ENABLED").pipe(Config.withDefault(true));
   const hostEnvironment = yield* HostProcess.Environment;
   const awaitingShellConsent = hostEnvironment.T3CODE_DESKTOP_SHELL_DISCOVERY_PENDING === "1";
   // A managed policy can switch analytics off over the environment, never on.
   const policyAllows =
     ManagedPolicy.deniedBy(yield* ManagedPolicy.ManagedPolicy, "telemetry") === undefined;
   // A cached PATH does not establish consent from the current login shell.
-  const telemetryEnabled = Effect.suspend(() => {
-    if (!telemetryConfig.enabled || !policyAllows) return Effect.succeed(false);
+  return Effect.suspend(() => {
+    if (!enabled || !policyAllows) return Effect.succeed(false);
     if (!awaitingShellConsent) return Effect.succeed(true);
     if (hostEnvironment.T3CODE_DESKTOP_SHELL_DISCOVERY_PENDING === "1")
       return Effect.succeed(false);
@@ -144,6 +142,12 @@ export const make = Effect.gen(function* () {
       Effect.orElseSucceed(() => false),
     );
   });
+});
+
+/** @public */
+export const make = Effect.gen(function* () {
+  const telemetryConfig = yield* TelemetryEnvConfig;
+  const telemetryEnabled = yield* telemetryConsent;
   const httpClient = yield* HttpClient.HttpClient;
   const serverConfig = yield* ServerConfig.ServerConfig;
   const { distinctId, installId } = yield* getTelemetryIdentity;

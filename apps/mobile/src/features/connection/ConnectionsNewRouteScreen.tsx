@@ -1,5 +1,6 @@
 import { errorDisplayMessage } from "@t3tools/client-runtime/errors";
-import { T, useGT } from "gt-react-native";
+import { connectRelayPairing } from "@t3tools/client-runtime/gustaf-relay";
+import { msg, T, useGT } from "gt-react-native";
 import { ListRow } from "../../components/ui/ListRow";
 import * as Dialog from "../../components/ui/Dialog";
 import { ScreenScrollView as ScrollView } from "../../components/ui/ScreenScrollView";
@@ -25,11 +26,16 @@ import { SettingsScreen } from "../settings/components/SettingsScreen";
 import { AppText as Text, AppTextInput, type AppTextInputProps } from "../../components/ui/AppText";
 import { FrostedCutout } from "../../components/ui/FrostedCutout";
 import { buildPairingUrl, extractPairingUrlFromQrPayload, parsePairingUrl } from "./pairing";
+import { isRelayPairingLink, pairOverRelay } from "../relay/relayTunnels";
 import { useRemoteConnections } from "../../state/use-remote-environment-registry";
 import { SymbolView } from "../../components/ui/AppSymbol";
 import { hasCloudPublicConfig } from "../cloud/publicConfig";
 import { CloudEnvironmentRows } from "./CloudEnvironmentRows";
-import { autoConnectReport, devAutoConnectAttemptAtom } from "./devAutoConnect";
+import {
+  autoConnectReport,
+  devAutoConnectAttemptAtom,
+  relayLinkAttemptAtom,
+} from "./devAutoConnect";
 import { linkedEnvironmentPrefillAtom } from "./linkedEnvironmentPrefill";
 import { splitEnvironmentSections } from "./environmentSections";
 import { leaveSettingsPage } from "../settings/settings-navigation";
@@ -40,6 +46,7 @@ type ConnectionsNewRouteParams = {
   readonly mode?: string;
   readonly pairingUrl?: string;
   readonly autoConnect?: string;
+  readonly relayLink?: string;
   readonly routeFor?: EnvironmentId;
   /** A linked machine this app chose to pair with; its details come from app state, never the link. */
   readonly linked?: string;
@@ -51,13 +58,15 @@ export function ConnectionsNewRouteScreen({
   const params = route.params ?? {};
   // Dev-only prefill prevents production links from supplying an attacker-chosen host and token.
   const routePairingUrl = __DEV__ ? (params.pairingUrl?.trim() ?? "") : "";
+  const relayLink = params.relayLink?.trim() ?? "";
   const known = useAtomValue(linkedEnvironmentPrefillAtom);
   const linked = known !== null && known.environmentId === params.linked ? known : null;
   // A new prefill link replaces whatever the form held.
   return (
     <PairingForm
-      key={`${routePairingUrl}:${linked?.environmentId ?? ""}`}
+      key={`${relayLink}:${routePairingUrl}:${linked?.environmentId ?? ""}`}
       routePairingUrl={routePairingUrl}
+      relayLink={relayLink}
       routeFor={params.routeFor ?? linked?.environmentId}
       linked={linked}
     />
@@ -66,10 +75,12 @@ export function ConnectionsNewRouteScreen({
 
 function PairingForm({
   routePairingUrl,
+  relayLink,
   routeFor,
   linked,
 }: {
   readonly routePairingUrl: string;
+  readonly relayLink: string;
   readonly routeFor: EnvironmentId | undefined;
   readonly linked: { readonly label: string; readonly host: string | null } | null;
 }) {
@@ -90,13 +101,22 @@ function PairingForm({
     routePairingUrl,
     ownAttempt,
   );
-  const connecting = isSubmitting || autoConnect.connecting;
-  const pairingConnectionError = submitError ?? autoConnect.error;
+  const relayAttempt = useAtomValue(relayLinkAttemptAtom);
+  const relayFromLink =
+    relayAttempt !== null && relayAttempt.relayLink === relayLink ? relayAttempt : null;
+  const connecting =
+    isSubmitting || autoConnect.connecting || relayFromLink?.status === "connecting";
+  const pairingConnectionError =
+    submitError ??
+    autoConnect.error ??
+    (relayFromLink?.status === "failed" ? relayFromLink.error : null);
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const screenFocused = useIsFocused();
   const [scannerLocked, setScannerLocked] = useState(false);
   // A good scan parks the camera so it can't re-read the code over later edits.
   const [scanComplete, setScanComplete] = useState(false);
+  // Pairing through the Gustaf relay: connecting, then waiting for the computer's approval.
+  const [relayStatus, setRelayStatus] = useState<string | null>(null);
 
   const headerIconColor = useUniwindTheme()["--color-icon"];
 
@@ -146,6 +166,10 @@ function PairingForm({
     }
 
     setScannerLocked(true);
+    if (isRelayPairingLink(data)) {
+      void handleRelayScan(data);
+      return;
+    }
 
     try {
       const pairingUrl = extractPairingUrlFromQrPayload(data);
@@ -169,13 +193,58 @@ function PairingForm({
     }
   };
 
-  const handleSubmit = async () => {
-    const pairingUrl = buildPairingUrl(hostInput, codeInput);
+  const handleRelayScan = async (link: string) => {
+    setScanComplete(true);
+    setOwnAttempt(true);
+    setSubmitError(null);
+    setIsSubmitting(true);
+    setRelayStatus(m(msg("Connecting to the computer through the Gustaf relay…")));
+    let pairingUrl: string;
+    try {
+      pairingUrl = await pairOverRelay(link, (safetyCode) =>
+        setRelayStatus(
+          m(
+            msg(
+              "Allow this phone on the computer to finish pairing. The computer shows the same safety code: {code}",
+              { code: safetyCode },
+            ),
+          ),
+        ),
+      );
+    } catch (error) {
+      setIsSubmitting(false);
+      setRelayStatus(null);
+      setScanComplete(false);
+      setScannerLocked(false);
+      setSubmitError(
+        error instanceof Error ? error.message : m(msg("Pairing over the relay failed.")),
+      );
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      return;
+    }
+    setRelayStatus(null);
+    setScannerLocked(false);
+    const { host, code } = parsePairingUrl(pairingUrl);
+    setHostInput(host);
+    setCodeInput(code);
+    await submitPairingUrl(pairingUrl, routeFor, true);
+  };
+
+  const handleSubmit = (targetEnvironmentId = routeFor) =>
+    submitPairingUrl(buildPairingUrl(hostInput, codeInput), targetEnvironmentId);
+
+  const submitPairingUrl = async (
+    pairingUrl: string,
+    targetEnvironmentId: EnvironmentId | undefined,
+    relay = false,
+  ) => {
     setOwnAttempt(true);
     setSubmitError(null);
     setIsSubmitting(true);
     onChangeConnectionPairingUrl(pairingUrl);
-    const outcome = await onConnectPress(pairingUrl, routeFor);
+    const outcome = relay
+      ? await connectRelayPairing(pairingUrl, targetEnvironmentId, onConnectPress)
+      : await onConnectPress(pairingUrl, targetEnvironmentId);
     setIsSubmitting(false);
     setSubmitError(outcome.error);
     void Haptics.notificationAsync(
@@ -274,7 +343,9 @@ function PairingForm({
                 pairingConnectionError ? "text-danger-foreground" : "text-foreground-muted",
               )}
             >
-              {pairingConnectionError ??
+              {relayStatus ??
+                (relayFromLink?.status === "connecting" ? relayFromLink.message : null) ??
+                pairingConnectionError ??
                 (linked
                   ? gt(
                       "Create a pairing code on {environment}, in its Settings → Sharing & access or with `t3 auth pairing create`, and enter it here.",

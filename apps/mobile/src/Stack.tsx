@@ -142,6 +142,7 @@ import { UsageRouteScreen } from "./features/usage/UsageRouteScreen";
 import { WorkflowRunRouteScreen } from "./features/workflows/WorkflowRunRouteScreen";
 import { WorkflowStepSheet } from "./features/workflows/WorkflowStepSheet";
 import { SettingsAboutRouteScreen } from "./features/settings/SettingsAboutRouteScreen";
+import { AccountSettingsRouteScreen } from "./features/account/AccountSettingsRouteScreen";
 import { SettingsNotificationsRouteScreen } from "./features/settings/SettingsNotificationsRouteScreen";
 import { SettingsRouteScreen } from "./features/settings/SettingsRouteScreen";
 import { SettingsLabsRouteScreen } from "./features/settings/ThreadSettingsSections";
@@ -182,6 +183,7 @@ const ROUTE_TITLES: Readonly<Record<string, string>> = {
   SettingsEnvironmentMaintenance: msg("Maintenance"),
   SettingsNotifications: msg("Notifications"),
   SettingsThreads: msg("Threads"),
+  SettingsAccount: msg("Account"),
   SettingsAbout: msg("About"),
   SettingsEnvironmentNew: msg("Add Environment"),
   SettingsArchive: msg("Archive", { $context: "noun, settings page of archived threads" }),
@@ -303,6 +305,11 @@ const SETTINGS_SCREENS = {
   SettingsThreads: createNativeStackScreen({
     screen: SettingsThreadsRouteScreen,
     linking: "settings/thread-preferences",
+    options: settingsPage(),
+  }),
+  SettingsAccount: createNativeStackScreen({
+    screen: AccountSettingsRouteScreen,
+    linking: "settings/account",
     options: settingsPage(),
   }),
   SettingsAbout: createNativeStackScreen({
@@ -864,7 +871,7 @@ const RootStackConfig = createWorkspaceStackNavigator({
     }),
     ConnectionsNew: createNativeStackScreen({
       screen: ConnectionsNewRouteScreen,
-      linking: "connections/new",
+      linking: { path: "connections/new", alias: ["relay-pair"] },
       options: sheetRoute({ detent: 0.55, maxDetent: 0.7 }),
     }),
     NotFound: createNativeStackScreen({

@@ -1,0 +1,25 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: gustaf_cloud
+      POSTGRES_USER: gustaf
+      POSTGRES_PASSWORD: image_test_only
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gustaf -d gustaf_cloud"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+    tmpfs:
+      - /var/lib/postgresql/data
+  api:
+    image: ${API_IMAGE:-gustaf-api:local}
+    environment:
+      DATABASE_URL: postgresql://gustaf:image_test_only@postgres:5432/gustaf_cloud
+      BETTER_AUTH_SECRET: image-test-only-not-a-real-secret-000
+      PUBLIC_BASE_URL: http://localhost:3100
+      GITHUB_CLIENT_ID: image-test-only
+      GITHUB_CLIENT_SECRET: image-test-only
+    depends_on:
+      postgres:
+        condition: service_healthy

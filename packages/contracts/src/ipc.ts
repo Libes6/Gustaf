@@ -20,6 +20,7 @@ import type {
   DesktopAppActivationRequest,
   DesktopAppActivationResponse,
 } from "./desktopAppActivation.ts";
+import type { DesktopGustafAccountBridge } from "./gustafAccount.ts";
 
 export interface ContextMenuItem<T extends string = string> {
   id: T;
@@ -1106,6 +1107,7 @@ export type SystemSettingsPane = typeof SystemSettingsPaneSchema.Type;
 
 export interface DesktopBridge {
   getAppBranding: () => DesktopAppBranding | null;
+  getAppVersion?: () => string | null;
   /** `null` until the desktop host has read the login shell's environment; ask again later. */
   getRelayTelemetryEnabled: () => boolean | null;
   getPathForFile: (file: File) => string;
@@ -1247,6 +1249,8 @@ export interface DesktopBridge {
     prepare: (locale: string) => Promise<DesktopAppleSpeechResult>;
     transcribe: (input: { locale: string; pcm: Uint8Array }) => Promise<DesktopAppleSpeechResult>;
   };
+  /** Gustaf cloud account, device registration, problem reports, relay client storage, and client config. */
+  gustafAccount?: DesktopGustafAccountBridge;
 }
 
 /** Renderer callback invoked by Electron with a fresh user gesture before display-media capture. */

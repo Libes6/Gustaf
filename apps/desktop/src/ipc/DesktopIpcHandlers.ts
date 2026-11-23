@@ -41,6 +41,7 @@ import {
 } from "./methods/updates.ts";
 import {
   getAppBranding,
+  getAppVersion,
   getLocalEnvironmentBootstraps,
   getLocalEnvironmentBearerToken,
   installRelayTelemetryEnabled,
@@ -92,6 +93,20 @@ import {
   uninstallCliCommand,
   addCliCommandToPath,
 } from "./methods/cliCommand.ts";
+import {
+  cancelGustafAccountSignIn,
+  getGustafAccountState,
+  getGustafClientConfig,
+  getGustafRelayClientCredential,
+  getGustafRelayClientStorageItem,
+  listGustafAccountDevices,
+  registerGustafComputer,
+  reportGustafProblem,
+  revokeGustafAccountDevice,
+  setGustafRelayClientStorageItem,
+  signInGustafAccount,
+  signOutGustafAccount,
+} from "./methods/gustafAccount.ts";
 
 export const installDesktopIpcHandlers = Effect.fn("desktop.ipc.installHandlers")(function* () {
   const ipc = yield* DesktopIpc.DesktopIpc;
@@ -105,6 +120,7 @@ export const installDesktopIpcHandlers = Effect.fn("desktop.ipc.installHandlers"
   yield* ipc.handleSync(takeLegacyLocalStorage);
   yield* ipc.handle(completeLegacyLocalStorage);
   yield* ipc.handleSync(getAppBranding);
+  yield* ipc.handleSync(getAppVersion);
   yield* installRelayTelemetryEnabled();
   yield* ipc.handleSync(getSystemLocale);
   yield* ipc.handleSync(getPreferredSystemLanguages);
@@ -182,6 +198,18 @@ export const installDesktopIpcHandlers = Effect.fn("desktop.ipc.installHandlers"
   yield* ipc.handle(installCliCommand);
   yield* ipc.handle(uninstallCliCommand);
   yield* ipc.handle(addCliCommandToPath);
+  yield* ipc.handle(getGustafAccountState);
+  yield* ipc.handle(signInGustafAccount);
+  yield* ipc.handle(cancelGustafAccountSignIn);
+  yield* ipc.handle(signOutGustafAccount);
+  yield* ipc.handle(listGustafAccountDevices);
+  yield* ipc.handle(registerGustafComputer);
+  yield* ipc.handle(revokeGustafAccountDevice);
+  yield* ipc.handle(reportGustafProblem);
+  yield* ipc.handle(getGustafRelayClientCredential);
+  yield* ipc.handle(getGustafRelayClientStorageItem);
+  yield* ipc.handle(setGustafRelayClientStorageItem);
+  yield* ipc.handle(getGustafClientConfig);
   for (const previewMethod of PreviewIpc.methods) {
     // Explicit types preserve the error/service union of these heterogeneous preview methods.
     yield* ipc.handle<

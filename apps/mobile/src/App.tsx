@@ -62,6 +62,8 @@ import { takeScheduledTaskNewLink } from "./features/settings/scheduled-task-edi
 import {
   pairingFormLinkAction,
   startDevAutoConnect,
+  startRelayPairingLink,
+  takeRelayPairingLink,
   withoutPairingTarget,
 } from "./features/connection/devAutoConnect";
 import {
@@ -109,6 +111,9 @@ import {
 import { pruneNewTaskFlowStates } from "./features/threads/new-task-flow-state";
 import { pruneNewTaskBranchCheckouts } from "./features/threads/NewTaskDraftRouteScreen";
 import { installAppUpdateChecks } from "./features/updates/app-updates";
+import { ClientConfigBanners } from "./features/client-config/ClientConfigBanners";
+import { installClientConfig } from "./features/client-config/clientConfig";
+import { installAccountHeartbeat } from "./features/account/useAccount";
 
 import "../global.css";
 
@@ -131,7 +136,9 @@ function getAppStateFromPath(path: string, options: Parameters<typeof getStateFr
     (state) => restoreSettingsLinkState(state, settingsLinkPage()),
     takeThreadPromptLink,
     takeNewTaskPromptLink,
+    (state) => takeRelayPairingLink(state, path),
     withoutPairingTarget,
+    startRelayPairingLink,
     startDevAutoConnect,
     takeScheduledTaskNewLink,
   );
@@ -140,6 +147,9 @@ function getAppStateFromPath(path: string, options: Parameters<typeof getStateFr
 const appLinking = {
   prefixes: [
     Linking.createURL("/"),
+    "gustaf://",
+    "gustaf-dev://",
+    "gustaf-preview://",
     "t3code://",
     "t3code-dev://",
     "t3code-preview://",
@@ -216,6 +226,8 @@ const appServiceDisposers = [
   installAgentNotificationNavigation(linkToAppPath),
   installAppShortcuts(linkToAppPath),
   installAppUpdateChecks(),
+  installClientConfig(),
+  installAccountHeartbeat(),
   installShowcaseCapture(rootPathnameFromState),
 ];
 disposeOnFoundationReplace(typeof module === "undefined" ? undefined : module.hot, () => {
@@ -323,6 +335,7 @@ function AppContent() {
               </NativeLayoutMetricsProvider>
             </GlobalVoiceInputControl>
             <OverlayPortalHost />
+            <ClientConfigBanners />
           </SafeAreaProvider>
         </KeyboardProvider>
       </GestureHandlerRootView>

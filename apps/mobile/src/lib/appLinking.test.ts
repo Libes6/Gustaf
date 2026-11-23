@@ -10,14 +10,22 @@ import {
 } from "./appLinking";
 
 describe("shouldHandleAppLink", () => {
-  it.each(["t3code://", "t3code:///", "t3code-dev://", "t3code-preview://"])(
-    "ignores scheme-only URL %s",
-    (url) => {
-      expect(shouldHandleAppLink(url, true)).toBe(false);
-    },
-  );
+  it.each([
+    "gustaf://",
+    "gustaf:///",
+    "gustaf-dev://",
+    "gustaf-preview://",
+    "t3code://",
+    "t3code:///",
+    "t3code-dev://",
+    "t3code-preview://",
+  ])("ignores scheme-only URL %s", (url) => {
+    expect(shouldHandleAppLink(url, true)).toBe(false);
+  });
 
   it.each([
+    "gustaf://threads/env-1/thread-1",
+    "gustaf-dev://pair?pairingUrl=x",
     "t3code://threads/env-1/thread-1",
     "t3code://pair?pairingUrl=x",
     "t3code-dev://settings/usage?tab=limits",
@@ -26,12 +34,15 @@ describe("shouldHandleAppLink", () => {
     expect(shouldHandleAppLink(url, true)).toBe(true);
   });
 
-  it.each(["t3code://expo-development-client/?url=x", "t3code://expo-sharing/anything"])(
-    "ignores lifecycle URL %s",
-    (url) => {
-      expect(shouldHandleAppLink(url, true)).toBe(false);
-    },
-  );
+  it.each([
+    "t3code://expo-development-client/?url=x",
+    "t3code://expo-sharing/anything",
+    "gustaf://auth?code=c&state=s",
+    "gustaf-dev://auth/?error=access_denied&state=s",
+    "t3code://auth?code=c&state=s",
+  ])("ignores lifecycle URL %s", (url) => {
+    expect(shouldHandleAppLink(url, true)).toBe(false);
+  });
 });
 
 describe("cloud-only deep links", () => {

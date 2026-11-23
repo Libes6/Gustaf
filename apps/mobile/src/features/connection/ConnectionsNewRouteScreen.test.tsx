@@ -38,6 +38,10 @@ vi.mock("expo-camera", () => ({
   CameraView: () => null,
   useCameraPermissions: () => [null, vi.fn()],
 }));
+vi.mock("../relay/relayTunnels", () => ({
+  isRelayPairingLink: () => false,
+  pairOverRelay: vi.fn(),
+}));
 vi.mock("expo-haptics", () => ({
   notificationAsync: vi.fn(async () => {}),
   NotificationFeedbackType: { Success: "success", Error: "error" },
@@ -85,6 +89,7 @@ vi.mock("./environmentSections", () => ({
 vi.mock("./devAutoConnect", () => ({
   autoConnectReport: () => ({ connecting: false, error: null }),
   devAutoConnectAttemptAtom: {},
+  relayLinkAttemptAtom: {},
 }));
 vi.mock("../../state/use-remote-environment-registry", () => ({
   setPendingConnectionError: (message: string | null) => {

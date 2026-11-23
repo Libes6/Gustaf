@@ -43,6 +43,13 @@ import {
   ServerAuthSessionMethod,
 } from "./auth.ts";
 import {
+  RelayHostCredentialInput,
+  RelayHostDecisionInput,
+  RelayHostPairingOffer,
+  RelayHostRevokeInput,
+  RelayHostStatus,
+} from "./relayHost.ts";
+import {
   ExecutionEnvironmentDescriptor,
   ORCHESTRATION_PROTOCOL_HEADER,
   ORCHESTRATION_PROTOCOL_VERSION_TEXT,
@@ -122,6 +129,9 @@ export const EnvironmentRequestInvalidReason = Schema.Literals([
   "invalid_audio",
   "speech_unavailable",
   "speech_busy",
+  "relay_not_online",
+  "relay_item_not_found",
+  "relay_invalid_url",
 ]);
 export type EnvironmentRequestInvalidReason = typeof EnvironmentRequestInvalidReason.Type;
 
@@ -138,6 +148,7 @@ export type EnvironmentOperationForbiddenReason = typeof EnvironmentOperationFor
 
 export const EnvironmentInternalErrorReason = Schema.Literals([
   "bootstrap_validation_failed",
+  "relay_host_failed",
   "browser_session_issuance_failed",
   "browser_session_cookie_failed",
   "access_token_issuance_failed",
@@ -1100,6 +1111,58 @@ class EnvironmentWebhooksHttpApi extends HttpApiGroup.make("webhooks")
   .add(HttpApiEndpoint.get("webhookGet", WEBHOOK_PATH, webhookEndpoint))
   .annotate(HttpApi.RedactedNames, { params: ["token"] }) {}
 
+const RelayHostErrors = [
+  EnvironmentRequestInvalidError,
+  ...EnvironmentScopedOperationErrors,
+] as const;
+
+class EnvironmentRelayHostHttpApi extends HttpApiGroup.make("relayHost")
+  .add(
+    HttpApiEndpoint.get("status", "/api/relay-host", {
+      headers: OptionalBearerHeaders,
+      success: RelayHostStatus,
+      error: EnvironmentScopedOperationErrors,
+    }).middleware(EnvironmentAuthenticatedAuth),
+  )
+  .add(
+    HttpApiEndpoint.put("setCredential", "/api/relay-host/credential", {
+      headers: OptionalBearerHeaders,
+      payload: RelayHostCredentialInput,
+      success: RelayHostStatus,
+      error: RelayHostErrors,
+    }).middleware(EnvironmentAuthenticatedAuth),
+  )
+  .add(
+    HttpApiEndpoint.delete("clearCredential", "/api/relay-host/credential", {
+      headers: OptionalBearerHeaders,
+      success: RelayHostStatus,
+      error: EnvironmentScopedOperationErrors,
+    }).middleware(EnvironmentAuthenticatedAuth),
+  )
+  .add(
+    HttpApiEndpoint.post("createOffer", "/api/relay-host/offer", {
+      headers: OptionalBearerHeaders,
+      success: RelayHostPairingOffer,
+      error: RelayHostErrors,
+    }).middleware(EnvironmentAuthenticatedAuth),
+  )
+  .add(
+    HttpApiEndpoint.post("decide", "/api/relay-host/decision", {
+      headers: OptionalBearerHeaders,
+      payload: RelayHostDecisionInput,
+      success: RelayHostStatus,
+      error: RelayHostErrors,
+    }).middleware(EnvironmentAuthenticatedAuth),
+  )
+  .add(
+    HttpApiEndpoint.post("revokeDevice", "/api/relay-host/devices/revoke", {
+      headers: OptionalBearerHeaders,
+      payload: RelayHostRevokeInput,
+      success: RelayHostStatus,
+      error: RelayHostErrors,
+    }).middleware(EnvironmentAuthenticatedAuth),
+  ) {}
+
 export class EnvironmentHttpApi extends HttpApi.make("environment")
   .add(EnvironmentMetadataHttpApi)
   .add(EnvironmentAuthHttpApi)
@@ -1109,5 +1172,6 @@ export class EnvironmentHttpApi extends HttpApi.make("environment")
   .add(EnvironmentProjectsHttpApi)
   .add(EnvironmentVoiceHttpApi)
   .add(EnvironmentConnectHttpApi)
+  .add(EnvironmentRelayHostHttpApi)
   .add(EnvironmentWebhooksHttpApi)
   .add(EnvironmentPeerLinkHttpApi) {}

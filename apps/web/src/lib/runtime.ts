@@ -3,6 +3,7 @@ import type * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Socket from "effect/socket/Socket";
 
+import { layerRelayWebSocket, relayAwareFetch } from "@t3tools/client-runtime/gustaf-relay";
 import { layerRemoteHttpClient } from "@t3tools/client-runtime/rpc";
 import * as RelayTracing from "@t3tools/shared/relayTracing";
 import * as PrimaryEnvironmentHttpClient from "../environments/primary/httpClient";
@@ -16,12 +17,22 @@ import {
   resolveRelayTracingConfig,
 } from "../cloud/publicConfig";
 import * as ClientTracer from "../observability/clientTracer";
+import { desktopRelay } from "../relay/desktopRelay";
 
 function configuredRelayUrl(): string {
   return resolveCloudPublicConfig().relayUrl ?? "http://relay.invalid";
 }
 
+// In the desktop app, environments paired over the Gustaf relay live at a virtual origin the
+// tunnel intercepts. File previews and media read their URLs with plain `fetch`, so the global one
+// is wrapped too; it passes every other URL straight through.
+if (desktopRelay) {
+  globalThis.fetch = relayAwareFetch(desktopRelay.tunnels, globalThis.fetch.bind(globalThis));
+}
 const layerHttpClient = layerRemoteHttpClient((input, init) => globalThis.fetch(input, init));
+const layerWebSocket = desktopRelay
+  ? layerRelayWebSocket(desktopRelay.tunnels, Socket.layerWebSocketConstructorGlobal)
+  : Socket.layerWebSocketConstructorGlobal;
 const layerRelayTracing = RelayTracing.layer(
   resolveRelayTracingConfig(),
   {
@@ -37,7 +48,7 @@ const layerRelayTracing = RelayTracing.layer(
 type RuntimeLayerSource =
   | typeof layerHttpClient
   | typeof Dpop.layer
-  | typeof Socket.layerWebSocketConstructorGlobal
+  | typeof layerWebSocket
   | typeof layerRelayTracing
   | typeof ClientTracer.layer
   | ReturnType<typeof ManagedRelayLayer.layer>;
@@ -66,7 +77,7 @@ export function __setPrimaryHttpRunnerForTests(runner?: PrimaryHttpEffectRunner)
 const layerRuntime = Layer.mergeAll(
   layerHttpClient,
   Dpop.layer,
-  Socket.layerWebSocketConstructorGlobal,
+  layerWebSocket,
   ClientTracer.layer,
   layerRelayTracing,
   ManagedRelayLayer.layer(configuredRelayUrl()).pipe(

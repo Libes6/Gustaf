@@ -1,7 +1,7 @@
 import { thrownErrorMessage } from "@t3tools/client-runtime/errors";
 import { m } from "~/i18n/messages";
 import { pipe } from "effect/Function";
-import { ChevronsLeftRightEllipsisIcon, PlusIcon, TerminalIcon } from "lucide-react";
+import { ChevronsLeftRightEllipsisIcon, GlobeIcon, PlusIcon, TerminalIcon } from "lucide-react";
 import { useAtomValue } from "@effect/atom-react";
 import { type KeyboardEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import { T, useGT, useMessages, Var } from "gt-react";
@@ -68,6 +68,8 @@ import {
   parseRemotePairingFields,
   formatDesktopSshConnectionError,
 } from "./ConnectionsSettings.logic";
+import { desktopRelay } from "../../relay/desktopRelay";
+import { RelayPairingPanel } from "./RelayPairingPanel";
 
 const SSH_PROTOCOL_NAME = "SSH";
 const EMPTY_DISCOVERED_SSH_HOSTS: ReadonlyArray<DesktopDiscoveredSshHost> = [];
@@ -125,7 +127,7 @@ export function AddEnvironmentDialog({
     }
     return keys;
   })();
-  const [savedBackendMode, setSavedBackendMode] = useState<"remote" | "ssh">("remote");
+  const [savedBackendMode, setSavedBackendMode] = useState<"remote" | "ssh" | "relay">("remote");
   const [savedBackendHost, setSavedBackendHost] = useState(prefill?.host ?? initialHost);
   const [savedBackendPairingCode, setSavedBackendPairingCode] = useState("");
   const [savedBackendSshHost, setSavedBackendSshHost] = useState("");
@@ -378,7 +380,7 @@ export function AddEnvironmentDialog({
     setSavedBackendHost(value);
   };
   const renderConnectionModeCard = (input: {
-    readonly mode: "remote" | "ssh";
+    readonly mode: "remote" | "ssh" | "relay";
     readonly title: string;
     readonly description: string;
     readonly icon?: ReactNode;
@@ -710,7 +712,7 @@ export function AddEnvironmentDialog({
         </DialogHeader>
         <DialogPanel>
           <div className="space-y-4">
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className={cn("grid gap-3", desktopRelay ? "sm:grid-cols-3" : "sm:grid-cols-2")}>
               {renderConnectionModeCard({
                 mode: "remote",
                 title: gt("Remote link"),
@@ -725,9 +727,33 @@ export function AddEnvironmentDialog({
                     icon: <TerminalIcon aria-hidden className="size-4" />,
                   })
                 : null}
+              {desktopRelay
+                ? renderConnectionModeCard({
+                    mode: "relay",
+                    title: gt("Gustaf relay"),
+                    description: gt("Reach a computer on any network with its relay link."),
+                    icon: <GlobeIcon aria-hidden className="size-4" />,
+                  })
+                : null}
             </div>
             <AnimatedHeight>
-              {savedBackendMode === "ssh" ? renderSshFields() : renderRemoteModeBody()}
+              {savedBackendMode === "relay" ? (
+                <RelayPairingPanel
+                  routeTarget={routeTarget}
+                  onPaired={() => {
+                    handleOpenChange(false);
+                    toastManager.add({
+                      type: "success",
+                      title: routeTarget ? gt("Route added") : gt("Backend added"),
+                      description: gt("Paired through the Gustaf relay."),
+                    });
+                  }}
+                />
+              ) : savedBackendMode === "ssh" ? (
+                renderSshFields()
+              ) : (
+                renderRemoteModeBody()
+              )}
             </AnimatedHeight>
           </div>
         </DialogPanel>

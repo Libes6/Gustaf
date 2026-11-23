@@ -103,6 +103,22 @@ function unwrapEnsureSshEnvironmentResult(result: unknown) {
   return result as Awaited<ReturnType<DesktopBridge["ensureSshEnvironment"]>>;
 }
 
+async function invokeGustafAccount<T>(channel: string, payload?: unknown): Promise<T> {
+  try {
+    return (await (payload !== undefined
+      ? ipcRenderer.invoke(channel, payload)
+      : ipcRenderer.invoke(channel))) as T;
+  } catch (error) {
+    if (error instanceof Error) {
+      const cleaned = error.message
+        .replace(/^Error invoking remote method '[^']+':\s*/, "")
+        .replace(/^GustafAccountError:\s*/, "");
+      throw new Error(cleaned, { cause: error });
+    }
+    throw error;
+  }
+}
+
 contextBridge.exposeInMainWorld("desktopBridge", {
   getAppBranding: () => {
     const result = ipcRenderer.sendSync(IpcChannels.GET_APP_BRANDING_CHANNEL);
@@ -110,6 +126,10 @@ contextBridge.exposeInMainWorld("desktopBridge", {
       return null;
     }
     return result as ReturnType<DesktopBridge["getAppBranding"]>;
+  },
+  getAppVersion: () => {
+    const result = ipcRenderer.sendSync(IpcChannels.GET_APP_VERSION_CHANNEL);
+    return typeof result === "string" ? result : null;
   },
   getRelayTelemetryEnabled: () => {
     const enabled = ipcRenderer.sendSync(IpcChannels.GET_RELAY_TELEMETRY_ENABLED_CHANNEL);
@@ -569,5 +589,26 @@ contextBridge.exposeInMainWorld("desktopBridge", {
       return () =>
         ipcRenderer.removeListener(IpcChannels.PREVIEW_FIND_RESULT_CHANNEL, wrappedListener);
     },
+  },
+  gustafAccount: {
+    getState: () => invokeGustafAccount(IpcChannels.GUSTAF_ACCOUNT_GET_STATE_CHANNEL),
+    signIn: () => invokeGustafAccount(IpcChannels.GUSTAF_ACCOUNT_SIGN_IN_CHANNEL),
+    cancelSignIn: () => invokeGustafAccount(IpcChannels.GUSTAF_ACCOUNT_CANCEL_SIGN_IN_CHANNEL),
+    signOut: () => invokeGustafAccount(IpcChannels.GUSTAF_ACCOUNT_SIGN_OUT_CHANNEL),
+    listDevices: () => invokeGustafAccount(IpcChannels.GUSTAF_ACCOUNT_LIST_DEVICES_CHANNEL),
+    registerThisComputer: () =>
+      invokeGustafAccount(IpcChannels.GUSTAF_ACCOUNT_REGISTER_DEVICE_CHANNEL),
+    revokeDevice: (deviceId) =>
+      invokeGustafAccount(IpcChannels.GUSTAF_ACCOUNT_REVOKE_DEVICE_CHANNEL, deviceId),
+    reportProblem: (report) =>
+      invokeGustafAccount(IpcChannels.GUSTAF_ACCOUNT_REPORT_PROBLEM_CHANNEL, report),
+    relayClient: {
+      credential: () => invokeGustafAccount(IpcChannels.GUSTAF_RELAY_CLIENT_CREDENTIAL_CHANNEL),
+      getItem: (key) =>
+        invokeGustafAccount(IpcChannels.GUSTAF_RELAY_CLIENT_STORAGE_GET_CHANNEL, key),
+      setItem: (key, value) =>
+        invokeGustafAccount(IpcChannels.GUSTAF_RELAY_CLIENT_STORAGE_SET_CHANNEL, { key, value }),
+    },
+    clientConfig: () => invokeGustafAccount(IpcChannels.GUSTAF_CLIENT_CONFIG_CHANNEL),
   },
 } satisfies DesktopBridge);

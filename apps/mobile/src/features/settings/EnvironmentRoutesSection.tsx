@@ -34,6 +34,8 @@ import { environmentSession } from "../../state/session";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { connectionTone } from "../connection/connectionTone";
 import { ListActionRow as SettingsActionRow } from "../../components/ui/ListActionRow";
+import { relayHostFromUrl } from "@t3tools/shared/relayTunnelClient";
+import { useRelaySafetyCode } from "../relay/useRelaySafetyCode";
 import { SettingsDragHandle } from "./components/SettingsDragHandle";
 import { SettingsSection } from "./components/SettingsSection";
 
@@ -257,7 +259,16 @@ function RouteRow(props: {
   const messages = useMessages();
   const { route, lifted, offset } = props;
   const label = connectionRouteLabelText(route, messages);
-  const address = connectionRouteAddress(route);
+  const routeAddress = connectionRouteAddress(route);
+  // A relay route's address is a made-up origin; the safety code is what the user can check.
+  const relayHost = routeAddress === null ? null : relayHostFromUrl(routeAddress);
+  const safetyCode = useRelaySafetyCode(relayHost);
+  const address =
+    relayHost === null
+      ? routeAddress
+      : safetyCode === null
+        ? null
+        : gt("Safety code {code}", { code: safetyCode });
   const refusedHint =
     props.refused && address !== null
       ? gt("The host refused this device's sign-in. Pair this address again with Add route.")

@@ -154,3 +154,17 @@ export const COMPLETE_LEGACY_LOCAL_STORAGE_CHANNEL = "desktop:complete-legacy-lo
 export const RESTART_AUDIO_SERVICE_CHANNEL = "desktop:restart-audio-service";
 
 export const START_FILE_DRAG_CHANNEL = "desktop:start-file-drag";
+
+export const GET_APP_VERSION_CHANNEL = "desktop:get-app-version";
+export const GUSTAF_ACCOUNT_GET_STATE_CHANNEL = "desktop:gustaf-account-get-state";
+export const GUSTAF_ACCOUNT_SIGN_IN_CHANNEL = "desktop:gustaf-account-sign-in";
+export const GUSTAF_ACCOUNT_CANCEL_SIGN_IN_CHANNEL = "desktop:gustaf-account-cancel-sign-in";
+export const GUSTAF_ACCOUNT_SIGN_OUT_CHANNEL = "desktop:gustaf-account-sign-out";
+export const GUSTAF_ACCOUNT_LIST_DEVICES_CHANNEL = "desktop:gustaf-account-list-devices";
+export const GUSTAF_ACCOUNT_REGISTER_DEVICE_CHANNEL = "desktop:gustaf-account-register-device";
+export const GUSTAF_ACCOUNT_REVOKE_DEVICE_CHANNEL = "desktop:gustaf-account-revoke-device";
+export const GUSTAF_ACCOUNT_REPORT_PROBLEM_CHANNEL = "desktop:gustaf-account-report-problem";
+export const GUSTAF_RELAY_CLIENT_CREDENTIAL_CHANNEL = "desktop:gustaf-relay-client-credential";
+export const GUSTAF_RELAY_CLIENT_STORAGE_GET_CHANNEL = "desktop:gustaf-relay-client-storage-get";
+export const GUSTAF_RELAY_CLIENT_STORAGE_SET_CHANNEL = "desktop:gustaf-relay-client-storage-set";
+export const GUSTAF_CLIENT_CONFIG_CHANNEL = "desktop:gustaf-client-config";

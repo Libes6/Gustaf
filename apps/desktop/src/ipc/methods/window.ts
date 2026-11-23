@@ -82,6 +82,15 @@ export const getAppBranding = DesktopIpc.makeSyncIpcMethod({
   }),
 });
 
+export const getAppVersion = DesktopIpc.makeSyncIpcMethod({
+  channel: IpcChannels.GET_APP_VERSION_CHANNEL,
+  result: Schema.String,
+  handler: Effect.fn("desktop.ipc.window.getAppVersion")(function* () {
+    const environment = yield* DesktopEnvironment.DesktopEnvironment;
+    return environment.appVersion;
+  }),
+});
+
 /**
  * Relay traces leave the machine, so a policy with `telemetry: false`, or one that cannot be read,
  * stops them. Read once here: a sync IPC handler cannot wait on the filesystem. Until the login

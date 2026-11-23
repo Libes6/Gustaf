@@ -1,0 +1,31 @@
+{
+  "name": "@gustaf/admin",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vp dev",
+    "build": "vp build",
+    "typecheck": "effect-tsgo tsrs --noEmit",
+    "test": "vp test run"
+  },
+  "dependencies": {
+    "@base-ui/react": "1.9.0",
+    "@tanstack/react-query": "5.102.8",
+    "@tanstack/react-router": "1.170.10",
+    "class-variance-authority": "0.7.1",
+    "lucide-react": "0.564.0",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "tailwind-merge": "3.6.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "4.3.3",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@vitejs/plugin-react": "6.1.2",
+    "tailwindcss": "4.3.3",
+    "vite": "catalog:",
+    "vite-plus": "catalog:"
+  }
+}

@@ -211,6 +211,18 @@
       "types": "./src/relay/index.ts",
       "default": "./src/relay/index.ts"
     },
+    "./gustaf-relay": {
+      "types": "./src/gustafRelay/index.ts",
+      "default": "./src/gustafRelay/index.ts"
+    },
+    "./state/relayHost": {
+      "types": "./src/state/relayHost.ts",
+      "default": "./src/state/relayHost.ts"
+    },
+    "./client-config": {
+      "types": "./src/clientConfig.ts",
+      "default": "./src/clientConfig.ts"
+    },
     "./state/auth": {
       "types": "./src/state/auth.ts",
       "default": "./src/state/auth.ts"

@@ -50,6 +50,7 @@ import { ConnectDeviceApprovalSettings } from "./ConnectDeviceApprovalSettings";
 import { EnvironmentIconMenu } from "./EnvironmentIconPicker";
 import { FoldedSettingsSection } from "./FoldedSettingsSection";
 import { EnvironmentsMap } from "./EnvironmentsMap";
+import { RelayHostSettingsSection } from "./RelayHostSettings";
 import { LinkedEnvironmentsSettings } from "./LinkedEnvironmentsSettings";
 import { addEnvironmentPrefillAtom } from "~/state/linkedThreadView";
 import { Toggle, ToggleGroup } from "../ui/toggle-group";
@@ -1446,6 +1447,9 @@ function ConnectionsSettingsContent({
               </details>
             ) : null}
           </SettingsSection>
+
+          {/* The relay reaches this computer, so it shows only beside this computer's access. */}
+          {isPrimaryAccess ? <RelayHostSettingsSection /> : null}
 
           {canReadAccess || canWriteAccess ? (
             <FoldedSettingsSection

@@ -42,6 +42,7 @@ import * as DesktopUpdates from "../updates/DesktopUpdates.ts";
 import * as DesktopSnapShot from "../snapShot/DesktopSnapShot.ts";
 import * as DesktopWslBackend from "../wsl/DesktopWslBackend.ts";
 import * as DesktopRendererHistory from "../telemetry/DesktopRendererHistory.ts";
+import * as GustafAccount from "../gustaf/GustafAccount.ts";
 import * as HostProcess from "@t3tools/shared/HostProcess";
 import { msg } from "gt-i18n";
 import { m } from "../i18n/messages.ts";
@@ -321,6 +322,7 @@ const bootstrap = Effect.fn("desktop.bootstrap")(function* (backendStarted: bool
     return;
   }
 
+  yield* (yield* GustafAccount.GustafAccount).startBackgroundTasks;
   yield* snapShot.initialize;
   // Only the user's own login shell PATH shows every t3 a new terminal runs; a fresh install has
   // no cached one. Without it, the command is left to Settings.
