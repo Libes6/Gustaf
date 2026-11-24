@@ -478,6 +478,14 @@ import {
   ScheduledTaskUpsertInput,
   ScheduledTaskMutationResult,
 } from "./scheduledTask.ts";
+import {
+  Subscription,
+  SubscriptionDeleteInput,
+  SubscriptionError,
+  SubscriptionListInput,
+  SubscriptionListResult,
+  SubscriptionUpsertInput,
+} from "./subscription.ts";
 import { SecretRequestAnswerInput, SecretRequestError } from "./secretRequest.ts";
 import { AgentFeedbackAnswerInput, AgentFeedbackRequestError } from "./agentFeedback.ts";
 import {
@@ -690,6 +698,10 @@ export const WS_METHODS = {
   guestShareCreate: "guestShare.create",
   scheduledTasksListWebhookDeliveries: "scheduledTasks.listWebhookDeliveries",
   scheduledTasksGetWebhookDelivery: "scheduledTasks.getWebhookDelivery",
+
+  subscriptionsList: "subscriptions.list",
+  subscriptionsUpsert: "subscriptions.upsert",
+  subscriptionsDelete: "subscriptions.delete",
 
   cloudGetRelayClientStatus: "cloud.getRelayClientStatus",
   cloudInstallRelayClient: "cloud.installRelayClient",
@@ -2475,6 +2487,23 @@ const WsScheduledTasksGetWebhookDeliveryRpc = Rpc.make(
   },
 );
 
+const WsSubscriptionsListRpc = Rpc.make(WS_METHODS.subscriptionsList, {
+  payload: SubscriptionListInput,
+  success: SubscriptionListResult,
+  error: Schema.Union([SubscriptionError, EnvironmentAuthorizationError]),
+});
+
+const WsSubscriptionsUpsertRpc = Rpc.make(WS_METHODS.subscriptionsUpsert, {
+  payload: SubscriptionUpsertInput,
+  success: Subscription,
+  error: Schema.Union([SubscriptionError, EnvironmentAuthorizationError]),
+});
+
+const WsSubscriptionsDeleteRpc = Rpc.make(WS_METHODS.subscriptionsDelete, {
+  payload: SubscriptionDeleteInput,
+  error: Schema.Union([SubscriptionError, EnvironmentAuthorizationError]),
+});
+
 const WsMcpServersListImportableRpc = Rpc.make(WS_METHODS.mcpServersListImportable, {
   payload: McpListImportableInput,
   success: McpListImportableResult,
@@ -2657,6 +2686,9 @@ export const WsRpcGroup = RpcGroup.make(
   WsAgentFeedbackAnswerRequestRpc,
   WsScheduledTasksListWebhookDeliveriesRpc,
   WsScheduledTasksGetWebhookDeliveryRpc,
+  WsSubscriptionsListRpc,
+  WsSubscriptionsUpsertRpc,
+  WsSubscriptionsDeleteRpc,
   WsMcpServersListImportableRpc,
   WsMcpServersImportRpc,
   WsMcpServersSearchRegistryRpc,

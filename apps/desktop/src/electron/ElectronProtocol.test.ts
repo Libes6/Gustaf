@@ -33,6 +33,7 @@ describe("ElectronProtocol", () => {
       const directory = yield* fileSystem.makeTempDirectoryScoped();
       yield* fileSystem.writeFileString(`${directory}/index.html`, "<html>app</html>");
       yield* fileSystem.writeFileString(`${directory}/app.js`, "export default 1;");
+      yield* fileSystem.writeFileString(`${directory}/wallpaper-frame.html`, "<html>scene</html>");
       let handler: ((request: Request) => Promise<Response>) | undefined;
       handleMock.mockImplementation((_scheme, nextHandler) => {
         handler = nextHandler;
@@ -49,6 +50,13 @@ describe("ElectronProtocol", () => {
       const page = yield* request("/settings/connections");
       assert.equal(yield* Effect.promise(() => page.text()), "<html>app</html>");
       assert.include(page.headers.get("content-security-policy") ?? "", "default-src 'self'");
+      // The app itself frames the wallpaper page, whose scene worker needs eval the app forbids.
+      const wallpaper = yield* request("/wallpaper-frame.html");
+      const wallpaperPolicy = wallpaper.headers.get("content-security-policy") ?? "";
+      assert.include(wallpaperPolicy, "script-src 'self' 'unsafe-eval'");
+      assert.include(wallpaperPolicy, "connect-src 'none'");
+      assert.include(wallpaperPolicy, "sandbox allow-scripts");
+      assert.notInclude(page.headers.get("content-security-policy") ?? "", " 'unsafe-eval'");
       const dottedRoute = yield* request("/environment/thread.with.dots", {
         headers: { accept: "text/html" },
       });

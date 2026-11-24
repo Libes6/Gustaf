@@ -528,6 +528,57 @@ export function summarizeT3ToolCalls(
           );
       break;
     }
+    case "subscription-list": {
+      const count = selected.length;
+      label = done
+        ? resolve(
+            msg(
+              "{count, plural, one {Listed subscriptions {count} time} other {Listed subscriptions {count} times}}",
+              { count },
+            ),
+          )
+        : resolve(
+            msg(
+              "{count, plural, one {Tried to list subscriptions {count} time} other {Tried to list subscriptions {count} times}}",
+              { count },
+            ),
+          );
+      break;
+    }
+    case "subscription-update": {
+      const count = selected.length;
+      label = done
+        ? resolve(
+            msg(
+              "{count, plural, one {Saved {count} subscription} other {Saved {count} subscriptions}}",
+              { count },
+            ),
+          )
+        : resolve(
+            msg(
+              "{count, plural, one {Tried to save {count} subscription} other {Tried to save {count} subscriptions}}",
+              { count },
+            ),
+          );
+      break;
+    }
+    case "subscription-delete": {
+      const count = selected.length;
+      label = done
+        ? resolve(
+            msg(
+              "{count, plural, one {Deleted {count} subscription} other {Deleted {count} subscriptions}}",
+              { count },
+            ),
+          )
+        : resolve(
+            msg(
+              "{count, plural, one {Tried to delete {count} subscription} other {Tried to delete {count} subscriptions}}",
+              { count },
+            ),
+          );
+      break;
+    }
     case "project-clone": {
       const count = countEntities(entityIds("cwd"));
       label = done

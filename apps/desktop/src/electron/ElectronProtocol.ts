@@ -11,6 +11,10 @@ import * as Schema from "effect/Schema";
 import * as Scope from "effect/Scope";
 
 import * as Electron from "electron";
+import {
+  WALLPAPER_FRAME_CONTENT_SECURITY_POLICY,
+  WALLPAPER_FRAME_PATH,
+} from "@t3tools/shared/wallpaperFrame";
 
 export const DESKTOP_HOST = "app";
 const DESKTOP_PRODUCTION_SCHEME = "t3code";
@@ -257,14 +261,18 @@ export const make = Effect.gen(function* () {
         Effect.try({
           try: () => {
             Electron.protocol.handle(input.scheme, async (request) => {
+              const policy =
+                new URL(request.url).pathname === WALLPAPER_FRAME_PATH
+                  ? WALLPAPER_FRAME_CONTENT_SECURITY_POLICY
+                  : contentSecurityPolicy;
               if ("assetDirectory" in input) {
                 return withContentSecurityPolicy(
                   await runPromise(serveDesktopAsset(request, input.assetDirectory)),
-                  contentSecurityPolicy,
+                  policy,
                 );
               }
               return runPromise(
-                proxyRequest(request, input.targetOrigin, contentSecurityPolicy).pipe(
+                proxyRequest(request, input.targetOrigin, policy).pipe(
                   Effect.catchTags({
                     ElectronProtocolFetchError: (error) => Effect.die(error.cause),
                   }),

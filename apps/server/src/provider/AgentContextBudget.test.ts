@@ -41,6 +41,7 @@ import { ProjectService } from "../project/ProjectService.ts";
 import { ProjectSetupScriptRunner } from "../project/ProjectSetupScriptRunner.ts";
 import { IssueService } from "../issue/IssueService.ts";
 import { PullRequestReviewGuideService } from "../pullRequest/PullRequestReviewGuideService.ts";
+import { SubscriptionService } from "../subscriptions/SubscriptionService.ts";
 import { PullRequestService } from "../pullRequest/PullRequestService.ts";
 import { ScheduledTaskService } from "../scheduledTasks/ScheduledTaskService.ts";
 import { SecretRequests } from "../secrets/SecretRequests.ts";
@@ -83,6 +84,7 @@ const toolHandlerServices = Layer.mergeAll(
   Layer.mock(ProviderAdapterRegistryV2)({}),
   Layer.mock(ProviderRegistry)({}),
   Layer.mock(PullRequestReviewGuideService)({}),
+  Layer.mock(SubscriptionService)({}),
   Layer.mock(PullRequestService)({}),
   Layer.mock(GitManager)({}),
   Layer.mock(RemoteDelegation)({}),

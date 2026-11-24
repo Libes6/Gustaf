@@ -553,7 +553,8 @@ function OpenCommandPaletteDialog(props: {
   );
   const keybindings = useAtomValue(primaryServerKeybindingsAtom);
   const providersByEnvironment = useEnvironmentProviders();
-  const { changeThemeItem, changeAppearanceItem, themeEditorItem } = useCommandPaletteThemeItems();
+  const { changeThemeItem, changeAppearanceItem, changeWallpaperItem, themeEditorItem } =
+    useCommandPaletteThemeItems();
   const portForwardItem = useCommandPalettePortForwardItem({
     activeThread: activeThread ?? null,
     query: deferredQuery,
@@ -1676,6 +1677,7 @@ function OpenCommandPaletteDialog(props: {
 
   actionItems.push(changeThemeItem);
   actionItems.push(changeAppearanceItem);
+  actionItems.push(changeWallpaperItem);
 
   actionItems.push(themeEditorItem);
 
@@ -1916,7 +1918,9 @@ function OpenCommandPaletteDialog(props: {
               ? changeThemeItem.groups
               : currentView?.groups[0]?.value === "appearance"
                 ? changeAppearanceItem.groups
-                : (currentView?.groups ?? rootGroups);
+                : currentView?.groups[0]?.value === "wallpapers"
+                  ? changeWallpaperItem.groups
+                  : (currentView?.groups ?? rootGroups);
 
   const isLinkedThreadSearch =
     linkedThreadSearch?.linkedThreads !== undefined && deferredQuery === linkedThreadSearch.query;
