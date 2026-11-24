@@ -54,7 +54,7 @@ export class ComputerUseExecutor extends Context.Service<
   }
 >()("t3/computerUse/ComputerUseExecutor") {}
 
-const unavailableError = () =>
+export const unavailableError = () =>
   new ComputerUseError({
     code: "unsupported",
     message:

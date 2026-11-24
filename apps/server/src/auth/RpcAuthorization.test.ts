@@ -99,6 +99,22 @@ describe("RPC authorization scopes", () => {
     );
   });
 
+  it("lets readers watch computer use and keeps control of the Mac behind write scopes", () => {
+    for (const method of [WS_METHODS.computerUseStatus, WS_METHODS.subscribeComputerUseStatus]) {
+      expect(requiredScopeForRpcMethod(method)).toBe(AuthOrchestrationReadScope);
+    }
+    for (const method of [
+      WS_METHODS.computerUseAllowThread,
+      WS_METHODS.computerUseOpenPermissionSettings,
+      WS_METHODS.computerUseStop,
+    ]) {
+      expect(requiredScopeForRpcMethod(method)).toBe(AuthOrchestrationOperateScope);
+    }
+    expect(requiredScopeForRpcMethod(WS_METHODS.computerUseSetEnabled)).toBe(
+      AuthSettingsWriteScope,
+    );
+  });
+
   it("still lets readers load settings the way installed Swift clients ask", () => {
     expect(requiredScopeForRpcMethod("server.getSettings")).toBe(AuthOrchestrationReadScope);
   });

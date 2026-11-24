@@ -29,9 +29,7 @@ import { rpcInitialItems } from "./rpcInitialItems.ts";
 import { subscribeChatGptHandoff } from "./provider/CodexChatGptHandoff.ts";
 import {
   AcpRegistryOperationError,
-  COMPUTER_USE_UNSUPPORTED_STATUS,
   CommandId,
-  ComputerUseError,
   authScopeResponse,
   AuthAccessStreamError,
   type AuthAccessStreamEvent,
@@ -218,6 +216,7 @@ import { terminalOutputStream, withOutputWindow } from "./terminal/OutputProtoco
 import { withSocketHeartbeat } from "./socketHeartbeat.ts";
 import * as ServerBrowser from "./preview/ServerBrowser.ts";
 import * as DeviceService from "./device/DeviceService.ts";
+import * as ComputerUseService from "./computerUse/ComputerUseService.ts";
 import { remoteSshDeviceHosts } from "./device/localSshDeviceHost.ts";
 import * as PreviewManager from "./preview/Manager.ts";
 import { issueAssetUrl } from "./assets/AssetAccess.ts";
@@ -313,11 +312,6 @@ import { requestUrl } from "./requestUrl.ts";
 
 const CONFIG_DISCOVERY_TIMEOUT = Duration.seconds(5);
 const isProviderUploadFeedbackError = Schema.is(ProviderUploadFeedbackError);
-
-const computerUseUnsupported = new ComputerUseError({
-  code: "unsupported",
-  message: "Computer use is not available in this environment.",
-});
 
 const resolveDiscoveryForConfig = <A, E, R>(
   discovery: Effect.Effect<A, E, R>,
@@ -1537,6 +1531,7 @@ export const layerWsRpc = (
       const reviewGuides = yield* PullRequestReviewGuideService.PullRequestReviewGuideService;
       const pullRequestSync = yield* PullRequestSyncReactor.PullRequestSyncReactor;
       const deviceService = yield* DeviceService.DeviceService;
+      const computerUse = yield* ComputerUseService.ComputerUseService;
       const deviceHostContext =
         yield* Effect.context<Effect.Services<ReturnType<typeof remoteSshDeviceHosts>>>();
       const orchestrationEngine = yield* Orchestrator.OrchestratorV2;
@@ -3499,15 +3494,13 @@ export const layerWsRpc = (
         [WS_METHODS.deviceDetail]: (input) => deviceService.detail(input),
         [WS_METHODS.deviceAction]: (input) => deviceService.action(input),
         [WS_METHODS.subscribeDeviceState]: (_input) => DeviceService.stateStream(deviceService),
-        // Until the computer-use service is wired in, every environment reads as unsupported.
-        [WS_METHODS.computerUseStatus]: (_input) => Effect.succeed(COMPUTER_USE_UNSUPPORTED_STATUS),
-        [WS_METHODS.computerUseSetEnabled]: (_input) => Effect.fail(computerUseUnsupported),
-        [WS_METHODS.computerUseOpenPermissionSettings]: (_input) =>
-          Effect.fail(computerUseUnsupported),
-        [WS_METHODS.computerUseAllowThread]: (_input) => Effect.fail(computerUseUnsupported),
-        [WS_METHODS.computerUseStop]: (_input) => Effect.fail(computerUseUnsupported),
-        [WS_METHODS.subscribeComputerUseStatus]: (_input) =>
-          Stream.make(COMPUTER_USE_UNSUPPORTED_STATUS),
+        [WS_METHODS.computerUseStatus]: (_input) => computerUse.status,
+        [WS_METHODS.computerUseSetEnabled]: (input) => computerUse.setEnabled(input.enabled),
+        [WS_METHODS.computerUseOpenPermissionSettings]: (input) =>
+          computerUse.openPermissionSettings(input.permission),
+        [WS_METHODS.computerUseAllowThread]: (input) => computerUse.allowThread(input.threadId),
+        [WS_METHODS.computerUseStop]: (_input) => computerUse.stop,
+        [WS_METHODS.subscribeComputerUseStatus]: (_input) => computerUse.statusChanges,
         [WS_METHODS.previewStopLocalServer]: (input) => portDiscovery.stopServer(input),
         [WS_METHODS.subscribeDiscoveredLocalServers]: (input) =>
           Stream.callback<DiscoveredLocalServerList>((queue) =>
