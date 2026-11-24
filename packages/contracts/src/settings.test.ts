@@ -324,6 +324,21 @@ describe("resolveIdleCompaction", () => {
   });
 });
 
+describe("ClientSettings two-line folder rows", () => {
+  it("is on when no preference was saved", () => {
+    expect(decodeClientSettings({}).boringSidebarMultilineRows).toBe(true);
+  });
+
+  it("keeps an explicit off and an explicit on", () => {
+    expect(
+      decodeClientSettings({ boringSidebarMultilineRows: false }).boringSidebarMultilineRows,
+    ).toBe(false);
+    expect(
+      decodeClientSettings({ boringSidebarMultilineRows: true }).boringSidebarMultilineRows,
+    ).toBe(true);
+  });
+});
+
 describe("ClientSettings notifications", () => {
   it("requires opt-in when existing settings omit notification preferences", () => {
     expect(decodeClientSettings({}).notificationMode).toBe("off");

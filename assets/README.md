@@ -1,5 +1,7 @@
 # Brand icons
 
+Gustaf: the PNG and ICO files in `dev/`, `nightly/` and `prod/` (and the copies in `apps/web/public`) hold the Gustaf bird, not the T3 mark, under the upstream file names so the build, launcher and mobile config keep resolving them. The Icon Composer projects below are still the upstream T3 artwork, so `vp run icons:export` would overwrite the Gustaf files and `vp run icons:check` reports them as stale. The source artwork is `apps/mobile/assets/gustaf-icon.png` (rounded tile) and `gustaf-icon-square.png` (full bleed).
+
 The three Icon Composer projects are the source of truth for full application icons:
 
 - `dev/app-icon.icon`

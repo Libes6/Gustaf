@@ -91,8 +91,8 @@ another theme.
 
 ### Ask an agent
 
-An agent on the same machine as the server can restyle T3 Code for you. Ask it to change the look,
-for example "make T3 Code's chat header taller" or "give T3 Code a solarized theme". It publishes
+An agent on the same machine as the server can restyle Gustaf for you. Ask it to change the look,
+for example "make Gustaf's chat header taller" or "give Gustaf a solarized theme". It publishes
 an [environment theme](#environment-themes) with colors and CSS, and web and desktop clients of that
 server switch to it. It can also switch them to light, dark, or system mode. The thread must run
 in Full access. Ask the agent to set a built-in theme to undo it.
@@ -106,7 +106,7 @@ it. app.t3.codes and other connections do not use them.
 
 Select a published theme in **Settings → Appearance** to follow its palette as the server updates
 it. **Duplicate** makes an independent copy you can edit. A saved custom theme with the same ID
-takes precedence. If the server stops publishing the selected theme, T3 Code falls back to its
+takes precedence. If the server stops publishing the selected theme, Gustaf falls back to its
 standard theme.
 
 Run this on the server to set a default and switch connected clients to it:
@@ -124,7 +124,7 @@ the default and published themes.
 
 ### Publish a theme
 
-Save a theme exported from T3 Code into `~/.t3/userdata/themes/` on the server, or the `themes`
+Save a theme exported from Gustaf into `~/.t3/userdata/themes/` on the server, or the `themes`
 directory under your custom state directory. The filename supplies the theme ID: `nightfall.json`
 can be selected with `t3 theme set nightfall`. Keep the filename stable when updating its colors.
 Do not use `system`, `light`, `dark`, or a built-in theme's ID.
@@ -144,7 +144,7 @@ For an integration that generates a palette, this shorter format also works:
 }
 ```
 
-Set `appearance` to `light` or `dark` and supply hex colors for `canvas` and `accent`. T3 Code
+Set `appearance` to `light` or `dark` and supply hex colors for `canvas` and `accent`. Gustaf
 generates the rest. The optional `colors` overrides use the names in the theme editor's advanced
 view. An optional `css` string adds [custom CSS](#custom-css).
 
@@ -154,7 +154,7 @@ Invalid files are not published.
 ### Background image
 
 A published theme can have a full-size background image. Ask an agent, for example "use
-~/Pictures/wallpaper.jpg as T3 Code's background", or save a JPEG, PNG, or WebP file of up to
+~/Pictures/wallpaper.jpg as Gustaf's background", or save a JPEG, PNG, or WebP file of up to
 16 MB beside the theme file: `nightfall.jpg` beside `nightfall.json`. The theme's CSS decides
 where the image shows:
 
