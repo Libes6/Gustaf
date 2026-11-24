@@ -2,13 +2,17 @@ import * as NodeSqlite from "node:sqlite";
 
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, describe, it } from "@effect/vitest";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
 import type * as EffectAcpSchema from "effect-acp/compat";
 import type { OrchestrationV2ProviderFailure } from "@t3tools/contracts";
 
-import { watchAntigravityPromptOutcome } from "./AntigravityTurnOutcome.ts";
+import {
+  antigravityLimitFailure,
+  watchAntigravityPromptOutcome,
+} from "./AntigravityTurnOutcome.ts";
 
 const USER_INPUT = 14;
 const PLANNER_RESPONSE = 15;
@@ -316,4 +320,26 @@ describe("watchAntigravityPromptOutcome", () => {
       );
     }).pipe(Effect.provide(NodeServices.layer)),
   );
+});
+
+describe("antigravityLimitFailure", () => {
+  it("reads a quota or rate limit from either harness error format, and nothing else", () => {
+    const now = DateTime.makeUnsafe("2026-01-01T00:00:00.000Z");
+    const quota = antigravityLimitFailure(
+      "Error 429, Message: Resource has been exhausted, Status: RESOURCE_EXHAUSTED [reason:QUOTA_EXHAUSTED quotaResetDelay:2h]",
+      now,
+    );
+    assert.equal(quota?.class, "usage_limit");
+    assert.equal(quota?.code, "RESOURCE_EXHAUSTED");
+    assert.equal(quota?.resetAt, "2026-01-01T02:00:00.000Z");
+    const rateLimit = antigravityLimitFailure(
+      "RESOURCE_EXHAUSTED (code 429): Too many requests.",
+      now,
+    );
+    assert.equal(rateLimit?.class, "usage_limit");
+    assert.equal(rateLimit?.message, "Too many requests.");
+    assert.isUndefined(
+      antigravityLimitFailure("Error 502, Message: Bad Gateway, Status: UNAVAILABLE", now),
+    );
+  });
 });

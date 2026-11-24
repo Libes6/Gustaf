@@ -133,7 +133,7 @@ const UNAUTHORIZED = /\b401\b|unauthori[sz]ed/i;
  * agy refuses every turn, without asking the model, while one of its MCP servers fails to start.
  * `reason` is the harness's own text; a server that refused without sign-in needs one.
  */
-const antigravityMcpServerFailure = (server: string, reason: string) =>
+export const antigravityMcpServerFailure = (server: string, reason: string) =>
   UNAUTHORIZED.test(reason)
     ? makeProviderFailure({
         class: "provider_error",
@@ -165,6 +165,38 @@ function statusError(text: string) {
   return match === null ? null : ([match[0], match[2], match[3], match[1]] as const);
 }
 
+const quotaFailure = (
+  text: string,
+  apiError: ReturnType<typeof statusError> | RegExpExecArray | null,
+  now: DateTime.Utc | undefined,
+) =>
+  makeProviderFailure({
+    class: "usage_limit",
+    message: "You have reached your Antigravity quota for this period.",
+    code: apiError?.[3] ?? "QUOTA_EXHAUSTED",
+    retryable: true,
+    resetAt: resetAtFrom(text, now) ?? null,
+  });
+
+/** The quota or rate limit in a harness error, as its chat message carries it. */
+export function antigravityLimitFailure(
+  text: string,
+  now: DateTime.Utc,
+): OrchestrationV2ProviderFailure | undefined {
+  const apiError = API_ERROR.exec(text) ?? statusError(text);
+  if (QUOTA_EXHAUSTED.test(text)) return quotaFailure(text, apiError, now);
+  if (apiError === null) return undefined;
+  const [, httpStatus, message, status] = apiError;
+  if (httpStatus !== "429" && status !== "RESOURCE_EXHAUSTED") return undefined;
+  return makeProviderFailure({
+    class: "usage_limit",
+    message: message!.trim(),
+    code: status ?? null,
+    retryable: true,
+    resetAt: resetAtFrom(text, now) ?? null,
+  });
+}
+
 function turnFailure(
   stopReason: EffectAcpSchema.StopReason,
   step: LastStep | undefined,
@@ -187,15 +219,7 @@ function turnFailure(
   const reusable = (failure: OrchestrationV2ProviderFailure) =>
     ({ failure, threadDisposition: "reusable" }) as const;
   if (stopReason === "refusal" || QUOTA_EXHAUSTED.test(text)) {
-    return reusable(
-      makeProviderFailure({
-        class: "usage_limit",
-        message: "You have reached your Antigravity quota for this period.",
-        code: apiError?.[3] ?? "QUOTA_EXHAUSTED",
-        retryable: true,
-        resetAt: resetAtFrom(text, now) ?? null,
-      }),
-    );
+    return reusable(quotaFailure(text, apiError, now));
   }
   const mcpServer = MCP_LOAD_FAILED.exec(text)?.[1];
   if (mcpServer !== undefined) return reusable(antigravityMcpServerFailure(mcpServer, text));
