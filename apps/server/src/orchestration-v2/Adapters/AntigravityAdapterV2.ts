@@ -37,6 +37,7 @@ import {
   readAntigravityPendingReply,
 } from "../../provider/acp/AntigravityChildWork.ts";
 import { readAntigravityClientTextFile } from "../../provider/acp/AntigravityClientFiles.ts";
+import { makeAntigravityPromptGuard } from "../../provider/acp/AntigravityPromptGuard.ts";
 import {
   antigravityFailedMcpServer,
   watchAntigravityPromptOutcome,
@@ -228,6 +229,7 @@ export function makeAntigravityAcpAdapterFlavor(
     mcpOverHttp: true,
     // agy answers every prompt with "The MCP server 'X' failed to initialize" instead.
     abortsOnFailedMcpServer: true,
+    replacesMcpResults: true,
     failedMcpServerOf: antigravityFailedMcpServer,
     // agy outside Gustaf reads ~/.gemini's MCP config, so threads say what Gustaf sent.
     namesSentMcpServers: true,
@@ -307,6 +309,7 @@ export function makeAntigravityAcpAdapterFlavor(
     checksVersionAtHandshake: true,
     // Antigravity can leave a prompt open without updates; long tools and approvals pause this.
     promptInactivityTimeout: "15 minutes",
+    makePromptGuard: makeAntigravityPromptGuard,
     reportsPerTurnPromptUsage: true,
     geminiPromptUsage: true,
     ...(profileDirectory === undefined

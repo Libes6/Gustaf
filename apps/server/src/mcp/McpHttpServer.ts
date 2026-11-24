@@ -1221,6 +1221,9 @@ const withToolAnalytics =
     return yield* registration.pipe(Effect.provideService(McpServer.McpServer, recordingServer));
   });
 
+const isCallToolResult = Schema.is(McpSchema.CallToolResult);
+const encodeCallToolResult = Schema.encodeOption(McpSchema.CallToolResult);
+
 /**
  * ACP runtimes and Code Mode wrappers can drop or replace structured MCP tool results on
  * completion. Recording each thread-scoped call's compact result before returning lets adapters
@@ -1263,16 +1266,33 @@ const withToolResultCapture = Effect.fn("McpHttpServer.withToolResultCapture")(f
               if (exit._tag === "Failure" && Cause.hasInterruptsOnly(exit.cause)) {
                 return Effect.void;
               }
+              const options = { providerSessionId: thread.providerSessionId, epoch };
               const output =
                 exit._tag === "Success"
                   ? compactT3McpToolOutput(toolName, exit.value)
                   : { isError: true };
-              return output === undefined
-                ? Effect.void
-                : mcpSessions.value.recordToolResult(thread.threadId, toolName, payload, output, {
-                    providerSessionId: thread.providerSessionId,
-                    epoch,
-                  });
+              // Providers that show a stand-in for the result opt in to the full one.
+              const result = exit._tag === "Success" ? exit.value : undefined;
+              const raw = isCallToolResult(result)
+                ? mcpSessions.value.recordRawToolResult(
+                    thread.threadId,
+                    toolName,
+                    payload,
+                    () => Option.getOrUndefined(encodeCallToolResult(result)),
+                    options,
+                  )
+                : Effect.void;
+              return (
+                output === undefined
+                  ? Effect.void
+                  : mcpSessions.value.recordToolResult(
+                      thread.threadId,
+                      toolName,
+                      payload,
+                      output,
+                      options,
+                    )
+              ).pipe(Effect.andThen(raw));
             }),
           );
         }),

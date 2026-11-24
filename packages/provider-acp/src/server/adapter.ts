@@ -465,6 +465,11 @@ export interface AcpAdapterV2Flavor {
   readonly rejectsStdioMcpServers?: boolean;
   /** See `ProviderAdapterV2.abortsOnFailedMcpServer`. */
   readonly abortsOnFailedMcpServer?: boolean;
+  /**
+   * Tool updates carry the model's own one-line description of an MCP call in place of its
+   * result, so `t3-code` items show the full result the server kept instead.
+   */
+  readonly replacesMcpResults?: boolean;
   /** The agent's own CLI loads another MCP list, so a thread names the user servers Gustaf sent. */
   readonly namesSentMcpServers?: boolean;
   /** See `ProviderAdapterV2.failedMcpServerOf`. */
@@ -740,6 +745,14 @@ export interface AcpAdapterV2Flavor {
    * agent request, tool or subagent is open, and replaces the agent before the next turn.
    */
   readonly promptInactivityTimeout?: Duration.Input;
+  /**
+   * Runs before `session/prompt`. The returned check sees each update of the prompt's
+   * session; a failure it returns stops the turn and replaces the agent, like
+   * `promptInactivityTimeout`, for an agent that keeps going on its own.
+   */
+  readonly makePromptGuard?: () => (
+    notification: EffectAcpSchema.SessionNotification,
+  ) => OrchestrationV2ProviderFailure | undefined;
   /** Grok can retain task_already_running until process exit. */
   readonly restartRuntimeAfterInterrupt?: boolean;
   /** Prompt failures after which the agent process keeps failing until replaced. */
@@ -1834,6 +1847,13 @@ interface ActiveAcpTurn {
   /** Clock millis of the prompt's last progress, for `promptInactivityTimeout`. */
   lastProgressAt: number;
   inactivityWatchdog: Fiber.Fiber<void> | undefined;
+  /** From `makePromptGuard`, with the runtime generation its prompt was sent on. */
+  promptGuard:
+    | {
+        readonly check: ReturnType<NonNullable<AcpAdapterV2Flavor["makePromptGuard"]>>;
+        readonly generation: number;
+      }
+    | undefined;
 }
 
 const PROMPT_OUTCOME_CHECK_TIMEOUT = Duration.seconds(5);
@@ -2850,6 +2870,10 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
           Queue.offer(events, event).pipe(Effect.asVoid);
         let scheduleDeferredFinalize: (context: ActiveAcpTurn) => Effect.Effect<void> = () =>
           Effect.void;
+        let stopPromptByGuard: (
+          context: ActiveAcpTurn,
+          failure: OrchestrationV2ProviderFailure,
+        ) => Effect.Effect<void> = () => Effect.void;
         let refreshModelSwitchCapability: Effect.Effect<void> = Effect.void;
         // openSession configures the session itself; a late setup that lands
         // first waits here and is adopted once that configuration is in place.
@@ -4869,12 +4893,43 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
             const toolName = `${mcpIdentity.server}.${mcpIdentity.tool}`;
             const input =
               mcpIdentity.input ?? unknownRecord(rawInputRecord?.arguments) ?? rawInputRecord ?? {};
-            let output = rawOutput === undefined ? undefined : acpMcpToolCallOutput(rawOutput);
             const resolvedT3Tool = resolveT3McpToolId(toolName);
             const isHtmlRender = resolvedT3Tool === HTML_RENDER_TOOL_NAME;
+            let mcpRawOutput = rawOutput;
+            if (
+              flavor.replacesMcpResults === true &&
+              resolvedT3Tool !== null &&
+              !isHtmlRender &&
+              (status === "completed" || status === "failed")
+            ) {
+              const kept = yield* mcpSessions.takeRawToolResult(
+                context.input.threadId,
+                resolvedT3Tool,
+                input,
+              );
+              // A repeated completion carries the description again.
+              const recovered =
+                kept === undefined
+                  ? previous?.data.rawOutput !== undefined &&
+                    unknownRecord(previous.data.rawOutput)?.result !== undefined &&
+                    unknownRecord(rawOutput)?.result === undefined
+                    ? previous.data.rawOutput
+                    : undefined
+                  : { result: kept.result };
+              if (recovered !== undefined) {
+                mcpRawOutput = recovered;
+                context.tools.set(toolCall.toolCallId, {
+                  ...toolCall,
+                  data: { ...toolCall.data, rawOutput: recovered },
+                });
+              }
+            }
+            const mcpRawOutputRecord = unknownRecord(mcpRawOutput);
+            let output =
+              mcpRawOutput === undefined ? undefined : acpMcpToolCallOutput(mcpRawOutput);
             const isError =
               compactDynamicToolOutput(output)?.isError === true ||
-              compactDynamicToolOutput(rawOutputRecord?.result)?.isError === true;
+              compactDynamicToolOutput(mcpRawOutputRecord?.result)?.isError === true;
             const callInputKey =
               resolvedT3Tool !== null && !isHtmlRender
                 ? `${toolCall.toolCallId}\0${resolvedT3Tool}\0${McpProviderSessions.hashToolInput(input)}`
@@ -4888,7 +4943,7 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
               // Unwrapping `{ result: { isError: true, content/structuredContent } }` drops the
               // error flag (and diagnostic content when structuredContent is also present);
               // preserve the diagnostic error envelope and remember it across summary replays.
-              const rawResult = unknownRecord(rawOutputRecord?.result);
+              const rawResult = unknownRecord(mcpRawOutputRecord?.result);
               if (compactDynamicToolOutput(output)?.isError !== true) {
                 output =
                   rawResult !== undefined && compactDynamicToolOutput(rawResult)?.isError === true
@@ -5012,7 +5067,7 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
                 serverName: mcpIdentity.server,
                 toolName: mcpIdentity.tool,
                 source: unknownRecord(
-                  (unknownRecord(rawOutputRecord?.result) ?? rawOutputRecord)?._meta,
+                  (unknownRecord(mcpRawOutputRecord?.result) ?? mcpRawOutputRecord)?._meta,
                 )?.source,
               }),
               type: "dynamic_tool",
@@ -5984,6 +6039,14 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
         ) {
           const context = yield* Ref.get(activeTurn);
           const update = notification.update;
+          if (
+            context?.promptGuard !== undefined &&
+            !context.finalized &&
+            notification.sessionId === context.nativeThreadId
+          ) {
+            const failure = context.promptGuard.check(notification);
+            if (failure !== undefined) yield* stopPromptByGuard(context, failure);
+          }
           if (
             followsAgentWorkState &&
             flavor.extractSubagentSessionEvent !== undefined &&
@@ -9119,11 +9182,16 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
          * Holds the transition permit from the deadline check through process teardown,
          * so Stop and the next turn see either a running prompt or a replaced runtime.
          */
-        const retireInactivePrompt = Effect.fn("AcpAdapterV2.retireInactivePrompt")(function* (
+        const retirePrompt = Effect.fn("AcpAdapterV2.retirePrompt")(function* (
           context: ActiveAcpTurn,
           generation: number,
-          timeoutMillis: number,
-          checkPromptOutcome: PromptOutcomeCheck | undefined,
+          reason:
+            | {
+                readonly _tag: "inactive";
+                readonly timeoutMillis: number;
+                readonly checkPromptOutcome: PromptOutcomeCheck | undefined;
+              }
+            | { readonly _tag: "guard"; readonly failure: OrchestrationV2ProviderFailure },
         ) {
           const retired = yield* runRuntimeCallbackAtGeneration(
             generation,
@@ -9131,12 +9199,15 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
               if (context.finalized || context.interrupted) return "done" as const;
               if ((yield* Ref.get(activeTurn)) !== context) return "done" as const;
               if (yield* Deferred.isDone(context.promptWireSettled)) return "done" as const;
-              const now = yield* Clock.currentTimeMillis;
-              if (context.lastProgressAt + timeoutMillis > now) return "rearm" as const;
-              if (yield* promptInactivityPaused(context)) {
-                context.lastProgressAt = now;
-                return "rearm" as const;
+              if (reason._tag === "inactive") {
+                const now = yield* Clock.currentTimeMillis;
+                if (context.lastProgressAt + reason.timeoutMillis > now) return "rearm" as const;
+                if (yield* promptInactivityPaused(context)) {
+                  context.lastProgressAt = now;
+                  return "rearm" as const;
+                }
               }
+              context.promptGuard = undefined;
               context.inactivityWatchdog = undefined;
               openAgentRequests.clear();
               yield* quarantineNativeTransportAtGeneration(generation);
@@ -9144,6 +9215,11 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
               yield* Ref.set(runtimeRestartRequired, true);
               yield* cancelPendingRuntimeRequests();
               yield* terminalizeOpenForegroundTools(context, "failed");
+              if (reason._tag === "guard") {
+                yield* finalizeTurn(context, "failed", reason.failure);
+                return "retired" as const;
+              }
+              const { timeoutMillis, checkPromptOutcome } = reason;
               // Bounded: it runs under the transition permit that Stop and the next turn wait on.
               const recorded =
                 checkPromptOutcome === undefined
@@ -9176,17 +9252,34 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
           if (Option.isNone(retired) || retired.value !== "retired") {
             return Option.getOrElse(retired, () => "done" as const);
           }
-          yield* Effect.logWarning("orchestration-v2.acp-prompt-inactive", {
-            driver,
-            providerSessionId: input.providerSessionId,
-            providerTurnId: context.providerTurnId,
-            timeoutMillis,
-          });
+          yield* Effect.logWarning(
+            reason._tag === "guard"
+              ? "orchestration-v2.acp-prompt-stopped-by-guard"
+              : "orchestration-v2.acp-prompt-inactive",
+            {
+              driver,
+              providerSessionId: input.providerSessionId,
+              providerTurnId: context.providerTurnId,
+              ...(reason._tag === "guard"
+                ? { failureClass: reason.failure.class }
+                : { timeoutMillis: reason.timeoutMillis }),
+            },
+          );
           if (runtimeScope !== undefined) {
             yield* Scope.close(runtimeScope, Exit.void).pipe(Effect.ignore);
           }
           return "retired" as const;
         });
+
+        stopPromptByGuard = (context, failure) => {
+          const guard = context.promptGuard;
+          if (guard === undefined) return Effect.void;
+          context.promptGuard = undefined;
+          // Retiring closes the runtime this update arrived on, so it runs off the update path.
+          return runtimeTransitionPermit
+            .withPermit(retirePrompt(context, guard.generation, { _tag: "guard", failure }))
+            .pipe(Effect.forkIn(sessionScope), Effect.asVoid);
+        };
 
         const watchPromptInactivity = Effect.fn("AcpAdapterV2.watchPromptInactivity")(function* (
           context: ActiveAcpTurn,
@@ -9211,7 +9304,11 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
               continue;
             }
             const outcome = yield* runtimeTransitionPermit.withPermit(
-              retireInactivePrompt(context, generation, timeoutMillis, checkPromptOutcome),
+              retirePrompt(context, generation, {
+                _tag: "inactive",
+                timeoutMillis,
+                checkPromptOutcome,
+              }),
             );
             if (outcome !== "rearm") return;
           }
@@ -9285,6 +9382,9 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
           sessionId: string,
         ) {
           const mcpSession = yield* mcpSessions.read(turnInput.threadId);
+          if (mcpSession !== undefined && flavor.replacesMcpResults === true) {
+            yield* mcpSessions.keepToolResults(turnInput.threadId);
+          }
           const instructionState = {
             interactionMode: turnInput.runtimePolicy.interactionMode,
             hasT3Mcp: mcpSession !== undefined,
@@ -9910,6 +10010,7 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
               nativePromptId: undefined,
               lastProgressAt: 0,
               inactivityWatchdog: undefined,
+              promptGuard: undefined,
             };
             const carryover = yield* Ref.getAndSet(carryoverSubagents, null);
             let rehydratedCarryoverSubagents: ReadonlyArray<ActiveAcpSubagent> = [];
@@ -10090,6 +10191,12 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
               released: context.foregroundIdle,
             };
             context.promptSentAt = yield* Clock.currentTimeMillis;
+            if (flavor.makePromptGuard !== undefined) {
+              context.promptGuard = {
+                check: flavor.makePromptGuard(),
+                generation: promptGeneration,
+              };
+            }
             if (promptInactivityTimeoutMillis !== undefined) {
               context.inactivityWatchdog = yield* watchPromptInactivity(
                 context,

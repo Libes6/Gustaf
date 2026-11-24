@@ -1,4 +1,5 @@
 import {
+  type AuthEnvironmentScope,
   AuthEnvironmentMaintainScope,
   AuthDiagnosticsReadScope,
   AuthFilesystemReadScope,
@@ -11,6 +12,7 @@ import {
   ProviderInstanceId,
   ProjectId,
   IssueTrackerKind,
+  McpServerId,
   SecretProviderId,
   ThreadId,
   TurnItemId,
@@ -580,6 +582,11 @@ describe("settings mutation authorization", () => {
         ).toMatchObject({ requiredPermission: AuthProvidersManageScope });
         expect(
           yield* client[WS_METHODS.serverUpdateSettings]({
+            patch: { mcpServers: { [McpServerId.make("figma")]: null } },
+          }).pipe(Effect.flip),
+        ).toMatchObject({ requiredPermission: AuthProvidersManageScope });
+        expect(
+          yield* client[WS_METHODS.serverUpdateSettings]({
             patch: { requireConnectDeviceApproval: false },
           }).pipe(Effect.flip),
         ).toMatchObject({ requiredPermission: AuthAccessWriteScope });
@@ -792,6 +799,122 @@ it.effect("separates host file URLs from readable attachment URLs", () =>
     }
     expect(handled).toBe(2);
   }),
+);
+
+it.effect("guards MCP import, server checks and sign-in with the grants they need", () =>
+  Effect.gen(function* () {
+    const mcpTags = [
+      WS_METHODS.mcpServersListImportable,
+      WS_METHODS.mcpServersImport,
+      WS_METHODS.mcpServersStatus,
+      WS_METHODS.mcpServersSignIn,
+      WS_METHODS.mcpServersSubmitSignInCallback,
+      WS_METHODS.mcpServersSignOut,
+    ] as const;
+    type McpTag = (typeof mcpTags)[number];
+    const group = WsRpcGroup.omit(
+      ...[...WsRpcGroup.requests.keys()].filter(
+        (tag): tag is Exclude<keyof typeof RPC_REQUIRED_SCOPES, McpTag> =>
+          !(mcpTags as ReadonlyArray<string>).includes(tag),
+      ),
+    );
+    let handled = 0;
+    const call = (scopes: ReadonlyArray<AuthEnvironmentScope>) =>
+      RpcTest.makeClient(group).pipe(
+        Effect.provide(
+          Layer.mergeAll(
+            group.toLayerHandler(WS_METHODS.mcpServersListImportable, () =>
+              Effect.sync(() => {
+                handled += 1;
+                return { servers: [], unreadablePaths: [] };
+              }),
+            ),
+            group.toLayerHandler(WS_METHODS.mcpServersImport, () =>
+              Effect.sync(() => {
+                handled += 1;
+                return { imported: [] };
+              }),
+            ),
+            group.toLayerHandler(WS_METHODS.mcpServersStatus, () =>
+              Effect.sync(() => {
+                handled += 1;
+                return { servers: [] };
+              }),
+            ),
+            group.toLayerHandler(WS_METHODS.mcpServersSignIn, () =>
+              Effect.sync(() => {
+                handled += 1;
+                return { authUrl: "https://auth.test/authorize", redirectUri: "http://127.0.0.1" };
+              }),
+            ),
+            group.toLayerHandler(WS_METHODS.mcpServersSubmitSignInCallback, ({ callbackUrl }) =>
+              Effect.sync(() => {
+                handled += 1;
+                return { id: McpServerId.make(new URL(callbackUrl).hostname) };
+              }),
+            ),
+            group.toLayerHandler(WS_METHODS.mcpServersSignOut, () =>
+              Effect.sync(() => {
+                handled += 1;
+              }),
+            ),
+            RpcAuthorization.layer(scopes),
+          ),
+        ),
+      );
+    const entry = (transport: "stdio" | "http") => ({
+      source: "codex" as const,
+      name: "figma",
+      id: McpServerId.make("figma"),
+      transport,
+    });
+
+    const providersOnly = yield* call([AuthProvidersManageScope]);
+    expect(
+      yield* providersOnly[WS_METHODS.mcpServersListImportable]({}).pipe(Effect.flip),
+    ).toMatchObject({ requiredPermission: AuthSettingsWriteScope });
+
+    yield* providersOnly[WS_METHODS.mcpServersStatus]({});
+    const jam = McpServerId.make("jam");
+    yield* providersOnly[WS_METHODS.mcpServersSignIn]({ id: jam });
+    yield* providersOnly[WS_METHODS.mcpServersSubmitSignInCallback]({ callbackUrl: "http://jam/" });
+    yield* providersOnly[WS_METHODS.mcpServersSignOut]({ id: jam });
+    expect(handled).toBe(4);
+
+    const settingsOnly = yield* call([AuthSettingsWriteScope]);
+    const providersRequired = { requiredPermission: AuthProvidersManageScope };
+    expect(yield* settingsOnly[WS_METHODS.mcpServersStatus]({}).pipe(Effect.flip)).toMatchObject(
+      providersRequired,
+    );
+    expect(
+      yield* settingsOnly[WS_METHODS.mcpServersSignIn]({ id: jam }).pipe(Effect.flip),
+    ).toMatchObject(providersRequired);
+    expect(
+      yield* settingsOnly[WS_METHODS.mcpServersSubmitSignInCallback]({
+        callbackUrl: "http://jam/",
+      }).pipe(Effect.flip),
+    ).toMatchObject(providersRequired);
+    expect(
+      yield* settingsOnly[WS_METHODS.mcpServersSignOut]({ id: jam }).pipe(Effect.flip),
+    ).toMatchObject(providersRequired);
+    expect(
+      yield* settingsOnly[WS_METHODS.mcpServersImport]({ entries: [entry("http")] }).pipe(
+        Effect.flip,
+      ),
+    ).toMatchObject(providersRequired);
+
+    const settingsAndProviders = yield* call([AuthSettingsWriteScope, AuthProvidersManageScope]);
+    yield* settingsAndProviders[WS_METHODS.mcpServersListImportable]({});
+    yield* settingsAndProviders[WS_METHODS.mcpServersImport]({ entries: [entry("http")] });
+    expect(handled).toBe(6);
+    // A stdio server runs a command on the host.
+    expect(
+      yield* settingsAndProviders[WS_METHODS.mcpServersImport]({
+        entries: [entry("http"), entry("stdio")],
+      }).pipe(Effect.flip),
+    ).toMatchObject({ requiredPermission: AuthTerminalOperateScope });
+    expect(handled).toBe(6);
+  }).pipe(Effect.scoped),
 );
 
 it.effect("denies manual cleanup before the handler without settings permission", () =>

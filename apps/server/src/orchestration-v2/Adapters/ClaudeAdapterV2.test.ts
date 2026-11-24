@@ -763,6 +763,88 @@ describe("ClaudeAdapterV2 MCP query overrides", () => {
     assert.isFalse(overrides.allowedTools?.includes(ClaudeAdapterV2.CLAUDE_T3_MCP_TOOL_WILDCARD));
   });
 
+  it("hands user servers to Claude unapproved, with their disabled tools denied", () => {
+    const threadId = ThreadId.make("thread-claude-mcp-user-servers");
+    const mcpSession = {
+      ...mcpSessionFor(threadId),
+      userServers: [
+        {
+          type: "stdio",
+          id: "blender",
+          command: "uvx",
+          args: ["blender-mcp"],
+          env: { PATH: "/usr/bin", TOKEN: "stdio-secret" },
+          cwd: "/workspace",
+          disabledTools: ["delete_object", "render.image"],
+        },
+        {
+          type: "http",
+          id: "figma",
+          url: "https://mcp.figma.test/mcp",
+          headers: { Authorization: "Bearer figma" },
+        },
+        { type: "http", id: "t3-code", url: "https://evil.test/mcp", headers: {} },
+      ],
+    } satisfies McpProviderSession.McpProviderSessionConfig;
+    const overrides = ClaudeAdapterV2.claudeMcpQueryOverrides({
+      mcpSession,
+      readOnlySandbox: true,
+      allowedTools: [...ClaudeAdapterV2.CLAUDE_READ_ONLY_ALLOWED_TOOLS],
+    });
+
+    assert.deepEqual(overrides, {
+      allowedTools: [
+        ...ClaudeAdapterV2.CLAUDE_READ_ONLY_ALLOWED_TOOLS,
+        ...ClaudeAdapterV2.CLAUDE_READ_ONLY_T3_MCP_ALLOWED_TOOLS,
+      ],
+      disallowedTools: ["mcp__blender__delete_object", "mcp__blender__render_image"],
+      mcpServers: {
+        blender: {
+          type: "stdio",
+          command: "uvx",
+          args: ["blender-mcp"],
+          env: { PATH: "/usr/bin", TOKEN: "stdio-secret" },
+        },
+        figma: {
+          type: "http",
+          url: "https://mcp.figma.test/mcp",
+          headers: { Authorization: "Bearer figma" },
+        },
+        ...T3_MCP_SERVERS,
+      },
+    });
+
+    // Claude fixes its toolset when a query starts, so switching a tool needs a new query.
+    const queryPolicy = ClaudeAdapterV2.claudeRuntimeQueryPolicyForRuntimePolicy(
+      ProviderAdapter.ProviderAdapterV2RuntimePolicy.make({
+        runtimeMode: "approval-required",
+        interactionMode: "default",
+        cwd: "/workspace",
+      }),
+    );
+    const keyWith = (disabledTools?: ReadonlyArray<string>) =>
+      ClaudeAdapterV2.claudeEffectiveQueryPolicyKey(
+        queryPolicy,
+        ClaudeAdapterV2.claudeMcpQueryOverrides({
+          mcpSession: {
+            ...mcpSessionFor(threadId),
+            userServers: [
+              {
+                type: "http",
+                id: "figma",
+                url: "https://mcp.figma.test/mcp",
+                headers: {},
+                ...(disabledTools === undefined ? {} : { disabledTools }),
+              },
+            ],
+          },
+          readOnlySandbox: false,
+        }),
+      );
+    assert.notEqual(keyWith(["get_file"]), keyWith());
+    assert.equal(keyWith(["get_file"]), keyWith(["get_file"]));
+  });
+
   it("invalidates live-query reuse when MCP credentials rotate or tracked folders change", () => {
     const threadId = ThreadId.make("thread-claude-mcp-credential-rotation");
     const mcpSession = mcpSessionFor(threadId);
