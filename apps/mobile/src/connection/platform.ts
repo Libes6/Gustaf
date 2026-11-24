@@ -28,6 +28,7 @@ import { appAtomRegistry } from "../state/atom-registry";
 import { clearThreadOutboxEnvironment } from "../state/thread-outbox-removal";
 import { clearComposerDraftsEnvironment } from "../state/use-composer-drafts";
 import { clearThreadComposerErrorsForEnvironment } from "../state/thread-composer-error";
+import { keepConnectionRunningSince } from "../features/keep-connection/keepConnectionNative";
 import { mobileApplicationActiveWakeup } from "./app-state-wakeups";
 import * as ConnectionStorage from "./storage";
 
@@ -132,7 +133,11 @@ const layerWakeups = Wakeups.layer({
               if (state === "active") {
                 Queue.offerUnsafe(
                   queue,
-                  mobileApplicationActiveWakeup(backgroundedAtMs, Date.now()),
+                  mobileApplicationActiveWakeup(
+                    backgroundedAtMs,
+                    Date.now(),
+                    keepConnectionRunningSince(),
+                  ),
                 );
                 backgroundedAtMs = null;
               }

@@ -1733,5 +1733,15 @@
   "Couldn't search thread messages": "Не удалось выполнить поиск по сообщениям тредов",
   "Couldn't search messages for \"{query}\". Change the search to try again.": "Не удалось выполнить поиск сообщений по запросу «{query}». Измените запрос и попробуйте снова.",
   "Waiting on a subagent": "Ожидание субагента",
-  "Waiting on {count} subagents": "Ожидание субагентов: {count}"
+  "Waiting on {count} subagents": "Ожидание субагентов: {count}",
+  "Connection to {names} is active": "Соединение с {names} активно",
+  "Gustaf stays connected in the background. Tap to open.": "Gustaf остаётся на связи в фоне. Нажмите, чтобы открыть.",
+  "Turn off": "Выключить",
+  "Background connection": "Соединение в фоне",
+  "Keep connection in background": "Держать соединение в фоне",
+  "Allow notifications": "Разрешить уведомления",
+  "Notifications are off, so the connection is not kept.": "Уведомления выключены, поэтому соединение не удерживается.",
+  "Starts once an environment is enabled.": "Включится, когда появится включённое окружение.",
+  "Gustaf keeps running with a permanent notification, so returning to the app does not wait for a reconnect. Uses more battery.": "Gustaf продолжает работать с постоянным уведомлением, и при возврате в приложение не нужно ждать переподключения. Расходует больше заряда.",
+  "Android shows a notification while Gustaf keeps the connection. Allow notifications in system Settings to turn this on.": "Пока Gustaf держит соединение, Android показывает уведомление. Чтобы включить функцию, разрешите уведомления в системных настройках."
 }

@@ -116,6 +116,8 @@ export interface Preferences {
   readonly mathRenderingEnabled?: boolean;
   /** Unset means on: crash reports are sent unless the user turns them off. */
   readonly crashReportsEnabled?: boolean;
+  /** Android only; unset means off. */
+  readonly keepConnectionInBackground?: boolean;
   readonly connectOnboardingOptOutAccounts?: ReadonlyArray<string>;
   readonly collapsedProjectGroups?: readonly string[];
   readonly dismissedDatabaseStorageNotices?: readonly string[];
@@ -202,6 +204,7 @@ function sanitizePreferences(parsed: Preferences): Preferences {
     codeWordBreak?: boolean;
     mathRenderingEnabled?: boolean;
     crashReportsEnabled?: boolean;
+    keepConnectionInBackground?: boolean;
     connectOnboardingOptOutAccounts?: ReadonlyArray<string>;
     collapsedProjectGroups?: readonly string[];
     dismissedDatabaseStorageNotices?: readonly string[];
@@ -297,6 +300,9 @@ function sanitizePreferences(parsed: Preferences): Preferences {
     preferences.mathRenderingEnabled = parsed.mathRenderingEnabled;
   if (typeof parsed.crashReportsEnabled === "boolean") {
     preferences.crashReportsEnabled = parsed.crashReportsEnabled;
+  }
+  if (typeof parsed.keepConnectionInBackground === "boolean") {
+    preferences.keepConnectionInBackground = parsed.keepConnectionInBackground;
   }
   if (Array.isArray(parsed.connectOnboardingOptOutAccounts)) {
     preferences.connectOnboardingOptOutAccounts = parsed.connectOnboardingOptOutAccounts.filter(

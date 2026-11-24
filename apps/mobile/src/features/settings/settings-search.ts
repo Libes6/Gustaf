@@ -13,6 +13,9 @@ const SETTINGS_SEARCH_TERMS = {
     "add environment",
     "remote",
     "tailscale",
+    "keep connection",
+    "background",
+    "battery",
   ],
   SettingsNotifications: ["push", "alerts", "live activity", "agent activity"],
   SettingsAppearance: [
