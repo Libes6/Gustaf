@@ -1,6 +1,6 @@
 import { McpServerConfig, McpServerId } from "@t3tools/contracts";
 import * as Schema from "effect/Schema";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 import { catalogEntryToMcpServerConfig, MCP_CATALOG } from "./mcpCatalog.ts";
 
