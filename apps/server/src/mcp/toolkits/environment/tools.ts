@@ -9,6 +9,8 @@ import {
 } from "@t3tools/contracts";
 import * as Schema from "effect/Schema";
 import { Tool, Toolkit } from "effect/ai";
+import * as ServerConfig from "../../../config.ts";
+import * as TraceDiagnostics from "../../../diagnostics/TraceDiagnostics.ts";
 import * as ServerEnvironment from "../../../environment/ServerEnvironment.ts";
 import * as ThreadCommandExecutor from "../../../orchestration-v2/ThreadCommandExecutor.ts";
 import * as ThreadManagementService from "../../../orchestration-v2/ThreadManagementService.ts";
@@ -67,4 +69,45 @@ const EnvironmentPreferencesTool = Tool.make("t3_environment_preferences_update"
   }),
   success: Schema.Struct(PreferenceFields),
 }).annotate(Tool.Destructive, true);
-export const EnvironmentToolkit = Toolkit.make(EnvironmentReadTool, EnvironmentPreferencesTool);
+const EnvironmentErrorsReadTool = Tool.make("t3_environment_errors_read", {
+  failure: OrchestratorMcpFailure,
+  failureMode: "return",
+  dependencies: [
+    McpInvocationContext.McpInvocationContext,
+    ThreadManagementService.ThreadManagementService,
+    ServerEnvironment.ServerEnvironment,
+    ServerConfig.ServerConfig,
+    TraceDiagnostics.TraceDiagnostics,
+  ],
+  description:
+    "Read recent app crashes (route, stack; minified in releases) and failing operations on this server, newest first.",
+  parameters: Schema.Struct({ environmentId: OrchestratorMcpEnvironmentTarget }),
+  success: Schema.Struct({
+    clientCrashes: Schema.Array(
+      Schema.Struct({
+        at: Schema.String,
+        kind: Schema.String,
+        route: Schema.NullOr(Schema.String),
+        message: Schema.String,
+        stack: Schema.NullOr(Schema.String),
+        surface: Schema.NullOr(Schema.String),
+        appVersion: Schema.NullOr(Schema.String),
+      }),
+    ),
+    serverFailures: Schema.Array(
+      Schema.Struct({
+        name: Schema.String,
+        cause: Schema.String,
+        count: Schema.Number,
+        lastSeenAt: Schema.String,
+      }),
+    ),
+  }),
+})
+  .annotate(Tool.Readonly, true)
+  .annotate(Tool.Destructive, false);
+export const EnvironmentToolkit = Toolkit.make(
+  EnvironmentReadTool,
+  EnvironmentPreferencesTool,
+  EnvironmentErrorsReadTool,
+);

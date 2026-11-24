@@ -1,5 +1,7 @@
 import { Component, type ReactNode } from "react";
 
+import { reportClientCrash } from "../observability/clientCrash";
+
 interface RenderErrorBoundaryProps {
   readonly children: ReactNode;
   readonly fallback: ReactNode;
@@ -32,6 +34,10 @@ export class RenderErrorBoundary extends Component<
 
   static getDerivedStateFromError() {
     return { failed: true };
+  }
+
+  override componentDidCatch(error: unknown) {
+    reportClientCrash("component", error);
   }
 
   override render() {
