@@ -269,6 +269,12 @@ Choose **Delete now** to run the enabled rules immediately. The latest results s
 worktrees were removed or kept and why, plus any failures.
 Results also list folders in the worktree folder that no thread uses, with their sizes; cleanup never removes them, so remove them manually if you want.
 
+To see every worktree of the selected projects, open **Settings → Worktrees → Worktree inventory**.
+It lists Git worktrees, worktrees whose folder is gone, detached ones, and paths that threads used,
+including deleted threads, with links to those threads and their pull requests. **Check changes**
+looks for uncommitted files in one worktree. The inventory only reads; it never deletes or prunes.
+Agents can read the same list with the `t3_worktree_inventory` tool.
+
 The inactive and settled retention periods also apply to the folders of
 [threads without a project](./thread-sidebar.md#start-without-a-project). Those folders are not
 Git repositories, so their files are deleted with them and cannot be recovered; the thread stays,

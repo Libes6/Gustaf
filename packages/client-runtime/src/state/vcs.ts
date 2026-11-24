@@ -4,6 +4,7 @@ import {
   type VcsListRefsResult,
   type VcsRefreshStatusResult,
   type VcsStatusResult,
+  type WorktreeInventoryInput,
   WS_METHODS,
 } from "@t3tools/contracts";
 import { applyGitStatusStreamEvent } from "@t3tools/shared/git";
@@ -18,6 +19,7 @@ import * as SubscriptionRef from "effect/SubscriptionRef";
 import { Atom, AtomRegistry } from "effect/reactivity";
 
 import {
+  createEnvironmentQueryAtomFamily,
   createEnvironmentRpcCommand,
   createEnvironmentRpcSubscriptionAtomFamily,
   createEnvironmentSubscriptionAtomFamily,
@@ -307,8 +309,24 @@ export function createVcsEnvironmentAtoms<R, E>(
       Exit.isSuccess(exit) ? exit.value.refsDigest : undefined,
     );
 
+  // Each read runs `git worktree list` per project, so it reads only while the inventory is shown.
+  const worktreeInventoryQuery = createEnvironmentQueryAtomFamily(runtime, {
+    label: "environment-data:vcs:worktree-inventory-query",
+    staleTimeMs: 0,
+    execute: Effect.fn("VcsEnvironment.worktreeInventoryQuery")(function* (
+      input: WorktreeInventoryInput,
+    ) {
+      // Readers mount this only with `worktreeInventory.permissionAtom`; the server checks again.
+      return yield* requestGuarded(WS_METHODS.vcsWorktreeInventory, input);
+    }),
+  });
   return {
     listRefs,
+    worktreeInventory: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:vcs:worktree-inventory",
+      tag: WS_METHODS.vcsWorktreeInventory,
+    }),
+    worktreeInventoryQuery,
     // An uncached read for decisions that must match the repository now, not
     // the persisted list a picker renders from.
     readRefs: createEnvironmentRpcCommand(runtime, {

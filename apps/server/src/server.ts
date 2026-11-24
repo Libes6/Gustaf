@@ -160,6 +160,7 @@ import * as KnownWorkspaces from "./workspace/KnownWorkspaces.ts";
 import * as WorkspaceFileSystem from "./workspace/WorkspaceFileSystem.ts";
 import * as WorkspacePaths from "./workspace/WorkspacePaths.ts";
 import * as GitVcsDriver from "./vcs/GitVcsDriver.ts";
+import * as WorktreeInventory from "./workspace/WorktreeInventory.ts";
 import * as VcsAutomaticFetchInterval from "./vcs/VcsAutomaticFetchInterval.ts";
 import * as VcsDriverRegistry from "./vcs/VcsDriverRegistry.ts";
 import * as VcsProjectConfig from "./vcs/VcsProjectConfig.ts";
@@ -531,6 +532,13 @@ const layerVcs = Layer.empty.pipe(
     SourceControlSignIn.layer.pipe(Layer.provide(layerSourceControlProviderRegistry)),
   ),
   Layer.provideMerge(layerProjectCloneTracker),
+  Layer.provideMerge(
+    WorktreeInventory.layer.pipe(
+      Layer.provide(layerGitWorkflow),
+      Layer.provide(GitVcsDriver.layer),
+      Layer.provide(ProjectStore.layer),
+    ),
+  ),
   Layer.provideMerge(
     VcsStatusBroadcaster.layer.pipe(
       Layer.provide(layerGitWorkflow),

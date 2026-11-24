@@ -7028,6 +7028,26 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
       }),
     );
 
+  const listWorktrees: GitVcsDriver.GitVcsDriver["Service"]["listWorktrees"] = (cwd) =>
+    executeWorktreeList("GitVcsDriver.listWorktrees", cwd, []).pipe(
+      Effect.map(({ stdout }) =>
+        stdout.split("\0\0").flatMap((record) => {
+          const fields = record.split("\0");
+          const worktree = fields.find((field) => field.startsWith("worktree "));
+          const branch = fields.find((field) => field.startsWith("branch refs/heads/"));
+          return worktree === undefined
+            ? []
+            : [
+                {
+                  path: path.resolve(cwd, worktree.slice("worktree ".length)),
+                  branch: branch?.slice("branch refs/heads/".length) ?? null,
+                  prunable: fields.some((field) => field.startsWith("prunable")),
+                },
+              ];
+        }),
+      ),
+    );
+
   const listWorktreePaths: GitVcsDriver.GitVcsDriver["Service"]["listWorktreePaths"] = (cwd) =>
     executeWorktreeList("GitVcsDriver.listWorktreePaths", cwd, []).pipe(
       // A `prunable` record's directory is gone; another checkout may now sit there.
@@ -7195,5 +7215,6 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
     }),
     listLocalBranchNames,
     listWorktreePaths,
+    listWorktrees,
   });
 });
