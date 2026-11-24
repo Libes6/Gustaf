@@ -56,6 +56,9 @@ const summary = {
   ],
 };
 
+const SIGN_IN_MESSAGE =
+  "Sign in with Google to see Antigravity limits. This instance keeps its own sign-in; the agy terminal's is not shared.";
+
 const fixture = Effect.fn("AntigravityUsageTest.fixture")(function* (
   options: {
     summary?: unknown;
@@ -684,10 +687,32 @@ describe("Antigravity subscription limits", () => {
         }),
       );
       const limits = yield* probe;
-      expect(limits.unavailable?.message).not.toBe(
-        "Sign in with Google to see Antigravity limits.",
-      );
+      expect(limits.unavailable?.message).not.toBe(SIGN_IN_MESSAGE);
       expect(limits.unavailable?.reason).not.toBe("unsupported");
+    }).pipe(Effect.scoped, Effect.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))),
+  );
+
+  it.effect("reads the instance's own sign-in, never the shared keyring entry", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const cliToken = (accessToken: string) =>
+        JSON.stringify({
+          token: { access_token: accessToken, refresh_token: "r", expiry: "2099-01-01T00:00:00Z" },
+        });
+      // The fixture rejects any request whose bearer token is not `access-token`.
+      const { probe, requests, tokenPath } = yield* fixture({
+        missingToken: true,
+        keyringSecret: cliToken("another-account-token"),
+      });
+      yield* fs.writeFileString(
+        path.join(path.dirname(tokenPath), "antigravity-oauth-token"),
+        cliToken("access-token"),
+      );
+      const limits = yield* probe;
+      expect(limits.unavailable).toBeUndefined();
+      expect(requests.length).toBeGreaterThan(0);
+      expect(JSON.stringify(requests)).not.toContain("another-account-token");
     }).pipe(Effect.scoped, Effect.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))),
   );
 
@@ -701,9 +726,7 @@ describe("Antigravity subscription limits", () => {
         missingToken: true,
         keyringSecret: keyringSecret("2026-10-09T14:00:00Z"),
       });
-      expect((yield* personal.probe).unavailable?.message).toBe(
-        "Sign in with Google to see Antigravity limits.",
-      );
+      expect((yield* personal.probe).unavailable?.message).toBe(SIGN_IN_MESSAGE);
       expect(personal.requests).toEqual([]);
 
       const signedIn = yield* fixture({
