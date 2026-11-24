@@ -7,11 +7,14 @@ import {
   collectLimitAccounts,
   collectLimitPools,
   displayLimitWindows,
-  paceRemainingPercent,
-  remainingPercent,
   type LimitAccount,
   type LimitPoolWindow,
 } from "@t3tools/shared/usageLimits";
+import {
+  displayedPercent,
+  paceDisplayPercent,
+  windowDisplayPercent,
+} from "@t3tools/shared/usageLimitsDisplay";
 import {
   collectExternalUsageLinks,
   collectLimitNotices,
@@ -24,6 +27,7 @@ import { useNowMinuteMs } from "../../lib/clock";
 import { tryOpenExternalUrl } from "../../lib/openExternalUrl";
 import { ScreenScrollView as ScrollView } from "../../components/ui/ScreenScrollView";
 import { Defs, Path, Pattern, Rect, Svg } from "react-native-svg";
+import type { UsageLimitsDisplay } from "@t3tools/contracts/settings";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { SymbolView } from "../../components/ui/AppSymbol";
@@ -34,6 +38,7 @@ import { SettingsScreen } from "../settings/components/SettingsScreen";
 import { environmentPresentations } from "../../state/presentation";
 import { refillLabel, ResetCredits, resetLabels } from "./UsageLimitsSection";
 import { usageProviderKind, useProviderColors } from "./usageProviders";
+import { useUsageLimitsDisplay } from "./useUsageLimitsDisplay";
 
 const PACE_LABEL = {
   ahead: msg("Ahead of pace"),
@@ -126,13 +131,17 @@ function PaceGap({
 
 function AccountSegment({
   remaining,
+  display,
   color,
   refillPercent,
 }: {
   readonly remaining: number;
+  readonly display: UsageLimitsDisplay;
   readonly color: string;
   readonly refillPercent: number;
 }) {
+  const shown = displayedPercent(remaining, display);
+  const refill = Math.min(100 - remaining, refillPercent);
   const patternId = useId().replace(/:/g, "");
   const [size, setSize] = useState({ width: 0, height: 0 });
   return (
@@ -156,13 +165,14 @@ function AccountSegment({
           </Defs>
           {refillPercent > 0 ? (
             <Rect
-              x={`${100 - Math.min(100 - remaining, refillPercent)}%`}
-              width={`${Math.min(100 - remaining, refillPercent)}%`}
+              // A used fill gives back its last stretch; a remaining fill shows it past the fill's end.
+              x={`${display === "used" ? shown - Math.min(shown, refillPercent) : 100 - refill}%`}
+              width={`${display === "used" ? Math.min(shown, refillPercent) : refill}%`}
               height="100%"
               fill={`url(#${patternId})`}
             />
           ) : null}
-          <Rect width={`${remaining}%`} height="100%" fill={color} opacity={0.35} />
+          <Rect width={`${shown}%`} height="100%" fill={color} opacity={0.35} />
         </Svg>
       ) : null}
     </View>
@@ -189,6 +199,7 @@ function PoolWindowCard({
   const navigation = useNavigation();
   const gt = useGT();
   const m = useMessages();
+  const display = useUsageLimitsDisplay();
   const [barWidth, setBarWidth] = useState(0);
   // Each segment needs room for its account, percent and reset to label itself.
   const segmentWidth = barWidth / Math.max(pool.columns.length, 1);
@@ -212,12 +223,21 @@ function PoolWindowCard({
           ) : null}
           <View className="flex-row items-baseline gap-1.5">
             <Text className="text-sm leading-(--text-3xl--line-height) text-foreground-muted">
-              <T>
-                <Text className="text-3xl font-t3-bold tabular-nums text-foreground">
-                  <Var>{pool.remainingPercent}</Var>%
-                </Text>{" "}
-                left
-              </T>
+              {display === "used" ? (
+                <T>
+                  <Text className="text-3xl font-t3-bold tabular-nums text-foreground">
+                    <Var>{displayedPercent(pool.remainingPercent, display)}</Var>%
+                  </Text>{" "}
+                  used
+                </T>
+              ) : (
+                <T>
+                  <Text className="text-3xl font-t3-bold tabular-nums text-foreground">
+                    <Var>{pool.remainingPercent}</Var>%
+                  </Text>{" "}
+                  left
+                </T>
+              )}
             </Text>
           </View>
         </View>
@@ -247,7 +267,8 @@ function PoolWindowCard({
             />
           );
         const { account, window } = member;
-        const timeLeft = paceRemainingPercent(window, now);
+        const pace = paceDisplayPercent(window, now, display);
+        const shown = windowDisplayPercent(window, display);
         const credits = account.limits.resetCredits?.availableCount ?? 0;
         const resetsIn = resetLabels(window, now, m)?.compact;
         return (
@@ -255,31 +276,48 @@ function PoolWindowCard({
             key={account.key}
             accessibilityRole="button"
             accessibilityLabel={
-              timeLeft === null
-                ? gt("Segment {index}, {account}, {remaining}% left", {
-                    index: index + 1,
-                    account: accountName(account, m),
-                    remaining: remainingPercent(window),
-                  })
-                : gt(
-                    "Segment {index}, {account}, {remaining}% left, {timeLeft}% of the window left",
-                    {
+              display === "used"
+                ? pace === null
+                  ? gt("Segment {index}, {account}, {used}% used", {
                       index: index + 1,
                       account: accountName(account, m),
-                      remaining: remainingPercent(window),
-                      timeLeft,
-                    },
-                  )
+                      used: shown,
+                    })
+                  : gt(
+                      "Segment {index}, {account}, {used}% used, {elapsed}% of the window elapsed",
+                      {
+                        index: index + 1,
+                        account: accountName(account, m),
+                        used: shown,
+                        elapsed: pace,
+                      },
+                    )
+                : pace === null
+                  ? gt("Segment {index}, {account}, {remaining}% left", {
+                      index: index + 1,
+                      account: accountName(account, m),
+                      remaining: shown,
+                    })
+                  : gt(
+                      "Segment {index}, {account}, {remaining}% left, {timeLeft}% of the window left",
+                      {
+                        index: index + 1,
+                        account: accountName(account, m),
+                        remaining: shown,
+                        timeLeft: pace,
+                      },
+                    )
             }
             accessibilityHint={gt("Show account details")}
             onPress={() => openAccount(account)}
             className={wide ? "h-9 min-w-0 flex-1 rounded-md" : "h-7 min-w-0 flex-1 rounded-md"}
           >
-            <PaceGap timeLeft={timeLeft}>
+            <PaceGap timeLeft={pace}>
               <View className="absolute inset-0 rounded-md bg-subtle" />
               <View className="absolute inset-0 overflow-hidden rounded-md">
                 <AccountSegment
-                  remaining={remainingPercent(window)}
+                  remaining={windowDisplayPercent(window, "remaining")}
+                  display={display}
                   color={normalizeProviderAccentColor(account.accentColor) ?? color}
                   refillPercent={window.resetsAt ? member.refillPercent : 0}
                 />
@@ -301,7 +339,7 @@ function PoolWindowCard({
                     </Text>
                   )}
                   <Text className="text-sm font-t3-bold tabular-nums text-foreground">
-                    {remainingPercent(window)}%
+                    {shown}%
                   </Text>
                 </View>
                 {inlineReset && (resetsIn || credits) ? (
@@ -355,44 +393,59 @@ function PoolWindowCard({
         const credits = account.limits.resetCredits?.availableCount ?? 0;
         const reset = resetLabels(window, now, m);
         const resetsIn = reset?.full;
+        const shown = windowDisplayPercent(window, display);
         return (
           <Pressable
             key={account.key}
             accessibilityRole="button"
             accessibilityLabel={
-              resetsIn && credits
-                ? gt(
-                    "Segment {index}, {account}, {remaining}% left, {resetsIn}, {credits, plural, other {{credits} reset credits banked}}",
-                    {
+              display === "used"
+                ? [
+                    gt("Segment {index}, {account}, {used}% used", {
                       index: index + 1,
                       account: accountName(account, m),
-                      remaining: remainingPercent(window),
-                      resetsIn,
-                      credits,
-                    },
-                  )
-                : resetsIn
-                  ? gt("Segment {index}, {account}, {remaining}% left, {resetsIn}", {
-                      index: index + 1,
-                      account: accountName(account, m),
-                      remaining: remainingPercent(window),
-                      resetsIn,
-                    })
-                  : credits
-                    ? gt(
-                        "Segment {index}, {account}, {remaining}% left, {credits, plural, other {{credits} reset credits banked}}",
-                        {
-                          index: index + 1,
-                          account: accountName(account, m),
-                          remaining: remainingPercent(window),
-                          credits,
-                        },
-                      )
-                    : gt("Segment {index}, {account}, {remaining}% left", {
+                      used: shown,
+                    }),
+                    resetsIn,
+                    credits
+                      ? gt("{credits, plural, other {{credits} reset credits banked}}", { credits })
+                      : null,
+                  ]
+                    .filter(Boolean)
+                    .join(", ")
+                : resetsIn && credits
+                  ? gt(
+                      "Segment {index}, {account}, {remaining}% left, {resetsIn}, {credits, plural, other {{credits} reset credits banked}}",
+                      {
                         index: index + 1,
                         account: accountName(account, m),
-                        remaining: remainingPercent(window),
+                        remaining: shown,
+                        resetsIn,
+                        credits,
+                      },
+                    )
+                  : resetsIn
+                    ? gt("Segment {index}, {account}, {remaining}% left, {resetsIn}", {
+                        index: index + 1,
+                        account: accountName(account, m),
+                        remaining: shown,
+                        resetsIn,
                       })
+                    : credits
+                      ? gt(
+                          "Segment {index}, {account}, {remaining}% left, {credits, plural, other {{credits} reset credits banked}}",
+                          {
+                            index: index + 1,
+                            account: accountName(account, m),
+                            remaining: shown,
+                            credits,
+                          },
+                        )
+                      : gt("Segment {index}, {account}, {remaining}% left", {
+                          index: index + 1,
+                          account: accountName(account, m),
+                          remaining: shown,
+                        })
             }
             accessibilityHint={gt("Show account details")}
             onPress={() => openAccount(account)}
@@ -414,9 +467,7 @@ function PoolWindowCard({
             >
               {accountName(account, m)}
             </Text>
-            <Text className="text-sm font-t3-medium tabular-nums text-foreground">
-              {remainingPercent(window)}%
-            </Text>
+            <Text className="text-sm font-t3-medium tabular-nums text-foreground">{shown}%</Text>
             <View className="flex-row items-center gap-1">
               {resetsIn ? (
                 <>
@@ -609,7 +660,8 @@ export function UsageLimitAccountScreen({ route }: AccountScreenProps) {
     .find((candidate) => candidate.driver === account?.driver)
     ?.windows.find((candidate) => candidate.id === windowId && candidate.kind === windowKind);
   const window = pool?.members.find((member) => member.account.key === accountKey)?.window;
-  const evenPace = window ? paceRemainingPercent(window, now) : null;
+  const display = useUsageLimitsDisplay();
+  const evenPace = window ? paceDisplayPercent(window, now, display) : null;
   const reset = pool?.resets.find((candidate) => candidate.member.account.key === accountKey);
   const [revealed, setRevealed] = useState(false);
   const gt = useGT();
@@ -658,9 +710,15 @@ export function UsageLimitAccountScreen({ route }: AccountScreenProps) {
             <View className="gap-3 rounded-[24px] border-continuous bg-grouped-card p-4">
               <Text className="text-sm font-t3-medium text-foreground">{window.label}</Text>
               <Text className="text-3xl font-t3-bold tabular-nums text-foreground">
-                <T>
-                  <Var>{remainingPercent(window)}</Var>% left
-                </T>
+                {display === "used" ? (
+                  <T>
+                    <Var>{windowDisplayPercent(window, display)}</Var>% used
+                  </T>
+                ) : (
+                  <T>
+                    <Var>{windowDisplayPercent(window, display)}</Var>% left
+                  </T>
+                )}
               </Text>
               {window.resetsAt ? (
                 <Text selectable className="text-sm text-foreground-muted">
@@ -677,9 +735,15 @@ export function UsageLimitAccountScreen({ route }: AccountScreenProps) {
               ) : null}
               {evenPace !== null ? (
                 <Text className="text-sm text-foreground-muted">
-                  <T>
-                    Even pace: <Var>{evenPace}</Var>% left by now
-                  </T>
+                  {display === "used" ? (
+                    <T>
+                      Even pace: <Var>{evenPace}</Var>% used by now
+                    </T>
+                  ) : (
+                    <T>
+                      Even pace: <Var>{evenPace}</Var>% left by now
+                    </T>
+                  )}
                 </Text>
               ) : null}
               {reset && reset.restoresPercent > 0 ? (

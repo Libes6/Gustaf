@@ -158,6 +158,10 @@ Open **Usage > Limits** to see the remaining Gemini and shared Claude/GPT allowa
 for Google sign-ins. Each group has separate five-hour and weekly limits and reset
 times. Limits refresh with provider status and include usage outside T3 Code.
 
+Each Antigravity instance keeps its own Google sign-in, separate from the `agy` command line's.
+If Limits asks you to sign in although `agy` works in your terminal, sign in from the
+provider's settings.
+
 A server restart keeps your Google sign-in. The provider shows the saved account
 until a session, a refresh, or a sign-out reports something new.
 

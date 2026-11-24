@@ -421,6 +421,12 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: [msg("reasoning effort thinking bars graph word label level composer")],
   },
   {
+    id: "usage-limits-display",
+    title: msg("Limits display"),
+    to: "/settings/appearance",
+    searchTerms: [msg("usage quota used remaining left spent percent bar rate limit")],
+  },
+  {
     id: "math-rendering",
     title: msg("Render math"),
     to: "/settings/appearance",
