@@ -48,6 +48,7 @@ import * as ManagedPolicy from "../policy/ManagedPolicy.ts";
 import * as PreviewManager from "../preview/Manager.ts";
 
 import * as DeviceService from "../device/DeviceService.ts";
+import * as ComputerUseService from "../computerUse/ComputerUseService.ts";
 import * as GitManager from "../git/GitManager.ts";
 import * as PullRequestReviewGuideService from "../pullRequest/PullRequestReviewGuideService.ts";
 import * as PullRequestService from "../pullRequest/PullRequestService.ts";
@@ -1886,7 +1887,7 @@ it.effect("offers agent feedback tools only while the setting is on, to every cl
 );
 
 it.effect(
-  "lists watch tools only to threads that are not delegated children, and forge tools only where the project has a forge",
+  "lists watch and Mac tools only to threads that are not delegated children, and forge tools only where the project has a forge",
   () =>
     Effect.scoped(
       Effect.gen(function* () {
@@ -1912,7 +1913,10 @@ it.effect(
           ["noForgeToken", scopeFor("noForgeToken", false)],
         ]);
         const serverLayer = McpHttpServer.layerMcpTransport(
-          McpHttpServer.layerPullRequestsToolkit,
+          Layer.mergeAll(
+            McpHttpServer.layerPullRequestsToolkit,
+            McpHttpServer.layerComputerUseToolkit,
+          ),
         ).pipe(
           Layer.provide(ServerSettings.layerTest()),
           Layer.provide(
@@ -1929,6 +1933,8 @@ it.effect(
                 servesProject: (projectId) => Effect.succeed(projectId !== "project-noForgeToken"),
               }),
               Layer.mock(GitManager.GitManager)({}),
+              // The desktop gave this server its executor, so /mcp offers the Mac.
+              Layer.mock(ComputerUseService.ComputerUseService)({ available: true }),
               Layer.mock(Orchestrator.OrchestratorV2)({}),
               Layer.mock(ProjectionStore.ProjectionStoreV2)({
                 getThreadShell: (threadId) =>
@@ -1984,8 +1990,10 @@ it.effect(
             "unwatch_pull_request",
           ]),
         );
+        expect(parentTools).toContain("computer_screenshot");
         expect(childTools).toContain("link_pull_request");
         expect(childTools).not.toContain("watch_pull_request");
+        expect(childTools.filter((name) => name.startsWith("computer_"))).toEqual([]);
         expect(childTools).not.toContain("unwatch_pull_request");
         expect(parentTools).toEqual(
           expect.arrayContaining([
