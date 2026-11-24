@@ -50,6 +50,17 @@ clients read declared capabilities, never provider names.
   bypass a provider's sandbox or approval rules.
 - **T3 MCP tools.** Inject the thread's authenticated MCP server so agents can reach T3 tools, and
   keep turns working if that server is unreachable.
+- **User MCP servers reach an agent only when a session opens.** A server's list, its per-agent
+  selection and a signed-in server's token are fixed at `session/new` (or the adapter's equivalent),
+  so a change reaches a session only by reopening it. The
+  [session manager](../../apps/server/src/orchestration-v2/ProviderSessionManager.ts) reopens an idle
+  per-thread session before the next message; Codex shares one session between threads, so a thread
+  there keeps the old token until that session closes.
+- **Antigravity merges MCP servers from two places.** The agent combines the servers in `session/new`
+  with `$GEMINI_HOME/config/mcp_config.json`, and a client server replaces a config server of the
+  same name. The profile must not hold that file, or its servers load beside the user's list unseen.
+  The agent connects on the first prompt and one server that cannot start refuses every prompt, so a
+  server that failed its check is left out of the session instead of being sent.
 
 ## Model manifest
 
