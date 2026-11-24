@@ -206,7 +206,7 @@ export function buildNewThreadLink(input: {
   return url.toString();
 }
 
-const APP_SCHEME = /^t3code(?:-[a-z]+)?:$/;
+const APP_SCHEME = /^(?:t3code|gustaf)(?:-[a-z]+)?:$/;
 const THREAD_PATH = /^\/([^/]+)\/([^/]+)\/?$/;
 
 export function promptLinkAppPath(
