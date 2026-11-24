@@ -164,6 +164,8 @@ export interface McpInvocationScope {
   readonly origin?: string | undefined;
   /** False when the calling thread's project is on no forge T3 reads; `/mcp` reads it per request. */
   readonly forge?: boolean;
+  /** True where the desktop app gave this server its computer-use executor. Unset is off. */
+  readonly computerUse?: boolean;
 }
 
 /**
@@ -215,6 +217,19 @@ export const hiddenWithoutBackgroundWait = (): boolean => {
   const scope = fiber && Context.getOrUndefined(fiber.context, McpInvocationContext);
   return (
     scope === undefined || (scope.thread !== undefined && scope.capabilities.has("background-wait"))
+  );
+};
+
+/**
+ * `hiddenFromOutsideClients`, and shown only where this server drives the Mac it runs on, and
+ * never to a delegated child: the user allows computer use for the thread they watch.
+ */
+export const hiddenWithoutComputerUse = (): boolean => {
+  const fiber = Fiber.getCurrent();
+  const scope = fiber && Context.getOrUndefined(fiber.context, McpInvocationContext);
+  return (
+    scope === undefined ||
+    (scope.thread !== undefined && scope.thread.subagent !== true && scope.computerUse === true)
   );
 };
 

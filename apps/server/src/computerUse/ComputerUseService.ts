@@ -47,7 +47,7 @@ export interface ComputerUseScreenshot {
   readonly context: ComputerUseContext;
 }
 
-const MAX_WAIT_SECONDS = 10;
+export const MAX_WAIT_SECONDS = 10;
 
 export class ComputerUseService extends Context.Service<
   ComputerUseService,

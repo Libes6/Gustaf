@@ -19,6 +19,7 @@ import { AiError, McpProtocol, McpSchema, McpServer, Tool, Toolkit } from "effec
 import { HttpBody, HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http";
 import {
   AuthSessionId,
+  ComputerUseError,
   DeviceToolError,
   OrchestratorMcpFailure,
   PreviewAutomationError,
@@ -110,6 +111,13 @@ import * as HtmlHandlers from "./toolkits/html/handlers.ts";
 import { MessageToolkit } from "./toolkits/message/tools.ts";
 import * as MessageHandlers from "./toolkits/message/handlers.ts";
 import { HtmlPreviewTool, HtmlPreviewToolkit, HtmlRenderToolkit } from "./toolkits/html/tools.ts";
+import * as ComputerUseHandlers from "./toolkits/computerUse/handlers.ts";
+import {
+  ComputerScreenshotTool,
+  ComputerScreenshotToolkit,
+  ComputerStandardToolkit,
+} from "./toolkits/computerUse/tools.ts";
+import * as ComputerUseService from "../computerUse/ComputerUseService.ts";
 import { MCP_HTTP_PATH } from "../httpCors.ts";
 import { requestUrl } from "../requestUrl.ts";
 
@@ -307,6 +315,10 @@ const makeMcpAuthMiddleware = Effect.gen(function* () {
   const pullRequests = yield* Effect.serviceOption(PullRequestService.PullRequestService);
   const projections = yield* Effect.serviceOption(ProjectionStore.ProjectionStoreV2);
   const sessions = yield* Effect.serviceOption(SessionStore.SessionStore);
+  const computerUse = Option.exists(
+    yield* Effect.serviceOption(ComputerUseService.ComputerUseService),
+    (service) => service.available,
+  );
   // Auth runs once per request, so a response that streams on ends when the outside client's
   // session is revoked or expires. `events/stream` ends itself first with
   // `notifications/events/terminated`, which cutting the body here would lose.
@@ -389,6 +401,7 @@ const makeMcpAuthMiddleware = Effect.gen(function* () {
       agentFeedback,
       workflows,
       origin,
+      computerUse,
       ...(forge === undefined ? {} : { forge }),
     };
   });
@@ -997,6 +1010,33 @@ const registerDeviceScreenshot = Effect.fn("McpHttpServer.registerDeviceScreensh
 
 const isOrchestratorMcpFailure = Schema.is(OrchestratorMcpFailure);
 const isDeviceToolError = Schema.is(DeviceToolError);
+const isComputerUseError = Schema.is(ComputerUseError);
+
+const registerComputerScreenshot = Effect.fn("McpHttpServer.registerComputerScreenshot")(
+  function* () {
+    const computerUse = yield* ComputerUseService.ComputerUseService;
+    const threads = yield* ThreadManagementService.ThreadManagementService;
+    const built = yield* decodeAsAdvertised(ComputerScreenshotToolkit);
+    yield* registerImageTool(
+      ComputerScreenshotTool,
+      (payload) =>
+        built
+          .handle("computer_screenshot", payload)
+          .pipe(Stream.unwrap, Stream.run(Sink.last()), Effect.flatMap(Effect.fromOption)),
+      (effect) =>
+        effect.pipe(
+          Effect.provideService(ComputerUseService.ComputerUseService, computerUse),
+          Effect.provideService(ThreadManagementService.ThreadManagementService, threads),
+        ),
+      "screenshot",
+      // Both are written by the server or the desktop for the agent; neither carries screen content.
+      (error) =>
+        isComputerUseError(error) || isOrchestratorMcpFailure(error)
+          ? error.message
+          : (parameterValidationMessage(error) ?? "Mac screenshot failed."),
+    );
+  },
+);
 
 const registerHtmlPreview = Effect.fn("McpHttpServer.registerHtmlPreview")(function* () {
   const htmlRender = yield* HtmlRender.HtmlRender;
@@ -1504,6 +1544,11 @@ export const layerDeviceToolkit = Layer.mergeAll(
   layerDeviceScreenshotRegistration,
 );
 
+export const layerComputerUseToolkit = Layer.mergeAll(
+  toolkitRegistration(ComputerStandardToolkit, ComputerUseHandlers.layerStandard),
+  imageToolRegistration(registerComputerScreenshot(), ComputerUseHandlers.layerScreenshot),
+);
+
 /**
  * `McpServer` for in-process calls, which provide `McpInvocationContext`
  * around `callTool` as the auth middleware does for each /mcp request.
@@ -1550,6 +1595,7 @@ export const layerTools = Layer.mergeAll(
   layerIssuesToolkit,
   layerSubscriptionsToolkit,
   layerDeviceToolkit,
+  layerComputerUseToolkit,
   layerHtmlToolkit,
   layerMessageToolkit,
 );
