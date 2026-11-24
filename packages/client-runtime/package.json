@@ -259,6 +259,10 @@
       "types": "./src/delayedStatus.ts",
       "default": "./src/delayedStatus.ts"
     },
+    "./state/computerUse": {
+      "types": "./src/state/computerUse.ts",
+      "default": "./src/state/computerUse.ts"
+    },
     "./state/connections": {
       "types": "./src/state/connections.ts",
       "default": "./src/state/connections.ts"

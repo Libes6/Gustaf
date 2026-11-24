@@ -32,6 +32,7 @@ import { environmentSession, useEnvironmentScope, readEnvironmentScope } from ".
 import { useAtomCommand } from "../../state/use-atom-command";
 import { useRemoteConnections } from "../../state/use-remote-environment-registry";
 import { ConnectionEnvironmentRow } from "../connection/ConnectionEnvironmentRow";
+import { ComputerUseSection } from "./ComputerUseSection";
 import { EnvironmentRoutesSection } from "./EnvironmentRoutesSection";
 import { OutdatedServerUpdateSection } from "./OutdatedServerUpdateSection";
 import { ListActionRow as SettingsActionRow } from "../../components/ui/ListActionRow";
@@ -341,6 +342,10 @@ function EnvironmentDetail({ environmentId }: { readonly environmentId: Environm
                     />
                   ) : null}
                 </SettingsSection>
+                <ComputerUseSection
+                  environmentId={environmentId}
+                  label={environment.environmentLabel}
+                />
                 <SettingsSection title={gt("Providers")}>
                   <SettingsActionRow
                     icon="arrow.clockwise"

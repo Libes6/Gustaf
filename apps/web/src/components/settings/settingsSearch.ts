@@ -40,6 +40,7 @@ export type SettingsPath =
   | "/settings/mcp"
   | "/settings/secrets"
   | "/settings/subscriptions"
+  | "/settings/computer-use"
   | "/settings/maintenance"
   | "/settings/labs"
   | "/settings/account"
@@ -123,6 +124,7 @@ export const SETTINGS_SECTION_LABELS: Readonly<Record<SettingsPath, string>> = {
   "/settings/mcp": msg("MCP"),
   "/settings/secrets": msg("Secrets"),
   "/settings/subscriptions": msg("Subscriptions"),
+  "/settings/computer-use": msg("Control Mac"),
   "/settings/maintenance": msg("Maintenance"),
   "/settings/labs": msg("Labs"),
   "/settings/account": msg("Account"),
@@ -167,6 +169,7 @@ const ALL_SETTINGS_NAV_GROUPS: ReadonlyArray<SettingsNavGroup> = [
       "/settings/providers",
       "/settings/threads",
       "/settings/browser",
+      "/settings/computer-use",
       "/settings/devices",
       "/settings/scheduled-tasks",
     ],
@@ -1158,6 +1161,17 @@ export const SETTINGS_SEARCH_ITEMS = [
     to: "/settings/scheduled-tasks",
   },
   {
+    id: "computer-use",
+    title: msg("Control Mac"),
+    to: "/settings/computer-use",
+    environmentOnly: true,
+    searchTerms: [
+      msg(
+        "computer use agent screen mouse keyboard desktop macos permissions screen recording accessibility",
+      ),
+    ],
+  },
+  {
     id: "subscriptions",
     title: msg("Subscriptions"),
     to: "/settings/subscriptions",
@@ -1588,6 +1602,7 @@ const SETTINGS_CATEGORY_SCOPES: Readonly<Record<SettingsPath, SettingsSearchScop
   "/settings/access": "connections",
   "/settings/secrets": null,
   "/settings/subscriptions": null,
+  "/settings/computer-use": null,
   "/settings/mcp": null,
   "/settings/scheduled-tasks": null,
   "/settings/maintenance": null,
