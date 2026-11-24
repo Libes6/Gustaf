@@ -215,6 +215,7 @@ describe("DesktopSettings", () => {
           environment.desktopSettingsPath,
           `{
             // JSONC-style comments and trailing commas match server settings parsing.
+            "computerUseEnabled": true,
             "serverExposureMode": "network-accessible",
             "tailscaleServeEnabled": true,
             "tailscaleServePort": 8443,
@@ -223,6 +224,7 @@ describe("DesktopSettings", () => {
         );
 
         assert.deepEqual(yield* settings.load, {
+          computerUseEnabled: true,
           linuxPasswordStore: "auto",
           localEnvironmentEnabled: true,
           mainWindowBounds: { x: 120, y: 80, width: 1280, height: 900 },
@@ -376,6 +378,7 @@ describe("DesktopSettings", () => {
         });
 
         assert.deepEqual(yield* settings.load, {
+          computerUseEnabled: false,
           linuxPasswordStore: "auto",
           localEnvironmentEnabled: true,
           mainWindowBounds: null,
@@ -405,6 +408,7 @@ describe("DesktopSettings", () => {
         });
 
         assert.deepEqual(yield* settings.load, {
+          computerUseEnabled: false,
           linuxPasswordStore: "auto",
           localEnvironmentEnabled: true,
           mainWindowBounds: null,

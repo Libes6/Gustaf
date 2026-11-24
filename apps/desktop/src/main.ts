@@ -72,6 +72,9 @@ import * as DesktopUpdates from "./updates/DesktopUpdates.ts";
 import * as BrowserImport from "./preview/BrowserImport/BrowserImport.ts";
 import * as LinuxBrowserSecret from "./preview/BrowserImport/LinuxBrowserSecret.ts";
 import * as AppleSpeech from "./speech/AppleSpeech.ts";
+import * as ComputerUseBackend from "./computerUse/ComputerUseBackend.ts";
+import * as ComputerUseExecutor from "./computerUse/ComputerUseExecutor.ts";
+import * as ComputerUseHost from "./computerUse/ComputerUseHost.ts";
 import * as BrowserSession from "./preview/BrowserSession.ts";
 import * as DesktopBrowserHost from "./preview/DesktopBrowserHost.ts";
 import * as LoopbackTunnel from "./preview/LoopbackTunnel.ts";
@@ -193,7 +196,14 @@ const layerDesktopAppActivation = DesktopAppActivation.layer.pipe(
   Layer.provide(layerDesktopWindow),
 );
 
+const layerComputerUse = ComputerUseExecutor.layer.pipe(
+  Layer.provide(ComputerUseBackend.layerHelper),
+  Layer.provide(ComputerUseHost.layerElectron),
+  Layer.provide(layerDesktopFoundation),
+);
+
 const layerDesktopBackend = DesktopBackendPool.layer.pipe(
+  Layer.provideMerge(layerComputerUse),
   Layer.provideMerge(DesktopAppIdentity.layer),
   Layer.provideMerge(DesktopBackendConfiguration.layer),
   Layer.provideMerge(DesktopWslEnvironment.layer),
