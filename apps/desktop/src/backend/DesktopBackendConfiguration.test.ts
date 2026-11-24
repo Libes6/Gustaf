@@ -254,6 +254,17 @@ describe("DesktopBackendConfiguration", () => {
         assert.equal(first.bootstrap.t3Home, environment.baseDir);
         assert.equal(first.bootstrap.tailscaleServeEnabled, true);
         assert.equal(first.bootstrap.tailscaleServePort, 8443);
+        assert.deepEqual(
+          [
+            first.bootstrap.desktopTelemetryFd,
+            first.bootstrap.desktopTelemetryControlFd,
+            first.bootstrap.desktopBrowserFd,
+            first.bootstrap.desktopBrowserControlFd,
+            first.bootstrap.desktopComputerUseFd,
+            first.bootstrap.desktopComputerUseControlFd,
+          ],
+          [4, 5, 6, 7, 8, 9],
+        );
         assert.match(first.bootstrap.desktopBootstrapSecret ?? "", /^[0-9a-f]{64}$/i);
         assert.equal(
           second.bootstrap.desktopBootstrapSecret,
@@ -699,6 +710,32 @@ describe("DesktopBackendConfiguration", () => {
     ),
   );
 
+  it.effect("leaves the computer-use channel off outside macOS", () =>
+    Effect.gen(function* () {
+      const fileSystem = yield* FileSystem.FileSystem;
+      const baseDir = yield* fileSystem.makeTempDirectoryScoped({
+        prefix: "t3-desktop-backend-config-test-",
+      });
+      yield* Effect.gen(function* () {
+        const configuration = yield* DesktopBackendConfiguration.DesktopBackendConfiguration;
+        const primary = yield* configuration.resolvePrimary;
+        assert.equal(primary.bootstrap.desktopBrowserControlFd, 7);
+        assert.notProperty(primary.bootstrap, "desktopComputerUseFd");
+        assert.notProperty(primary.bootstrap, "desktopComputerUseControlFd");
+      }).pipe(
+        Effect.provide(
+          layerBackendConfiguration().pipe(
+            Layer.provideMerge(layerServerExposure),
+            Layer.provideMerge(DesktopAppSettings.layerTest()),
+            Layer.provideMerge(DesktopWslServerTree.layerTest()),
+            Layer.provideMerge(DesktopWslEnvironment.layerTest()),
+            Layer.provideMerge(layerEnvironment(baseDir, { platform: "linux" })),
+          ),
+        ),
+      );
+    }).pipe(Effect.scoped, Effect.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))),
+  );
+
   it.effect("gives the Windows and WSL backends one host scope that survives a restart", () =>
     Effect.gen(function* () {
       const fileSystem = yield* FileSystem.FileSystem;
@@ -794,6 +831,8 @@ describe("DesktopBackendConfiguration", () => {
         assert.equal(config.bootstrap.host, "0.0.0.0");
         assert.equal(config.bootstrap.tailscaleServeEnabled, false);
         assert.notProperty(config.bootstrap, "desktopTelemetryFd");
+        assert.notProperty(config.bootstrap, "desktopComputerUseFd");
+        assert.notProperty(config.bootstrap, "desktopComputerUseControlFd");
         assert.notProperty(config.bootstrap, "resourceMonitorPath");
         assert.equal(config.httpBaseUrl.href, "http://172.27.0.99:5050/");
         assert.equal(config.env.OPENAI_API_KEY, "openai-key");
