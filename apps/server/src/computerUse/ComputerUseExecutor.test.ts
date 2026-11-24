@@ -1,8 +1,10 @@
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import type { ComputerUseAction } from "@t3tools/contracts";
 import { describe, expect, it } from "@effect/vitest";
+import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
+import * as Layer from "effect/Layer";
 import * as PubSub from "effect/PubSub";
 import * as Queue from "effect/Queue";
 import * as Stream from "effect/Stream";
@@ -13,7 +15,7 @@ import * as ComputerUseExecutor from "./ComputerUseExecutor.ts";
 
 /** The desktop's side of the fd pair: what it reads from the server and writes back. */
 const fakeDesktop = Effect.gen(function* () {
-  const toServer = yield* Queue.unbounded<Uint8Array, Queue.Done>();
+  const toServer = yield* Queue.unbounded<Uint8Array, Cause.Done>();
   const fromServer = yield* Queue.unbounded<string>();
   const executor = yield* ComputerUseExecutor.makeChannel(Stream.fromQueue(toServer), (line) =>
     Queue.offer(fromServer, line),
@@ -44,7 +46,7 @@ describe("ComputerUseExecutor channel", () => {
 
       const act = yield* desktop.executor
         .request({ op: "act", sessionToken: "SESSION", action: keyAction })
-        .pipe(Effect.flip, Effect.forkChild);
+        .pipe(Effect.asVoid, Effect.flip, Effect.forkChild);
       const sentAct = yield* desktop.received;
       expect(sentAct).toEqual({ ...actRequest, id: sentAct.id });
 
@@ -66,7 +68,7 @@ describe("ComputerUseExecutor channel", () => {
       // A reply the server cannot read still ends its request instead of leaving it waiting.
       const odd = yield* desktop.executor
         .request({ op: "status" })
-        .pipe(Effect.flip, Effect.forkChild);
+        .pipe(Effect.asVoid, Effect.flip, Effect.forkChild);
       const sentStatus = yield* desktop.received;
       yield* desktop.send({ id: sentStatus.id, ok: false, error: { code: "from-the-future" } });
       expect(yield* Fiber.join(odd)).toMatchObject({ code: "failed" });
@@ -79,13 +81,15 @@ describe("ComputerUseExecutor channel", () => {
       const events = yield* desktop.executor.subscribe;
       const waiting = yield* desktop.executor
         .request({ op: "screenshot", sessionToken: "SESSION" })
-        .pipe(Effect.flip, Effect.forkChild);
+        .pipe(Effect.asVoid, Effect.flip, Effect.forkChild);
       yield* desktop.received;
 
       yield* desktop.close;
       expect(yield* PubSub.take(events)).toEqual({ _tag: "Disconnected" });
       expect((yield* Fiber.join(waiting)).code).toBe("failed");
-      expect((yield* Effect.flip(desktop.executor.request({ op: "status" }))).code).toBe("failed");
+      expect(
+        (yield* Effect.flip(Effect.asVoid(desktop.executor.request({ op: "status" })))).code,
+      ).toBe("failed");
     }).pipe(Effect.scoped),
   );
 
@@ -93,11 +97,16 @@ describe("ComputerUseExecutor channel", () => {
     Effect.gen(function* () {
       const executor = yield* ComputerUseExecutor.ComputerUseExecutor;
       expect(executor.available).toBe(false);
-      expect((yield* Effect.flip(executor.request({ op: "status" }))).code).toBe("unsupported");
+      expect((yield* Effect.flip(Effect.asVoid(executor.request({ op: "status" })))).code).toBe(
+        "unsupported",
+      );
     }).pipe(
-      Effect.provide(ComputerUseExecutor.layer),
-      Effect.provide(ServerConfig.layerTest(process.cwd(), { prefix: "t3-computer-use-" })),
-      Effect.provide(NodeServices.layer),
+      Effect.provide(
+        ComputerUseExecutor.layer.pipe(
+          Layer.provide(ServerConfig.layerTest(process.cwd(), { prefix: "t3-computer-use-" })),
+          Layer.provide(NodeServices.layer),
+        ),
+      ),
     ),
   );
 });

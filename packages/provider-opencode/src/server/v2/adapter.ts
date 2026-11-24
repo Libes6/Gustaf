@@ -4564,7 +4564,14 @@ export const make = Effect.fn("OpenCode2Adapter.make")(function* (instanceId: Pr
               ),
             ),
           );
-        if (available) {
+        // A failed re-add of an unchanged server leaves it registered, so it is still removed on stop.
+        const registered = (state.mcp ?? []).some(
+          (previous) =>
+            previous.name === entry.name &&
+            previous.directory === entry.directory &&
+            previous.key === entry.key,
+        );
+        if (available || registered) {
           added.push({ name: entry.name, directory: entry.directory, key: entry.key });
         }
         if (entry.name === name) mcpAvailable = available;
