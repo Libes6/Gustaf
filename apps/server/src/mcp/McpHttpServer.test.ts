@@ -2015,6 +2015,116 @@ it.effect(
     ).pipe(Effect.provide(NodeHttpServer.layerTest)),
 );
 
+it.effect("lists browser and device tools only to threads that hold those capabilities", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const scopeFor = (
+        token: string,
+        capabilities: ReadonlyArray<McpInvocationContext.McpCapability>,
+      ): McpInvocationContext.McpThreadInvocationScope => ({
+        environmentId,
+        requestNamespace: token,
+        thread: {
+          threadId: ThreadId.make(`thread-${token}`),
+          providerSessionId: token,
+          providerInstanceId: ProviderInstanceId.make("codex"),
+        },
+        client: undefined,
+        capabilities: new Set(capabilities),
+        issuedAt: 1,
+      });
+      const scopes = new Map([
+        ["bareToken", scopeFor("bareToken", ["orchestration"])],
+        ["browserToken", scopeFor("browserToken", ["orchestration", "preview"])],
+        ["deviceToken", scopeFor("deviceToken", ["orchestration", "device"])],
+      ]);
+      const serverLayer = McpHttpServer.layerMcpTransport(
+        Layer.mergeAll(
+          McpHttpServer.layerPreviewToolkit,
+          McpHttpServer.layerPreviewControlsRegistration,
+          McpHttpServer.layerDeviceToolkit,
+        ),
+      ).pipe(
+        Layer.provide(ServerSettings.layerTest()),
+        Layer.provide(
+          Layer.mock(McpSessionRegistry.McpSessionRegistry)({
+            resolve: (token) => Effect.succeed(scopes.get(token)),
+          }),
+        ),
+        Layer.provide(
+          Layer.mergeAll(
+            McpToolAccessTestkit.liveThreadsLayer,
+            Layer.mock(DeviceService.DeviceService)({}),
+            Layer.mock(ProjectService.ProjectService)({}),
+            Layer.mock(PreviewManager.PreviewManager)({}),
+            PreviewAutomationBroker.layer.pipe(Layer.provide(NodeCrypto.layer)),
+            ServerConfig.layerTest(process.cwd(), { prefix: "t3-mcp-capability-list-" }),
+            NodeServices.layer,
+            NodeCrypto.layer,
+          ),
+        ),
+      );
+      yield* HttpRouter.serve(serverLayer, { disableListenLog: true, disableLogger: true }).pipe(
+        Layer.build,
+      );
+      const httpClient = yield* HttpClient.HttpClient;
+      const listedTools = (token: string) =>
+        Effect.gen(function* () {
+          const headers = {
+            accept: "application/json, text/event-stream",
+            authorization: `Bearer ${token}`,
+          };
+          const initialize = yield* httpClient.post("/mcp", {
+            headers,
+            body: HttpBody.text(
+              `{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"probe","version":"1.0.0"}}}`,
+              "application/json",
+            ),
+          });
+          const listed = yield* httpClient.post("/mcp", {
+            headers: {
+              ...headers,
+              "mcp-session-id": initialize.headers["mcp-session-id"]!,
+              "mcp-protocol-version": "2025-06-18",
+            },
+            body: HttpBody.text(
+              `{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}`,
+              "application/json",
+            ),
+          });
+          const body = (yield* listed.json) as {
+            readonly result: { readonly tools: ReadonlyArray<{ readonly name: string }> };
+          };
+          return body.result.tools.map((tool) => tool.name);
+        });
+      const browserTools = (names: ReadonlyArray<string>) =>
+        names.filter((name) => name.startsWith("preview_") || name.startsWith("t3_preview_"));
+      const deviceTools = (names: ReadonlyArray<string>) =>
+        names.filter((name) => name.startsWith("device_"));
+
+      const bare = yield* listedTools("bareToken");
+      expect(browserTools(bare)).toEqual([]);
+      expect(deviceTools(bare)).toEqual([]);
+
+      const withBrowser = yield* listedTools("browserToken");
+      expect(browserTools(withBrowser)).toEqual(
+        expect.arrayContaining(["preview_open", "preview_snapshot", "t3_preview_list"]),
+      );
+      expect(browserTools(withBrowser)).toHaveLength(14);
+      expect(deviceTools(withBrowser)).toEqual([]);
+
+      const withDevice = yield* listedTools("deviceToken");
+      expect(deviceTools(withDevice).toSorted()).toEqual([
+        "device_close",
+        "device_list",
+        "device_open",
+        "device_screenshot",
+      ]);
+      expect(browserTools(withDevice)).toEqual([]);
+    }),
+  ).pipe(Effect.provide(NodeHttpServer.layerTest)),
+);
+
 it.effect(
   "narrows an OAuth client's modes to the T3-Mode-Limit it sends, and never widens them",
   () =>

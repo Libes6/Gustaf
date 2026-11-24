@@ -237,6 +237,23 @@ export const hiddenWithoutComputerUse = (): boolean => {
   );
 };
 
+/**
+ * `hiddenFromOutsideClients`, and hidden from a thread without the agent browser: the handlers
+ * refuse its calls (`requireThreadMcpCapability`), so listing them only costs the thread context.
+ */
+export const hiddenWithoutBrowser = (): boolean => {
+  const fiber = Fiber.getCurrent();
+  const scope = fiber && Context.getOrUndefined(fiber.context, McpInvocationContext);
+  return scope === undefined || (scope.thread !== undefined && scope.capabilities.has("preview"));
+};
+
+/** `hiddenWithoutBrowser` for the device tools, which need the thread's device access. */
+export const hiddenWithoutDevice = (): boolean => {
+  const fiber = Fiber.getCurrent();
+  const scope = fiber && Context.getOrUndefined(fiber.context, McpInvocationContext);
+  return scope === undefined || (scope.thread !== undefined && scope.capabilities.has("device"));
+};
+
 /** `McpSchema.EnabledWhen` for tools only a client outside a thread drives, such as the CLI. */
 export const hiddenFromThreads = (): boolean => {
   const fiber = Fiber.getCurrent();
