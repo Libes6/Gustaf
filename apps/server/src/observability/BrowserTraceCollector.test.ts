@@ -10,6 +10,7 @@ const recordingSink = () => {
     filePath: "/logs/sink.ndjson",
     push: (record) => names.push(record.name),
     flush: Effect.void,
+    flushSync: () => undefined,
     close: () => Effect.void,
   };
   return { names, sink };
