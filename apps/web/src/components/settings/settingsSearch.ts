@@ -423,6 +423,12 @@ export const SETTINGS_SEARCH_ITEMS = [
     to: "/settings/appearance",
   },
   {
+    id: "chat-wallpaper",
+    title: msg("Chat wallpaper"),
+    to: "/settings/appearance",
+    searchTerms: [msg("wallpaper scene background animation")],
+  },
+  {
     id: "environment-identification",
     title: msg("Environment identification"),
     to: "/settings/appearance",

@@ -486,6 +486,15 @@ it.layer(
       expect(head.status).toBe(200);
       expect(head.headers["content-length"]).toBe(String(Buffer.byteLength(nextHtml)));
       expect(yield* head.text).toBe("");
+
+      // The chat wallpaper page is framed by the app and evaluates scene code in a worker.
+      yield* fs.writeFileString(path.join(staticDir, "wallpaper-frame.html"), "<html>scene</html>");
+      const wallpaper = yield* request("/wallpaper-frame.html");
+      expect(yield* wallpaper.text).toBe("<html>scene</html>");
+      expect(wallpaper.headers["x-frame-options"]).toBe("SAMEORIGIN");
+      expect(wallpaper.headers["content-security-policy"]).toContain("frame-ancestors 'self'");
+      expect(wallpaper.headers["content-security-policy"]).toContain("connect-src 'none'");
+      expect(wallpaper.headers["content-security-policy"]).toContain("sandbox allow-scripts");
     }),
   );
 

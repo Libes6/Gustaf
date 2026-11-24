@@ -64,6 +64,10 @@ import {
   MCP_HTTP_PATH,
 } from "./httpCors.ts";
 import { requestUrl } from "./requestUrl.ts";
+import {
+  WALLPAPER_FRAME_CONTENT_SECURITY_POLICY,
+  WALLPAPER_FRAME_PATH,
+} from "@t3tools/shared/wallpaperFrame";
 
 const OTLP_TRACES_PROXY_PATH = "/api/observability/v1/traces";
 const LOOPBACK_HOSTNAMES = new Set(["127.0.0.1", "::1", "localhost"]);
@@ -667,6 +671,11 @@ const SPA_FRAME_HEADERS = {
   "Content-Security-Policy": "frame-ancestors 'none'",
   "X-Frame-Options": "DENY",
 };
+// The chat wallpaper page is the one HTML file the app frames itself.
+const WALLPAPER_FRAME_HEADERS = {
+  "Content-Security-Policy": WALLPAPER_FRAME_CONTENT_SECURITY_POLICY,
+  "X-Frame-Options": "SAMEORIGIN",
+};
 
 const handleStaticAndDevRequest = Effect.fn("handleStaticAndDevRequest")(
   function* (immutableBuildAssets: ReadonlySet<string>) {
@@ -756,6 +765,8 @@ const handleStaticAndDevRequest = Effect.fn("handleStaticAndDevRequest")(
       /^assets\/.+-[\w-]{8}\.[^/]+$/.test(relativePath) &&
       immutableBuildAssets.has(relativePath);
     const cacheControl = immutable ? "public, max-age=31536000, immutable" : "no-cache";
+    const htmlHeaders =
+      `/${relativePath}` === WALLPAPER_FRAME_PATH ? WALLPAPER_FRAME_HEADERS : SPA_FRAME_HEADERS;
     const validators = (info: FileSystem.File.Info) => {
       // Deployments can preserve HTML size and mtime while changing its bundle URLs.
       const modifiedAt = isHtml ? undefined : Option.getOrUndefined(info.mtime);
@@ -768,7 +779,7 @@ const handleStaticAndDevRequest = Effect.fn("handleStaticAndDevRequest")(
     };
     const headers: Record<string, string> = {
       "Cache-Control": cacheControl,
-      ...(isHtml ? SPA_FRAME_HEADERS : {}),
+      ...(isHtml ? htmlHeaders : {}),
       ...validators(fileInfo),
     };
     const etag = headers.ETag;
@@ -805,7 +816,7 @@ const handleStaticAndDevRequest = Effect.fn("handleStaticAndDevRequest")(
       return HttpServerResponse.uint8Array(bytes, {
         headers: {
           "Cache-Control": cacheControl,
-          ...(isHtml ? SPA_FRAME_HEADERS : {}),
+          ...(isHtml ? htmlHeaders : {}),
           ...validators({ ...info, size: ByteSize.bytes(bytes.byteLength) }),
         },
         contentType,

@@ -1,6 +1,6 @@
 import { BUILT_IN_THEMES } from "@t3tools/shared/themePalettes";
 import { msg, T, useGT, useMessages } from "gt-react";
-import { MonitorIcon, MoonIcon, PaletteIcon, SunIcon } from "lucide-react";
+import { ImageIcon, MonitorIcon, MoonIcon, PaletteIcon, SunIcon } from "lucide-react";
 
 import { m } from "../i18n/messages";
 import { useCustomThemes } from "../hooks/useCustomThemes";
@@ -20,6 +20,7 @@ import {
   ThemePreviewCircle,
 } from "./settings/ThemePreviewCircles";
 import { stackedThreadToast, toastManager } from "./ui/toast";
+import { useWallpaperLibrary } from "../wallpaper/wallpaperLibrary";
 
 export const APPEARANCE_OPTIONS = [
   { mode: "system", label: msg("System"), icon: MonitorIcon },
@@ -68,6 +69,35 @@ export function useCommandPaletteThemeItems() {
   const themeCards = useThemeCards();
   const gt = useGT();
   const messages = useMessages();
+  const wallpapers = useWallpaperLibrary();
+
+  const changeWallpaperItem: CommandPaletteSubmenuItem = {
+    kind: "submenu",
+    value: "action:change-wallpaper",
+    searchTerms: ["wallpaper", "scene", "background"],
+    title: gt("Change chat wallpaper"),
+    icon: <ImageIcon className={ITEM_ICON_CLASS} />,
+    addonIcon: <ImageIcon className={ADDON_ICON_CLASS} />,
+    groups: [
+      {
+        value: "wallpapers",
+        label: gt("Chat wallpaper"),
+        items: [
+          { id: null, name: gt("Off", { $context: "chat wallpaper turned off" }) },
+          ...wallpapers.options,
+        ].map((scene) => ({
+          kind: "action",
+          value: `wallpaper:${scene.id ?? "off"}`,
+          title: scene.name,
+          searchTerms: [scene.name, "wallpaper"],
+          icon: <ImageIcon className={ITEM_ICON_CLASS} />,
+          run: async () => {
+            wallpapers.select(scene.id);
+          },
+        })),
+      },
+    ],
+  };
 
   const changeThemeItem: CommandPaletteSubmenuItem = {
     kind: "submenu",
@@ -172,5 +202,5 @@ export function useCommandPaletteThemeItems() {
     },
   };
 
-  return { changeThemeItem, changeAppearanceItem, themeEditorItem };
+  return { changeThemeItem, changeAppearanceItem, changeWallpaperItem, themeEditorItem };
 }

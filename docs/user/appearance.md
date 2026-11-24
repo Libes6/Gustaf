@@ -48,6 +48,24 @@ The main sidebar, right panel, and terminal drawer open and close immediately by
 in your operating system. Moving between threads always snaps to the selected thread's panel state
 without replaying its transitions.
 
+## Chat wallpapers
+
+On web and desktop, choose a scene in **Settings → Appearance → Chat wallpaper**, or use **Change
+chat wallpaper** in the command palette. The choice is saved on this device or browser. Choose
+**Off** to remove it.
+
+A wallpaper shows a still frame. Turn on **Animate wallpaper** to keep the scene moving: it redraws
+only while the window has focus, uses more power, and stays still when your system asks for reduced
+motion.
+
+You can import more scenes in the Claude Desktop Themes `SCENES` format, from a `.js` file or an
+HTTPS link to one (GitHub file links work). An optional theme `.json` beside it supplies the name
+and the background color; interface colors stay as they are. Remove imported scenes in the same
+section.
+
+A scene runs isolated from the app, with no network access. If it stops responding, it is stopped
+and you see a message; choose another scene or turn wallpapers off.
+
 ## Custom themes
 
 On web and desktop, choose **Create theme** to adjust a palette, or import a T3 Code or VS Code

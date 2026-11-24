@@ -379,6 +379,10 @@
       "types": "./src/image.ts",
       "import": "./src/image.ts"
     },
+    "./wallpaperFrame": {
+      "types": "./src/wallpaperFrame.ts",
+      "import": "./src/wallpaperFrame.ts"
+    },
     "./subscriptions": {
       "types": "./src/subscriptions.ts",
       "import": "./src/subscriptions.ts"
