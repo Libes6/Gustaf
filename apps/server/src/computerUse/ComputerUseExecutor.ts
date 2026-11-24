@@ -80,9 +80,9 @@ const decodeReplyId = Schema.decodeUnknownOption(Schema.Struct({ id: Schema.Numb
  * The channel over any line transport: `input` is what the desktop writes, `write` sends one
  * line. Ends, with every waiting request failed, when `input` ends or fails.
  */
-export const makeChannel = Effect.fn("ComputerUseExecutor.makeChannel")(function* <E>(
+export const makeChannel = Effect.fn("ComputerUseExecutor.makeChannel")(function* <E, W>(
   input: Stream.Stream<Uint8Array, E>,
-  write: (line: string) => Effect.Effect<void, unknown>,
+  write: (line: string) => Effect.Effect<void, W>,
 ) {
   const events = yield* PubSub.unbounded<ComputerUseExecutorEvent>();
   const writeLock = yield* Semaphore.make(1);
@@ -151,7 +151,7 @@ export const makeChannel = Effect.fn("ComputerUseExecutor.makeChannel")(function
       yield* writeLock
         .withPermits(1)(write(`${encoded}\n`))
         .pipe(
-          Effect.catchCause((cause) =>
+          Effect.catch((cause) =>
             Effect.logWarning("computer use request not sent", { cause }).pipe(
               Effect.andThen(Effect.fail(unreachable())),
             ),
