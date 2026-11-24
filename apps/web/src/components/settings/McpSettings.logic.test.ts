@@ -5,6 +5,7 @@ import { describe, expect, it } from "vite-plus/test";
 import {
   currentMcpStatus,
   groupMcpTools,
+  isHeavyMcpServer,
   mcpStatusKey,
   mcpToolFilterUnsupported,
   mcpToolGroupMode,
@@ -80,5 +81,13 @@ describe("MCP tool switches", () => {
     );
     expect(mcpToolFilterUnsupported(undefined, [codex!, claude!, cursor!])).toEqual([cursor]);
     expect(mcpToolFilterUnsupported([codex!], [codex!, cursor!])).toEqual([]);
+  });
+});
+
+describe("MCP server weight", () => {
+  it("flags only servers above ten thousand tokens", () => {
+    expect(isHeavyMcpServer({})).toBe(false);
+    expect(isHeavyMcpServer({ approxTokens: 10_000 })).toBe(false);
+    expect(isHeavyMcpServer({ approxTokens: 10_001 })).toBe(true);
   });
 });

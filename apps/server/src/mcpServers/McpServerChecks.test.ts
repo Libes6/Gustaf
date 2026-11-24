@@ -93,6 +93,7 @@ it.effect("counts a working stdio server's tools across pages and its resources"
         status: "connected",
         tools: [{ name: "read_file", readOnly: true }, { name: "write_file" }],
         resourceCount: 1,
+        approxTokens: 20,
       },
       { id: McpServerId.make("off"), status: "disabled" },
     ]);
@@ -227,6 +228,7 @@ it.effect("asks for sign-in on HTTP 401, checks again on refresh, and after sign
           status: "connected",
           tools: [{ name: "get_issue" }],
           resourceCount: 0,
+          approxTokens: 10,
           signedIn: true,
         },
       ]);
@@ -432,3 +434,18 @@ it.effect("a server with the user's own Authorization header is not shown as sig
     assert.deepEqual(tokenRequests, []);
   }),
 );
+
+it("weighs a tool by the JSON the model reads, counting bytes rather than characters", () => {
+  // 120 bytes: the dash and the accented letters are multi-byte; ÷ 3.7 rounds to 32.
+  assert.strictEqual(
+    McpServerChecks.approximateToolTokens([
+      {
+        name: "search",
+        description: "Zoek — résumé",
+        inputSchema: { type: "object", properties: { q: { type: "string" } } },
+      },
+    ]),
+    32,
+  );
+  assert.strictEqual(McpServerChecks.approximateToolTokens([]), 0);
+});

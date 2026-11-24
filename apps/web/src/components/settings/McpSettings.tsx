@@ -41,6 +41,7 @@ import { useManagedPolicy } from "../../state/managedPolicy";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Switch } from "../ui/switch";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { SecretInput } from "./SecretInput";
 import { useSettingsScope } from "./SettingsScopeContext";
 import { McpConnectorsSection } from "./McpConnectorsSection";
@@ -48,6 +49,7 @@ import { McpMarketplaceDialog } from "./McpMarketplaceDialog";
 import {
   currentMcpStatus,
   groupMcpTools,
+  isHeavyMcpServer,
   mcpStatusKey,
   mcpToolFilterUnsupported,
   mcpToolGroupMode,
@@ -310,17 +312,39 @@ function McpEnvironmentSettings({
       case "connected": {
         const tools = String(status.tools?.length ?? 0);
         return (
-          <McpStatusLine
-            dot="bg-success"
-            text={
-              (status.resourceCount
-                ? gt("Tools: {tools}, resources: {resources}", {
-                    tools,
-                    resources: status.resourceCount,
-                  })
-                : gt("Tools: {tools}", { tools })) + off
-            }
-          />
+          <>
+            <McpStatusLine
+              dot="bg-success"
+              text={
+                (status.resourceCount
+                  ? gt("Tools: {tools}, resources: {resources}", {
+                      tools,
+                      resources: status.resourceCount,
+                    })
+                  : gt("Tools: {tools}", { tools })) + off
+              }
+            />
+            {status.approxTokens !== undefined && (
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <span
+                      className={`mt-0.5 block pl-3 ${isHeavyMcpServer(status) ? "text-warning" : ""}`}
+                    />
+                  }
+                >
+                  {gt("≈ {tokens} tokens if the provider does not defer loading", {
+                    tokens: status.approxTokens.toLocaleString(),
+                  })}
+                </TooltipTrigger>
+                <TooltipPopup>
+                  {gt(
+                    "Claude and Codex defer tool schemas and Antigravity loads them lazily, so they usually cost less. Other agents may add all of it to every thread.",
+                  )}
+                </TooltipPopup>
+              </Tooltip>
+            )}
+          </>
         );
       }
       case "needs-auth":

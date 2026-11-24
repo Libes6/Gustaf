@@ -284,6 +284,11 @@ export const McpServerStatus = Schema.Struct({
   /** Set when connected. */
   tools: Schema.optionalKey(Schema.Array(McpServerToolSummary)),
   resourceCount: Schema.optionalKey(Schema.Number),
+  /**
+   * About how many tokens the tools' names, descriptions and schemas take when a provider puts them
+   * all in the model's context (JSON bytes ÷ 3.7). Providers that load tools on demand cost less.
+   */
+  approxTokens: Schema.optionalKey(Schema.Number),
   /** Why it failed: the server's first stderr lines, or the error. */
   error: Schema.optionalKey(Schema.String),
   /** Gustaf holds a sign-in for this http server and sends its token to every provider. */
