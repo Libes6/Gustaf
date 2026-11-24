@@ -131,7 +131,7 @@ export function replacedVersionedAppImagePath(input: {
 // Docks may look up the Wayland app id without a desktop entry; icon theme lookups are case-sensitive.
 const LINUX_THEME_ICON_SIZE = "256x256";
 
-function linuxThemeIconNames(desktopEntryName: string): readonly string[] {
+export function linuxThemeIconNames(desktopEntryName: string): readonly string[] {
   const appId = desktopEntryName.replace(/\.desktop$/u, "");
   return [...new Set([appId.toLowerCase(), appId])];
 }
