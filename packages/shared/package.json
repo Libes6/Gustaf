@@ -515,6 +515,10 @@
       "types": "./src/cliRelease.ts",
       "import": "./src/cliRelease.ts"
     },
+    "./gustafService": {
+      "types": "./src/gustafService.ts",
+      "import": "./src/gustafService.ts"
+    },
     "./diffCutLines": {
       "types": "./src/diffCutLines.ts",
       "import": "./src/diffCutLines.ts"

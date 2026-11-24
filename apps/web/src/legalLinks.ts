@@ -1,1 +1,3 @@
-export const PRIVACY_POLICY_URL = "https://t3.codes/privacy-policy";
+import { GUSTAF_DOCS_URL } from "@t3tools/shared/gustafService";
+
+export const PRIVACY_POLICY_URL = `${GUSTAF_DOCS_URL}/telemetry.md`;

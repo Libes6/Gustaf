@@ -13,6 +13,12 @@ Postgres because held requests need per-link ordering, retry timing, and larger 
 
 Deployment and Clerk configuration live in the [Connect setup runbook](../operations/02_connect-setup.md).
 
+Gustaf builds do not ship T3 Connect. [`public-config.ts`](../../scripts/lib/public-config.ts) drops
+the Clerk, relay, and trace identifiers from every build, so no cloud configuration exists and
+every Connect surface (gated by `hasCloudPublicConfig`) stays hidden. The Gustaf account and
+`gustaf relay` take its place; their addresses live in
+[`gustafService.ts`](../../packages/shared/src/gustafService.ts).
+
 ## The relay is a trusted broker
 
 - **DPoP-bound bootstrap minting.** For a linked user, the relay asks the environment to mint a

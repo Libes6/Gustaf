@@ -45,3 +45,13 @@ it.each([
   ]);
   expect(assetLinks.map((link) => link.target.package_name)).toContain(identifier);
 });
+
+it("keeps over-the-air updates off unless a build names its own server", async () => {
+  expect((await loadConfig("production")).updates).toEqual({ enabled: false });
+
+  vi.stubEnv("GUSTAF_MOBILE_UPDATES_URL", "https://updates.example.test/manifest");
+  expect((await loadConfig("production")).updates).toMatchObject({
+    enabled: true,
+    url: "https://updates.example.test/manifest",
+  });
+});

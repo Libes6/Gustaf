@@ -11,13 +11,13 @@ launch T3 Code and configure providers afterwards.
 ## Command line
 
 ```bash
-curl -fsSL https://t3.codes/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/Libes6/Gustaf/main/scripts/install.sh | sh
 ```
 
 On Windows, in PowerShell:
 
 ```powershell
-irm https://t3.codes/install.ps1 | iex
+irm https://raw.githubusercontent.com/Libes6/Gustaf/main/scripts/install.ps1 | iex
 ```
 
 This installs the `t3` command to `~/.local/bin`. If that folder is not on your

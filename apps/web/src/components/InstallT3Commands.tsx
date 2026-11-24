@@ -1,3 +1,4 @@
+import { GUSTAF_INSTALL_PS1_URL, GUSTAF_INSTALL_SCRIPT_URL } from "@t3tools/shared/gustafService";
 import { T } from "gt-react";
 import { cn } from "~/lib/utils";
 
@@ -17,9 +18,9 @@ export function InstallT3Commands({
   return (
     <div className={cn("space-y-2", className)}>
       <p className="text-xs text-muted-foreground">macOS, Linux</p>
-      <CommandBlock command="curl -fsSL https://t3.codes/install.sh | sh" />
+      <CommandBlock command={`curl -fsSL ${GUSTAF_INSTALL_SCRIPT_URL} | sh`} />
       <p className="text-xs text-muted-foreground">Windows (PowerShell)</p>
-      <CommandBlock command="irm https://t3.codes/install.ps1 | iex" />
+      <CommandBlock command={`irm ${GUSTAF_INSTALL_PS1_URL} | iex`} />
       <p className="text-xs text-muted-foreground">
         <T>Then</T>
       </p>

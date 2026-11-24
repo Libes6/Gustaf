@@ -15,6 +15,7 @@ import * as Semaphore from "effect/Semaphore";
 import { HttpClient, HttpClientResponse } from "effect/http";
 
 import { writeFileStringAtomically } from "@t3tools/shared/atomicWrite";
+import { GUSTAF_MODEL_MANIFEST_URL } from "@t3tools/shared/gustafService";
 import { ServerConfig } from "../config.ts";
 import * as ServerSettings from "../serverSettings.ts";
 import { hasValidClaudeManifestAdapters } from "./ClaudeModelManifest.ts";
@@ -25,8 +26,7 @@ import {
 } from "./providerCompatibility.ts";
 import * as ModelCatalog from "@t3tools/provider-core/server/ModelCatalog";
 
-const MODEL_MANIFEST_URL =
-  "https://raw.githubusercontent.com/pingdotgg/t3code/main/apps/server/src/provider/model-manifest.json";
+const MODEL_MANIFEST_URL = GUSTAF_MODEL_MANIFEST_URL;
 
 const MANIFEST_TTL_MS = 60 * 60 * 1000;
 
