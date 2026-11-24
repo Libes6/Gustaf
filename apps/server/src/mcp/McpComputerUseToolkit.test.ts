@@ -79,6 +79,7 @@ const makeLayer = (actions: Array<ComputerUseAction>) =>
     Layer.provideMerge(McpToolAccessTestkit.liveThreadsLayer),
     Layer.provideMerge(
       Layer.mock(ComputerUseService.ComputerUseService)({
+        available: true,
         screenshot: (caller) =>
           caller.providerInstanceId === cursor
             ? Effect.fail(imagesUnseen)

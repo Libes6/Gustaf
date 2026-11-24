@@ -859,7 +859,7 @@ const layerUnusedConfigRpcServices = Layer.mergeAll(
   ThreadViewers.layer,
   Layer.mock(CodexInstallation.CodexInstallation)({ managedDirectory: "/unused" }),
   Layer.mock(DeviceService.DeviceService)({}),
-  Layer.mock(ComputerUseService.ComputerUseService)({}),
+  Layer.mock(ComputerUseService.ComputerUseService)({ available: false }),
   Layer.mock(EnvironmentTheme.EnvironmentThemeService)({}),
   Layer.mock(GitWorkflowService.GitWorkflowService)({}),
   Layer.mock(HostResources.HostResources)({}),
