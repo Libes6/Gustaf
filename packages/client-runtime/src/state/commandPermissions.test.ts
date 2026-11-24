@@ -161,6 +161,7 @@ describe("command permissions", () => {
     { method: WS_METHODS.workspaceAddTaskFolderRepository, scope: AuthSourceControlWriteScope },
     { method: WS_METHODS.providerMcpSignInStart, scope: AuthProvidersManageScope },
     { method: WS_METHODS.providerMcpSignInComplete, scope: AuthProvidersManageScope },
+    { method: WS_METHODS.computerUseSetEnabled, scope: AuthSettingsWriteScope },
   ])("requires the destination $scope grant for $method", ({ method, scope }) =>
     Effect.gen(function* () {
       const registry = yield* setup;
@@ -178,6 +179,25 @@ describe("command permissions", () => {
       yield* command.authorize(registry, env);
       registry.set(sessions(other), AsyncResult.success(grant(false)));
       expect(registry.get(command.permissionAtom(other))).toBe(false);
+    }),
+  );
+
+  it.effect.each([
+    WS_METHODS.computerUseAllowThread,
+    WS_METHODS.computerUseOpenPermissionSettings,
+    WS_METHODS.computerUseStop,
+  ])("requires the destination orchestration operate grant for %s", (method) =>
+    Effect.gen(function* () {
+      const registry = yield* setup;
+      const command = createCommandPermissions(runtime, method);
+      registry.set(sessions(env), AsyncResult.success(grant(true)));
+      expect(registry.get(command.permissionAtom(env))).toBe(true);
+      yield* command.authorize(registry, env);
+      registry.set(sessions(other), AsyncResult.success(grant(false)));
+      expect(registry.get(command.permissionAtom(other))).toBe(false);
+      expect((yield* command.authorize(registry, other).pipe(Effect.flip))._tag).toBe(
+        "EnvironmentAuthorizationError",
+      );
     }),
   );
 

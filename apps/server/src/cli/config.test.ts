@@ -603,6 +603,40 @@ it.layer(NodeServices.layer)("cli config resolution", (it) => {
     }),
   );
 
+  it.effect("reads the desktop channel fds from the bootstrap", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const baseDir = yield* fs.makeTempDirectoryScoped({ prefix: "t3-cli-config-fds-" });
+      const fd = yield* openBootstrapFd(
+        makeDesktopBootstrap({
+          desktopBrowserFd: 6,
+          desktopBrowserControlFd: 7,
+          desktopComputerUseFd: 8,
+          desktopComputerUseControlFd: 9,
+        }),
+      );
+
+      const resolved = yield* resolveServerConfig(
+        { ...minimalDesktopFlags(baseDir), bootstrapFd: Option.some(fd) },
+        Option.none(),
+      ).pipe(
+        Effect.provide(
+          Layer.mergeAll(
+            ConfigProvider.layer(ConfigProvider.fromEnv({ env: {} })),
+            NetService.layer,
+          ),
+        ),
+      );
+
+      expect(resolved).toMatchObject({
+        desktopBrowserFd: 6,
+        desktopBrowserControlFd: 7,
+        desktopComputerUseFd: 8,
+        desktopComputerUseControlFd: 9,
+      });
+    }),
+  );
+
   it.effect("reports saved settings as the source of endpoints read from settings.json", () =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;

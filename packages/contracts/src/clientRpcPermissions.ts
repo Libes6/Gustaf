@@ -120,6 +120,11 @@ export const CLIENT_GUARDED_RPC_SCOPES = {
   [WS_METHODS.mcpServersSignIn]: AuthProvidersManageScope,
   [WS_METHODS.mcpServersSubmitSignInCallback]: AuthProvidersManageScope,
   [WS_METHODS.mcpServersSignOut]: AuthProvidersManageScope,
+  // Lets an agent see and drive the Mac this environment runs on.
+  [WS_METHODS.computerUseSetEnabled]: AuthSettingsWriteScope,
+  [WS_METHODS.computerUseAllowThread]: AuthOrchestrationOperateScope,
+  [WS_METHODS.computerUseOpenPermissionSettings]: AuthOrchestrationOperateScope,
+  [WS_METHODS.computerUseStop]: AuthOrchestrationOperateScope,
 } as const;
 export type ClientGuardedRpcTag = keyof typeof CLIENT_GUARDED_RPC_SCOPES;
 

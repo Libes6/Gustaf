@@ -30,6 +30,9 @@ export const DesktopBackendBootstrap = Schema.Struct({
   desktopAppUpdate: Schema.optionalKey(Schema.Boolean),
   desktopBrowserFd: Schema.optionalKey(PositiveInt),
   desktopBrowserControlFd: Schema.optionalKey(PositiveInt),
+  // Computer-use executor channel; only a desktop primary backend on macOS gets it.
+  desktopComputerUseFd: Schema.optionalKey(PositiveInt),
+  desktopComputerUseControlFd: Schema.optionalKey(PositiveInt),
   resourceMonitorPath: Schema.optionalKey(TrimmedNonEmptyString),
 });
 

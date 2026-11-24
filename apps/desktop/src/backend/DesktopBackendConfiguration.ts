@@ -551,6 +551,10 @@ const resolvePrimaryStartConfig = Effect.fn("desktop.backendConfiguration.resolv
       desktopAppUpdate: input.desktopAppUpdate,
       desktopBrowserFd: 6,
       desktopBrowserControlFd: 7,
+      // The executor drives macOS only; other platforms start without the channel.
+      ...(environment.platform === "darwin"
+        ? { desktopComputerUseFd: 8, desktopComputerUseControlFd: 9 }
+        : {}),
       ...Option.match(input.resourceMonitorPath, {
         onNone: () => ({}),
         onSome: (resourceMonitorPath) => ({ resourceMonitorPath }),

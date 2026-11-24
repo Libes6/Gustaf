@@ -29,7 +29,9 @@ import { rpcInitialItems } from "./rpcInitialItems.ts";
 import { subscribeChatGptHandoff } from "./provider/CodexChatGptHandoff.ts";
 import {
   AcpRegistryOperationError,
+  COMPUTER_USE_UNSUPPORTED_STATUS,
   CommandId,
+  ComputerUseError,
   authScopeResponse,
   AuthAccessStreamError,
   type AuthAccessStreamEvent,
@@ -311,6 +313,11 @@ import { requestUrl } from "./requestUrl.ts";
 
 const CONFIG_DISCOVERY_TIMEOUT = Duration.seconds(5);
 const isProviderUploadFeedbackError = Schema.is(ProviderUploadFeedbackError);
+
+const computerUseUnsupported = new ComputerUseError({
+  code: "unsupported",
+  message: "Computer use is not available in this environment.",
+});
 
 const resolveDiscoveryForConfig = <A, E, R>(
   discovery: Effect.Effect<A, E, R>,
@@ -3492,6 +3499,15 @@ export const layerWsRpc = (
         [WS_METHODS.deviceDetail]: (input) => deviceService.detail(input),
         [WS_METHODS.deviceAction]: (input) => deviceService.action(input),
         [WS_METHODS.subscribeDeviceState]: (_input) => DeviceService.stateStream(deviceService),
+        // Until the computer-use service is wired in, every environment reads as unsupported.
+        [WS_METHODS.computerUseStatus]: (_input) => Effect.succeed(COMPUTER_USE_UNSUPPORTED_STATUS),
+        [WS_METHODS.computerUseSetEnabled]: (_input) => Effect.fail(computerUseUnsupported),
+        [WS_METHODS.computerUseOpenPermissionSettings]: (_input) =>
+          Effect.fail(computerUseUnsupported),
+        [WS_METHODS.computerUseAllowThread]: (_input) => Effect.fail(computerUseUnsupported),
+        [WS_METHODS.computerUseStop]: (_input) => Effect.fail(computerUseUnsupported),
+        [WS_METHODS.subscribeComputerUseStatus]: (_input) =>
+          Stream.make(COMPUTER_USE_UNSUPPORTED_STATUS),
         [WS_METHODS.previewStopLocalServer]: (input) => portDiscovery.stopServer(input),
         [WS_METHODS.subscribeDiscoveredLocalServers]: (input) =>
           Stream.callback<DiscoveredLocalServerList>((queue) =>
