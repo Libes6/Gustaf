@@ -59,23 +59,23 @@ only while the window has focus, uses more power, and stays still when your syst
 motion.
 
 You can import more scenes in the Claude Desktop Themes `SCENES` format, from a `.js` file or an
-HTTPS link to one (GitHub file links work). An optional theme `.json` beside it supplies the name
-and the background color; interface colors stay as they are. Remove imported scenes in the same
-section.
+HTTPS link to one (GitHub file links work). Import one scene at a time. An optional theme `.json`
+chosen with it supplies the name and the background color; interface colors stay as they are.
+Remove imported scenes in the same section. Other Claude mod formats are not supported.
 
 A scene runs isolated from the app, with no network access. If it stops responding, it is stopped
 and you see a message; choose another scene or turn wallpapers off.
 
 ## Custom themes
 
-On web and desktop, choose **Create theme** to adjust a palette, or import a T3 Code or VS Code
+On web and desktop, choose **Create theme** to adjust a palette, or import a Gustaf or VS Code
 theme. The theme editor's color picker lets you select an area of the app to find the color to
 change. Export your theme as JSON to share it.
 
 ### Custom CSS
 
 For a change that colors cannot make, open **Custom CSS** in the theme editor. The CSS is saved with
-the theme, applies after T3 Code's own styles on web and desktop, and is included in exports. Use
+the theme, applies after Gustaf's own styles on web and desktop, and is included in exports. Use
 `.dark` or `:root:not(.dark)` to target one appearance.
 
 Custom CSS cannot load files. `@import`, `image-set()`, and `url()` are ignored, except `url()`

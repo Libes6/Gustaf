@@ -81,8 +81,11 @@ export function WallpaperSettings() {
         credentials: "omit",
         signal: AbortSignal.timeout(15_000),
       });
-      if (!response.ok) throw new Error(String(response.status));
-      install([{ name: "scene.js", text: await response.text() }]);
+      if (response.ok) {
+        install([{ name: "scene.js", text: await response.text() }]);
+      } else {
+        setError(importFailed);
+      }
     } catch {
       setError(importFailed);
     }
