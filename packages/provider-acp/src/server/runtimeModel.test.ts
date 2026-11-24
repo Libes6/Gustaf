@@ -1421,6 +1421,21 @@ describe("extractMcpToolCallIdentity", () => {
     });
   });
 
+  it("recovers server and tool from Antigravity _meta.mcp", () => {
+    const toolCall = toolCallFromUpdate({
+      sessionUpdate: "tool_call",
+      toolCallId: "0ed23ac373304c17a1077ac87187f0df",
+      kind: "other",
+      title: "probe_get_tab",
+      status: "pending",
+      content: [],
+      rawInput: { arguments: {} },
+      _meta: { mcp: { tool: "get_tab", server: "probe" }, is_mcp_tool_call: true },
+    });
+
+    expect(extractMcpToolCallIdentity(toolCall)).toEqual({ server: "probe", tool: "get_tab" });
+  });
+
   it("recovers T3 identity from acp-mcp-call fallback commands", () => {
     const toolCall = toolCallFromUpdate({
       sessionUpdate: "tool_call",
