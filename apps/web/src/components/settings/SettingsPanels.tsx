@@ -22,6 +22,9 @@ import {
   MAX_SIDEBAR_AUTO_SETTLE_AFTER_DAYS,
   MIN_SIDEBAR_AUTO_SETTLE_AFTER_DAYS,
   type ResponseStreamingMode,
+  keepAwakeModeOf,
+  keepAwakeModePatch,
+  type KeepAwakeMode,
   type QuitConfirmationMode,
   SidebarProjectSortOrder,
   ScreenReaderAnnouncements,
@@ -143,6 +146,26 @@ const RESPONSE_STREAMING_MODE_DESCRIPTIONS: Record<ResponseStreamingMode, string
   turn: msg("Text appears once the agent finishes its turn."),
   paragraph: msg("Each paragraph or code block appears as soon as it is complete."),
 };
+
+const KEEP_AWAKE_MODES: readonly KeepAwakeMode[] = ["off", "while-agents-work", "always"];
+
+const KEEP_AWAKE_MODE_LABELS: Record<KeepAwakeMode, string> = {
+  off: msg("Off", { $context: "keep the computer awake: never" }),
+  "while-agents-work": msg("While agents work"),
+  always: msg("Always", { $context: "keep the computer awake: always" }),
+};
+
+const KEEP_AWAKE_MODE_DESCRIPTIONS: Record<KeepAwakeMode, string> = {
+  off: msg("The computer sleeps as usual, which pauses running agents."),
+  "while-agents-work": msg(
+    "Stop the computer from going to sleep while agents are working, and let it sleep once they finish. Closing a laptop lid still puts it to sleep.",
+  ),
+  always: msg(
+    "Keeps the computer awake as long as the server runs, for example to reach it from your phone. Closing a laptop lid still puts it to sleep.",
+  ),
+};
+
+const DEFAULT_KEEP_AWAKE_MODE = keepAwakeModeOf(DEFAULT_UNIFIED_SETTINGS);
 
 const SIDEBAR_PROJECT_SORT_ORDER_LABELS: Record<SidebarProjectSortOrder, string> = {
   updated_at: msg("Last user message"),
@@ -617,9 +640,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       ? [gt("Continue threads after restarts")]
       : []),
     ...(isBackgroundActivityDirty ? [gt("Background activity")] : []),
-    ...(settings.keepAwakeWhileAgentsWork !== DEFAULT_UNIFIED_SETTINGS.keepAwakeWhileAgentsWork
-      ? [gt("Keep awake while agents work")]
-      : []),
+    ...(keepAwakeModeOf(settings) !== DEFAULT_KEEP_AWAKE_MODE ? [gt("Keep computer awake")] : []),
     ...(settings.defaultThreadEnvMode !== DEFAULT_UNIFIED_SETTINGS.defaultThreadEnvMode
       ? [gt("New thread mode")]
       : []),
@@ -750,6 +771,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       continueThreadsAfterServerUpdate: DEFAULT_UNIFIED_SETTINGS.continueThreadsAfterServerUpdate,
       backgroundActivity: DEFAULT_UNIFIED_SETTINGS.backgroundActivity,
       keepAwakeWhileAgentsWork: DEFAULT_UNIFIED_SETTINGS.keepAwakeWhileAgentsWork,
+      keepAwakeAlways: DEFAULT_UNIFIED_SETTINGS.keepAwakeAlways,
       backgroundActivityProfile: DEFAULT_UNIFIED_SETTINGS.backgroundActivityProfile,
       automaticGitFetchInterval: DEFAULT_UNIFIED_SETTINGS.automaticGitFetchInterval,
       providerHealthRefreshInterval: DEFAULT_UNIFIED_SETTINGS.providerHealthRefreshInterval,
@@ -2385,6 +2407,12 @@ export function MaintenanceSettingsPanel() {
   const environmentId = environment?.environmentId ?? null;
   const isEnvironmentScope = scope.environmentIds.length === 1 && environmentId !== null;
   const hasServerTargets = connectedEnvironments.length > 0;
+  const messages = useMessages();
+  const mixedKeepAwake = useScopedSettingsMixed(["keepAwakeWhileAgentsWork", "keepAwakeAlways"]);
+  const keepAwakeMode = keepAwakeModeOf(settings);
+  const keepAwakeAlwaysSupported = connectedEnvironments.every(
+    (entry) => entry.serverConfig?.environment.capabilities.keepAwakeAlways === true,
+  );
 
   return (
     <SettingsPageContainer>
@@ -2465,33 +2493,53 @@ export function MaintenanceSettingsPanel() {
         <BackgroundActivitySettingsRow />
         <SettingsRow
           serverScoped
-          settingKeys={["keepAwakeWhileAgentsWork"]}
+          settingKeys={["keepAwakeWhileAgentsWork", "keepAwakeAlways"]}
           {...setting("keep-awake-while-agents-work")}
-          description={gt(
-            "Stop the computer from going to sleep while agents are working, and let it sleep once they finish. Closing a laptop lid still puts it to sleep.",
-          )}
+          description={
+            mixedKeepAwake
+              ? gt("The selected targets use different settings. Choose one to apply it to all.")
+              : messages(KEEP_AWAKE_MODE_DESCRIPTIONS[keepAwakeMode])
+          }
           resetAction={
-            settings.keepAwakeWhileAgentsWork !==
-            DEFAULT_UNIFIED_SETTINGS.keepAwakeWhileAgentsWork ? (
+            keepAwakeMode !== DEFAULT_KEEP_AWAKE_MODE ? (
               <SettingResetButton
-                ariaLabel={gt("Reset keep awake while agents work to default")}
-                onClick={() =>
-                  updateSettings({
-                    keepAwakeWhileAgentsWork: DEFAULT_UNIFIED_SETTINGS.keepAwakeWhileAgentsWork,
-                  })
-                }
+                ariaLabel={gt("Reset keep computer awake to default")}
+                onClick={() => updateSettings(keepAwakeModePatch(DEFAULT_KEEP_AWAKE_MODE))}
               />
             ) : null
           }
           control={
-            <ScopedSwitch
-              settingKeys={["keepAwakeWhileAgentsWork"]}
-              checked={settings.keepAwakeWhileAgentsWork}
-              onCheckedChange={(checked) =>
-                updateSettings({ keepAwakeWhileAgentsWork: Boolean(checked) })
-              }
-              aria-label={gt("Keep awake while agents work")}
-            />
+            <Select
+              value={mixedKeepAwake ? null : keepAwakeMode}
+              onValueChange={(value) => {
+                const mode = KEEP_AWAKE_MODES.find((entry) => entry === value);
+                if (mode !== undefined) updateSettings(keepAwakeModePatch(mode));
+              }}
+            >
+              <SelectTrigger
+                size="sm"
+                className="w-full sm:w-56"
+                aria-label={gt("Keep computer awake")}
+              >
+                <SelectValue>
+                  {(value: KeepAwakeMode | null) =>
+                    value === null ? gt("Mixed") : messages(KEEP_AWAKE_MODE_LABELS[value])
+                  }
+                </SelectValue>
+              </SelectTrigger>
+              <SelectPopup align="end" alignItemWithTrigger={false}>
+                {KEEP_AWAKE_MODES.map((mode) => (
+                  <SelectItem
+                    key={mode}
+                    hideIndicator
+                    value={mode}
+                    disabled={mode === "always" && !keepAwakeAlwaysSupported}
+                  >
+                    {messages(KEEP_AWAKE_MODE_LABELS[mode])}
+                  </SelectItem>
+                ))}
+              </SelectPopup>
+            </Select>
           }
         />
       </SettingsSection>

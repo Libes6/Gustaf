@@ -1417,6 +1417,8 @@ export const ServerSettings = Schema.Struct({
   ),
   /** Holds an OS sleep inhibitor while any run is active; closing a laptop lid still sleeps it. */
   keepAwakeWhileAgentsWork: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(true))),
+  /** Holds the same inhibitor whenever the server runs, with or without active runs. */
+  keepAwakeAlways: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
   /** New T3 Connect device keys wait for approval from someone already trusted here. */
   requireConnectDeviceApproval: Schema.Boolean.pipe(
     Schema.withDecodingDefault(Effect.succeed(false)),
@@ -1896,6 +1898,7 @@ export const ServerSettingsPatch = Schema.Struct({
   enableProviderUpdateChecks: Schema.optionalKey(Schema.Boolean),
   continueThreadsAfterServerUpdate: Schema.optionalKey(Schema.Boolean),
   keepAwakeWhileAgentsWork: Schema.optionalKey(Schema.Boolean),
+  keepAwakeAlways: Schema.optionalKey(Schema.Boolean),
   requireConnectDeviceApproval: Schema.optionalKey(Schema.Boolean),
   enableAgentBrowserAccess: Schema.optionalKey(Schema.Boolean),
   enablePreviewTunnel: Schema.optionalKey(Schema.Boolean),
@@ -2036,6 +2039,20 @@ export const ServerSettingsPatch = Schema.Struct({
   ),
 });
 export type ServerSettingsPatch = typeof ServerSettingsPatch.Type;
+
+export type KeepAwakeMode = "off" | "while-agents-work" | "always";
+
+type KeepAwakeSettings = Pick<ServerSettings, "keepAwakeWhileAgentsWork" | "keepAwakeAlways">;
+
+export function keepAwakeModeOf(settings: KeepAwakeSettings): KeepAwakeMode {
+  if (settings.keepAwakeAlways) return "always";
+  return settings.keepAwakeWhileAgentsWork ? "while-agents-work" : "off";
+}
+
+/** Writes both keys, so turning "always" off falls back to holding while agents work. */
+export function keepAwakeModePatch(mode: KeepAwakeMode): KeepAwakeSettings {
+  return { keepAwakeAlways: mode === "always", keepAwakeWhileAgentsWork: mode !== "off" };
+}
 
 /** The theme service sets theme defaults after it validates them, so clients cannot. */
 export const ClientServerSettingsPatch = ServerSettingsPatch.mapFields(

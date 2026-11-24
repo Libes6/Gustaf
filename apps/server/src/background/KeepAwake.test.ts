@@ -35,6 +35,19 @@ describe("KeepAwake.holdWhileWanted", () => {
   );
 });
 
+describe("KeepAwake.wantsAwake", () => {
+  it("holds always in always mode and only during runs while agents work", () => {
+    const modes = ["off", "while-agents-work", "always"] as const;
+    expect(
+      modes.map((mode) => [KeepAwake.wantsAwake(mode, false), KeepAwake.wantsAwake(mode, true)]),
+    ).toEqual([
+      [false, false],
+      [false, true],
+      [true, true],
+    ]);
+  });
+});
+
 describe("KeepAwake.inhibitorCommand", () => {
   it("runs PowerShell by its System32 path on Windows", () => {
     expect(
