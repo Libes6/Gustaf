@@ -999,6 +999,8 @@ export const DESKTOP_FILE_EXCLUSIONS = [
   "!apps/desktop/prod-resources/browser-secret/**/*",
   "!apps/desktop/prod-resources/apple-speech",
   "!apps/desktop/prod-resources/apple-speech/**/*",
+  "!apps/desktop/prod-resources/computer-use",
+  "!apps/desktop/prod-resources/computer-use/**/*",
   "!apps/desktop/prod-resources/windows-server",
   "!apps/desktop/prod-resources/windows-server/**/*",
   "!apps/desktop/prod-resources/wsl-runtime.tar.gz",
@@ -1123,6 +1125,9 @@ export const LINUX_BROWSER_SECRET_EXTRA_RESOURCES = [
 ] as const;
 export const MAC_APPLE_SPEECH_EXTRA_RESOURCES = [
   { from: "apps/desktop/prod-resources/apple-speech", to: "apple-speech" },
+] as const;
+export const MAC_COMPUTER_USE_EXTRA_RESOURCES = [
+  { from: "apps/desktop/prod-resources/computer-use", to: "computer-use" },
 ] as const;
 
 export interface MacPasskeySigningConfiguration {
@@ -2500,6 +2505,31 @@ export const stageAppleSpeech = Effect.fn("stageAppleSpeech")(function* (input: 
   );
 });
 
+export const stageComputerUse = Effect.fn("stageComputerUse")(function* (input: {
+  readonly repoRoot: string;
+  readonly stageResourcesDir: string;
+  readonly platform: typeof BuildPlatform.Type;
+  readonly arch: typeof BuildArch.Type;
+  readonly verbose: boolean;
+}) {
+  if (input.platform !== "mac") return;
+  const path = yield* Path.Path;
+  yield* runCommand(
+    ChildProcess.make(
+      "node",
+      [
+        path.join(input.repoRoot, "apps/desktop/scripts/build-computer-use.mjs"),
+        "--arch",
+        input.arch,
+        "--output",
+        path.join(input.stageResourcesDir, "computer-use", "gustaf-computer-use"),
+      ],
+      { cwd: input.repoRoot },
+    ),
+    { label: "build macOS computer-use helper", verbose: input.verbose },
+  );
+});
+
 const generateMacIconSet = Effect.fn("build-desktop-artifact.generateMacIconSet")(function* (
   sourcePng: string,
   targetIcns: string,
@@ -2845,6 +2875,7 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
       ...(platform === "linux" ? LINUX_CAPTURE_EXTRA_RESOURCES : []),
       ...(platform === "linux" ? LINUX_BROWSER_SECRET_EXTRA_RESOURCES : []),
       ...(platform === "mac" ? MAC_APPLE_SPEECH_EXTRA_RESOURCES : []),
+      ...(platform === "mac" ? MAC_COMPUTER_USE_EXTRA_RESOURCES : []),
       ...(platform === "win" ? WINDOWS_SERVER_EXTRA_RESOURCES : []),
       ...(platform === "win" && wslRuntimeBundled ? WSL_RUNTIME_EXTRA_RESOURCES : []),
     ],
@@ -2885,7 +2916,7 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
         NSCalendarsWriteOnlyAccessUsageDescription:
           "Commands you run in Gustaf may need to add events to your calendars.",
         NSScreenCaptureUsageDescription:
-          "Gustaf captures the active window when you use the window capture shortcut.",
+          "Gustaf captures the active window when you use the window capture shortcut, and shows this Mac's screen to an agent in a thread you allow to control it.",
         NSCameraUsageDescription:
           "Gustaf lets commands run by terminals and coding agents use the camera.",
         NSMicrophoneUsageDescription:
@@ -3878,6 +3909,13 @@ const buildDesktopArtifactUnlocked = Effect.fn("buildDesktopArtifactUnlocked")(f
     verbose: options.verbose,
   });
   yield* stageAppleSpeech({
+    repoRoot,
+    stageResourcesDir,
+    platform: options.platform,
+    arch: options.arch,
+    verbose: options.verbose,
+  });
+  yield* stageComputerUse({
     repoRoot,
     stageResourcesDir,
     platform: options.platform,
