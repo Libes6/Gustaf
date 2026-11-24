@@ -216,6 +216,7 @@ import { WorkspaceMutationIdProvider } from "./WorkspaceMutationIdProvider";
 import { useThreadTurnSubagents } from "./ThreadAgentsSheet";
 import { ComposerQueuedEditBanner } from "./ComposerQueuedEdit";
 import { useThreadQueuedCount } from "./ThreadQueueControl";
+import { ThreadComputerUseBar } from "./ThreadComputerUseBar";
 import { ThreadGuestShareBar } from "./ThreadGuestShareBar";
 import { ThreadSideChatsRow } from "./ThreadSideChatsRow";
 import type { ThreadContentPresentation } from "./threadContentPresentation";
@@ -1739,6 +1740,10 @@ function ThreadDetailBody(
                     <ThreadGuestShareBar
                       threadRef={props.selectedThreadDetailRef}
                       canOperateThread={props.canOperateThread}
+                    />
+                    <ThreadComputerUseBar
+                      environmentId={props.environmentId}
+                      threadId={props.selectedThread.id}
                     />
                     {props.draftMode ? null : (
                       <ThreadSideChatsRow

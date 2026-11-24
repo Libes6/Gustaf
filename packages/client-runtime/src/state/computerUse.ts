@@ -211,3 +211,34 @@ export function computerUseStep(
       };
   }
 }
+
+/**
+ * What a client can offer without a person at the Mac. Turning the feature on and granting macOS
+ * permissions need that person, so a phone or a remote window only reads state and stops.
+ */
+export type ComputerUseRemoteView =
+  | { readonly kind: "unsupported" }
+  | { readonly kind: "off" }
+  | { readonly kind: "grant-at-mac"; readonly missing: ReadonlyArray<ComputerUsePermission> }
+  | { readonly kind: "check-failed" }
+  | { readonly kind: "ready" }
+  | { readonly kind: "active"; readonly label: string };
+
+export function computerUseRemoteView(status: ComputerUseStatus): ComputerUseRemoteView {
+  switch (status.availability) {
+    case "unsupported":
+      return { kind: "unsupported" };
+    case "disabled":
+      return { kind: "off" };
+    case "ready":
+      return { kind: "ready" };
+    case "permissions-required": {
+      const missing = computerUseMissingPermissions(status);
+      return missing === null || missing.length === 0
+        ? { kind: "check-failed" }
+        : { kind: "grant-at-mac", missing };
+    }
+    case "active":
+      return { kind: "active", label: status.owner?.label ?? "" };
+  }
+}

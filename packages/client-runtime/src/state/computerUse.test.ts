@@ -3,12 +3,14 @@ import type { ComputerUseStatus } from "@t3tools/contracts";
 
 import {
   type ComputerUseHolder,
+  type ComputerUseRemoteView,
   type ComputerUseStep,
   computerUseErrorCode,
   computerUseErrorMessage,
   computerUseHasStopShortcut,
   computerUseHolder,
   computerUseIsOn,
+  computerUseRemoteView,
   computerUseStep,
 } from "./computerUse.ts";
 
@@ -106,6 +108,25 @@ describe("computerUseHolder", () => {
 
   it.each(cases)("%s", (_name, status, expected) => {
     expect(computerUseHolder(status, "env-1", "thread-1")).toBe(expected);
+  });
+});
+
+describe("computerUseRemoteView", () => {
+  const cases: ReadonlyArray<readonly [string, ComputerUseStatus, ComputerUseRemoteView]> = [
+    ["no executor is said outright", unsupported, { kind: "unsupported" }],
+    ["off is for the person at the Mac to change", disabled, { kind: "off" }],
+    [
+      "missing permissions are granted at the Mac",
+      missing(false, true),
+      { kind: "grant-at-mac", missing: ["screen-recording"] },
+    ],
+    ["unprobed permissions are not reported missing", unprobed, { kind: "check-failed" }],
+    ["ready", ready, { kind: "ready" }],
+    ["active shows whose session it is", activeFor({}), { kind: "active", label: "Fix the build" }],
+  ];
+
+  it.each(cases)("%s", (_name, status, expected) => {
+    expect(computerUseRemoteView(status)).toEqual(expected);
   });
 });
 
