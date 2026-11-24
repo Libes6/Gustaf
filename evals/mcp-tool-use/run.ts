@@ -57,6 +57,7 @@ import { makeSideChatContext } from "../../apps/server/src/orchestration-v2/Cont
 import { withInlineContext } from "../../apps/server/src/orchestration-v2/ContextHandoffDelivery.ts";
 import { AttachmentToolkit } from "../../apps/server/src/mcp/toolkits/attachment/tools.ts";
 import { DeviceToolkit } from "../../apps/server/src/mcp/toolkits/device/tools.ts";
+import { ComputerUseToolkit } from "../../apps/server/src/mcp/toolkits/computerUse/tools.ts";
 import { FeedbackToolkit } from "../../apps/server/src/mcp/toolkits/feedback/tools.ts";
 import {
   FEEDBACK_AWAITING_APPROVAL_NOTE,
@@ -512,6 +513,7 @@ const t3SourceTools: ReadonlyArray<Tool.Any> = [
   IssuesToolkit,
   SubscriptionsToolkit,
   DeviceToolkit,
+  ComputerUseToolkit,
   HtmlToolkit,
   MessageToolkit,
 ].flatMap((toolkit): ReadonlyArray<Tool.Any> => Object.values(toolkit.tools));
@@ -573,6 +575,8 @@ const hiddenWhileLinksOff = enabledWhen(McpInvocationContext.hiddenWhileLinksOff
 const hiddenWhileFeedbackOff = enabledWhen(McpInvocationContext.hiddenWhileFeedbackOff);
 // T3 lists PR and CI tools only to a thread whose project is on a forge it reads.
 const hiddenWithoutForge = enabledWhen(McpInvocationContext.hiddenWithoutForge);
+// T3 lists the Mac's tools where the desktop app runs the environment, never to a delegated child.
+const hiddenWithoutComputerUse = enabledWhen(McpInvocationContext.hiddenWithoutComputerUse);
 /**
  * `tools` is T3 as shipped. `raw` takes away T3's PR, CI and issue tools and their instructions,
  * so the agent works the forge with CLIs alone, to measure what the tools save.
@@ -600,7 +604,10 @@ const visibleT3Tools = (options: {
       (options.links === true || !hiddenWhileLinksOff.has(tool.name)) &&
       ((options.agentFeedback ?? "off") !== "off" || !hiddenWhileFeedbackOff.has(tool.name)) &&
       (options.forge !== false || !hiddenWithoutForge.has(tool.name)) &&
-      !(options.subagent === true && hiddenFromSubagents.has(tool.name)),
+      !(
+        options.subagent === true &&
+        (hiddenFromSubagents.has(tool.name) || hiddenWithoutComputerUse.has(tool.name))
+      ),
   );
 
 /**
