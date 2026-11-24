@@ -8,12 +8,14 @@ import {
   type ServerLifecycleWelcomePayload,
   type ServerProvider,
   type ServerSettings,
+  WS_METHODS,
 } from "@t3tools/contracts";
 import {
   AVAILABLE_CONNECTION_STATE,
   presentConnectionState,
   type EnvironmentPresentation,
 } from "@t3tools/client-runtime/connection";
+import { createEnvironmentRpcCommand } from "@t3tools/client-runtime/state/runtime";
 import { createServerEnvironmentAtoms } from "@t3tools/client-runtime/state/server";
 import { createOutdatedServerUpdateCommand } from "@t3tools/client-runtime/state/outdatedServerUpdate";
 import { createEnvironmentServerConfigsAtom } from "@t3tools/client-runtime/state/shell";
@@ -29,13 +31,57 @@ import { primaryEnvironmentIdAtom, localEnvironmentIdAtom } from "./primaryEnvir
 import { environmentSession } from "./session";
 import { reuseProvidersIgnoringCheckedAt } from "./serverProviders.logic";
 
-// Subscribe to every environment's themes; primary can change without reconnecting or updating the subscription.
-export const serverEnvironment = createServerEnvironmentAtoms(connectionAtomRuntime, {
+const baseServerEnvironment = createServerEnvironmentAtoms(connectionAtomRuntime, {
   initialConfigValueAtom: environmentSession.initialConfigValueAtom,
   environmentThemes: true,
   usageLimitSources: true,
   usageLimitsCommand: true,
 });
+
+// Subscribe to every environment's themes; primary can change without reconnecting or updating the subscription.
+export const serverEnvironment = {
+  ...baseServerEnvironment,
+  mcpListImportable: createEnvironmentRpcCommand(connectionAtomRuntime, {
+    label: "environment-data:server:mcp-list",
+    tag: WS_METHODS.mcpServersListImportable,
+  }),
+  importMcpServers: createEnvironmentRpcCommand(connectionAtomRuntime, {
+    label: "mcp:import",
+    tag: WS_METHODS.mcpServersImport,
+  }),
+  mcpSearchRegistry: createEnvironmentRpcCommand(connectionAtomRuntime, {
+    label: "environment-data:server:mcp-search-registry",
+    tag: WS_METHODS.mcpServersSearchRegistry,
+  }),
+  mcpServerStatus: createEnvironmentRpcCommand(connectionAtomRuntime, {
+    label: "environment-data:server:mcp-status",
+    tag: WS_METHODS.mcpServersStatus,
+  }),
+  signInMcpServer: createEnvironmentRpcCommand(connectionAtomRuntime, {
+    label: "mcp:server-sign-in",
+    tag: WS_METHODS.mcpServersSignIn,
+  }),
+  submitMcpServerSignInCallback: createEnvironmentRpcCommand(connectionAtomRuntime, {
+    label: "mcp:server-sign-in-callback",
+    tag: WS_METHODS.mcpServersSubmitSignInCallback,
+  }),
+  signOutMcpServer: createEnvironmentRpcCommand(connectionAtomRuntime, {
+    label: "mcp:server-sign-out",
+    tag: WS_METHODS.mcpServersSignOut,
+  }),
+  mcpListConnectors: createEnvironmentRpcCommand(connectionAtomRuntime, {
+    label: "environment-data:server:mcp-connectors",
+    tag: WS_METHODS.mcpConnectorsList,
+  }),
+  authorizeMcpConnector: createEnvironmentRpcCommand(connectionAtomRuntime, {
+    label: "mcp:connector-authorize",
+    tag: WS_METHODS.mcpConnectorsAuthorize,
+  }),
+  submitMcpConnectorCallback: createEnvironmentRpcCommand(connectionAtomRuntime, {
+    label: "mcp:connector-callback",
+    tag: WS_METHODS.mcpConnectorsSubmitCallback,
+  }),
+};
 export const environmentUpdateStatesAtom = environmentAtomList(
   "web-environment-update-states",
   serverEnvironment.updateStateAtom,

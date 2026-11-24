@@ -421,6 +421,31 @@ import {
   TextGeneratorError,
 } from "./settings.ts";
 import {
+  McpConnectorAuthorizeInput,
+  McpConnectorAuthorizeResult,
+  McpConnectorError,
+  McpConnectorSubmitCallbackInput,
+  McpConnectorsListInput,
+  McpConnectorsListResult,
+  McpServerAuthError,
+  McpServerSignInCallbackInput,
+  McpServerSignInCallbackResult,
+  McpServerSignInInput,
+  McpServerSignInResult,
+  McpServerSignOutInput,
+  McpServerStatusError,
+  McpServerStatusListInput,
+  McpServerStatusListResult,
+  McpImportInput,
+  McpImportResult,
+  McpListImportableInput,
+  McpListImportableResult,
+  McpRegistryError,
+  McpRegistrySearchInput,
+  McpRegistrySearchResult,
+  McpServerImportError,
+} from "./mcpServer.ts";
+import {
   WorkflowAnswerInput,
   WorkflowRequestError,
   WorkflowDefinitionChangeResult,
@@ -632,6 +657,17 @@ export const WS_METHODS = {
   serverReportClientActivity: "server.reportClientActivity",
   serverGetUsageSummary: "server.getUsageSummary",
   serverRefreshUsageRates: "server.refreshUsageRates",
+
+  mcpServersListImportable: "mcpServers.listImportable",
+  mcpServersImport: "mcpServers.import",
+  mcpServersSearchRegistry: "mcpServers.searchRegistry",
+  mcpServersStatus: "mcpServers.status",
+  mcpServersSignIn: "mcpServers.signIn",
+  mcpServersSubmitSignInCallback: "mcpServers.submitSignInCallback",
+  mcpServersSignOut: "mcpServers.signOut",
+  mcpConnectorsList: "mcpConnectors.list",
+  mcpConnectorsAuthorize: "mcpConnectors.authorize",
+  mcpConnectorsSubmitCallback: "mcpConnectors.submitCallback",
 
   workflowsSubscribe: "workflows.subscribe",
   workflowsCounts: "workflows.counts",
@@ -2439,6 +2475,68 @@ const WsScheduledTasksGetWebhookDeliveryRpc = Rpc.make(
   },
 );
 
+const WsMcpServersListImportableRpc = Rpc.make(WS_METHODS.mcpServersListImportable, {
+  payload: McpListImportableInput,
+  success: McpListImportableResult,
+  error: Schema.Union([McpServerImportError, EnvironmentAuthorizationError]),
+});
+
+const WsMcpServersImportRpc = Rpc.make(WS_METHODS.mcpServersImport, {
+  payload: McpImportInput,
+  success: McpImportResult,
+  error: Schema.Union([McpServerImportError, EnvironmentAuthorizationError]),
+});
+
+const WsMcpServersSearchRegistryRpc = Rpc.make(WS_METHODS.mcpServersSearchRegistry, {
+  payload: McpRegistrySearchInput,
+  success: McpRegistrySearchResult,
+  error: Schema.Union([McpRegistryError, EnvironmentAuthorizationError]),
+});
+
+const WsMcpServersStatusRpc = Rpc.make(WS_METHODS.mcpServersStatus, {
+  payload: McpServerStatusListInput,
+  success: McpServerStatusListResult,
+  error: Schema.Union([McpServerStatusError, EnvironmentAuthorizationError]),
+});
+
+const McpServerAuthRpcError = Schema.Union([McpServerAuthError, EnvironmentAuthorizationError]);
+
+const WsMcpServersSignInRpc = Rpc.make(WS_METHODS.mcpServersSignIn, {
+  payload: McpServerSignInInput,
+  success: McpServerSignInResult,
+  error: McpServerAuthRpcError,
+});
+
+const WsMcpServersSubmitSignInCallbackRpc = Rpc.make(WS_METHODS.mcpServersSubmitSignInCallback, {
+  payload: McpServerSignInCallbackInput,
+  success: McpServerSignInCallbackResult,
+  error: McpServerAuthRpcError,
+});
+
+const WsMcpServersSignOutRpc = Rpc.make(WS_METHODS.mcpServersSignOut, {
+  payload: McpServerSignOutInput,
+  error: McpServerAuthRpcError,
+});
+
+const McpConnectorRpcError = Schema.Union([McpConnectorError, EnvironmentAuthorizationError]);
+
+const WsMcpConnectorsListRpc = Rpc.make(WS_METHODS.mcpConnectorsList, {
+  payload: McpConnectorsListInput,
+  success: McpConnectorsListResult,
+  error: McpConnectorRpcError,
+});
+
+const WsMcpConnectorsAuthorizeRpc = Rpc.make(WS_METHODS.mcpConnectorsAuthorize, {
+  payload: McpConnectorAuthorizeInput,
+  success: McpConnectorAuthorizeResult,
+  error: McpConnectorRpcError,
+});
+
+const WsMcpConnectorsSubmitCallbackRpc = Rpc.make(WS_METHODS.mcpConnectorsSubmitCallback, {
+  payload: McpConnectorSubmitCallbackInput,
+  error: McpConnectorRpcError,
+});
+
 const WsSubscribeAuthAccessRpc = Rpc.make(WS_METHODS.subscribeAuthAccess, {
   payload: Schema.Struct({}),
   success: AuthAccessStreamEvent,
@@ -2559,6 +2657,16 @@ export const WsRpcGroup = RpcGroup.make(
   WsAgentFeedbackAnswerRequestRpc,
   WsScheduledTasksListWebhookDeliveriesRpc,
   WsScheduledTasksGetWebhookDeliveryRpc,
+  WsMcpServersListImportableRpc,
+  WsMcpServersImportRpc,
+  WsMcpServersSearchRegistryRpc,
+  WsMcpServersStatusRpc,
+  WsMcpServersSignInRpc,
+  WsMcpServersSubmitSignInCallbackRpc,
+  WsMcpServersSignOutRpc,
+  WsMcpConnectorsListRpc,
+  WsMcpConnectorsAuthorizeRpc,
+  WsMcpConnectorsSubmitCallbackRpc,
   WsServerReportClientActivityRpc,
   WsCloudGetRelayClientStatusRpc,
   WsCloudInstallRelayClientRpc,

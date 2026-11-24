@@ -1,5 +1,10 @@
 import { assert, it } from "@effect/vitest";
-import { DeviceHostId, SecretProviderId, UsageLimitSourceId } from "@t3tools/contracts";
+import {
+  DeviceHostId,
+  McpServerId,
+  SecretProviderId,
+  UsageLimitSourceId,
+} from "@t3tools/contracts";
 import * as SecretResolver from "@t3tools/secret-provider-core/server/SecretResolver";
 import * as Effect from "effect/Effect";
 
@@ -181,8 +186,19 @@ it.effect("reads a collected reference again once it is invalidated", () =>
         textGenerators: {},
         easDeviceHosts,
         simlockDeviceHosts,
+        mcpServers: {
+          [McpServerId.make("linear")]: {
+            enabled: true,
+            transport: {
+              type: "http",
+              url: "https://mcp.linear.app/mcp",
+              headers: { Authorization: source("mcp#token") },
+            },
+          },
+        },
       }),
     );
+    assert.isFalse(cache.has("mcp#token"));
     assert.isFalse(cache.has("cliproxy#key"));
     assert.isFalse(cache.has("voice#key"));
     assert.isFalse(cache.has("expo#token"));

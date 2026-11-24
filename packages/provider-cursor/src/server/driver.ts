@@ -3,6 +3,7 @@ import {
   ProviderSetupError,
   type ServerProviderModel,
 } from "@t3tools/contracts";
+import * as HostProcess from "@t3tools/shared/HostProcess";
 import { CursorSettings } from "../settings.ts";
 import type { SDKModel } from "@cursor/sdk";
 import * as Effect from "effect/Effect";
@@ -321,7 +322,17 @@ export const CursorDriver: ProviderDriver<
                 ),
               ),
             ]).pipe(Effect.map(([machineSnapshot, skills]) => ({ ...machineSnapshot, skills }))),
-      orchestrationAdapter,
+      orchestrationAdapter: {
+        ...orchestrationAdapter,
+        // The SDK loads user settings, `~/.cursor/mcp.json` among them; home as skills resolve it.
+        nativeMcpSources: {
+          provider: "cursor",
+          homeDir:
+            processEnv.HOME?.trim() ||
+            processEnv.USERPROFILE?.trim() ||
+            (yield* HostProcess.HomeDirectory),
+        },
+      },
       textGeneration,
     } satisfies ProviderInstance;
   }),

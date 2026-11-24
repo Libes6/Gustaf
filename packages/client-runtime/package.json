@@ -678,6 +678,10 @@
     "./pull-request-references": {
       "types": "./src/pullRequestReferences.ts",
       "default": "./src/pullRequestReferences.ts"
+    },
+    "./mcp-server-input": {
+      "types": "./src/mcpServerInput.ts",
+      "default": "./src/mcpServerInput.ts"
     }
   },
   "scripts": {

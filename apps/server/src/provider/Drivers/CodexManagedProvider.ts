@@ -28,6 +28,7 @@ import {
   type ProviderInstance,
 } from "@t3tools/provider-core/server/driver";
 import { codexContinuationIdentity } from "./CodexHomeLayout.ts";
+import * as HostProcess from "@t3tools/shared/HostProcess";
 import { withInstanceIdentity } from "@t3tools/provider-core/server/instanceIdentity";
 import { HttpClient } from "effect/http";
 const DRIVER = ProviderDriverKind.make("codex");
@@ -300,7 +301,14 @@ export const makeManagedCodexProvider = Effect.fn("makeManagedCodexProvider")(fu
     accentColor,
     enabled,
     snapshot,
-    orchestrationAdapter,
+    orchestrationAdapter: {
+      ...orchestrationAdapter,
+      nativeMcpSources: {
+        provider: "codex",
+        homeDir: yield* HostProcess.HomeDirectory,
+        codexHome: runtime.homePath,
+      },
+    },
     textGeneration,
     auth: runtime.auth.controller,
     snapshotForCwd: (cwd: string) =>

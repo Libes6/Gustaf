@@ -37,7 +37,10 @@ import {
   readAntigravityPendingReply,
 } from "../../provider/acp/AntigravityChildWork.ts";
 import { readAntigravityClientTextFile } from "../../provider/acp/AntigravityClientFiles.ts";
-import { watchAntigravityPromptOutcome } from "../../provider/acp/AntigravityTurnOutcome.ts";
+import {
+  antigravityFailedMcpServer,
+  watchAntigravityPromptOutcome,
+} from "../../provider/acp/AntigravityTurnOutcome.ts";
 import {
   antigravityApprovalOptions,
   antigravityToolOutlivesPrompt,
@@ -223,6 +226,11 @@ export function makeAntigravityAcpAdapterFlavor(
     supportsNativeGoals: options.supportsNativeGoals ?? Effect.succeed(false),
     // Agents that advertise HTTP MCP skip the stdio bridge process; others keep stdio.
     mcpOverHttp: true,
+    // agy answers every prompt with "The MCP server 'X' failed to initialize" instead.
+    abortsOnFailedMcpServer: true,
+    failedMcpServerOf: antigravityFailedMcpServer,
+    // agy outside Gustaf reads ~/.gemini's MCP config, so threads say what Gustaf sent.
+    namesSentMcpServers: true,
     sessionCarriesPullRequestLinking: antigravityAppendsSystemPrompt,
     makeRuntime,
     buildAttachmentPrompt: ({ text, attachments, resolveAttachmentPath, promptCapabilities }) =>

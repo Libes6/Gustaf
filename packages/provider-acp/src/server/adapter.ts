@@ -249,6 +249,7 @@ export interface AcpAdapterV2RuntimeInput {
   readonly mcpServers: ReadonlyArray<EffectAcpSchema.McpServer>;
   readonly acpMcpServers?: ReadonlyArray<EffectAcpSchema.McpServer>;
   readonly httpMcpServers?: ReadonlyArray<EffectAcpSchema.McpServer>;
+  readonly userMcpServers?: ReadonlyArray<EffectAcpSchema.McpServer>;
   readonly processEnvironment?: NodeJS.ProcessEnv;
   readonly resumeSessionId?: string;
   readonly interruptPromptOnCancel?: boolean;
@@ -460,6 +461,14 @@ export interface AcpAdapterV2Flavor {
     EffectAcpSchema.InitializeRequest["clientCapabilities"]
   >["_meta"];
   readonly mcpOverHttp?: boolean;
+  /** The agent refuses client stdio MCP servers, so the user's stdio servers are left out. */
+  readonly rejectsStdioMcpServers?: boolean;
+  /** See `ProviderAdapterV2.abortsOnFailedMcpServer`. */
+  readonly abortsOnFailedMcpServer?: boolean;
+  /** The agent's own CLI loads another MCP list, so a thread names the user servers Gustaf sent. */
+  readonly namesSentMcpServers?: boolean;
+  /** See `ProviderAdapterV2.failedMcpServerOf`. */
+  readonly failedMcpServerOf?: ProviderAdapter.ProviderAdapterV2["Service"]["failedMcpServerOf"];
   /** The agent has no tool search of its own, so T3 lists optional tools on demand. */
   readonly deferMcpTools?: boolean;
   readonly normalizeSessionUpdate?: (
@@ -1055,6 +1064,9 @@ interface AcpMcpContext {
   readonly servers: ReadonlyArray<EffectAcpSchema.McpServer>;
   readonly acpServers: ReadonlyArray<EffectAcpSchema.McpServer>;
   readonly httpServers: ReadonlyArray<EffectAcpSchema.McpServer>;
+  /** Plain stdio or http entries whichever way `t3-code` travels; never via the MCP-over-ACP bridge. */
+  readonly userServers: ReadonlyArray<EffectAcpSchema.McpServer>;
+  readonly skippedUserServers?: McpProviderSession.McpProviderSessionConfig["skippedUserServers"];
   readonly processEnvironment?: NodeJS.ProcessEnv;
   readonly endpoint?: string;
   readonly authorization?: string;
@@ -1101,7 +1113,7 @@ function acpMcpContext(
   callLauncher: string | undefined,
 ): AcpMcpContext {
   if (session === undefined) {
-    return { servers: [], acpServers: [], httpServers: [] };
+    return { servers: [], acpServers: [], httpServers: [], userServers: [] };
   }
   // codex-acp 1.2.0 and pi-acp drop injected HTTP servers, so HTTP is opt-in per flavor.
   return {
@@ -1134,6 +1146,10 @@ function acpMcpContext(
             },
           ]
         : [],
+    userServers: (session.userServers ?? []).map(acpUserMcpServer),
+    ...(session.skippedUserServers === undefined
+      ? {}
+      : { skippedUserServers: session.skippedUserServers }),
     endpoint: session.endpoint,
     authorization: session.authorizationHeader,
     processEnvironment: {
@@ -1151,11 +1167,29 @@ function acpMcpContext(
   };
 }
 
+// ACP stdio entries carry no cwd: the agent starts them in the session cwd.
+function acpUserMcpServer(server: McpProviderSession.McpUserServer): EffectAcpSchema.McpServer {
+  return server.type === "stdio"
+    ? {
+        name: server.id,
+        command: server.command,
+        args: [...server.args],
+        env: Object.entries(server.env).map(([name, value]) => ({ name, value })),
+      }
+    : {
+        type: "http",
+        name: server.id,
+        url: server.url,
+        headers: Object.entries(server.headers).map(([name, value]) => ({ name, value })),
+      };
+}
+
 function acpMcpActivation(context: AcpMcpContext) {
   return {
     mcpServers: context.servers,
     acpMcpServers: context.acpServers,
     httpMcpServers: context.httpServers,
+    userMcpServers: context.userServers,
   };
 }
 
@@ -2095,18 +2129,26 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
   const mcpSessions = yield* McpProviderSessions.McpProviderSessions;
   const { flavor, selfInvocation: self } = options;
   const callLauncher = yield* writeAcpMcpCallLauncher(host.paths.stateDir);
-  const readMcpContext = (threadId: ThreadId | null) =>
-    threadId === null
-      ? Effect.succeed(
-          acpMcpContext(undefined, self, flavor.mcpOverHttp, flavor.deferMcpTools, callLauncher),
-        )
-      : mcpSessions
-          .read(threadId)
-          .pipe(
-            Effect.map((session) =>
-              acpMcpContext(session, self, flavor.mcpOverHttp, flavor.deferMcpTools, callLauncher),
-            ),
-          );
+  const readMcpContext = Effect.fnUntraced(function* (threadId: ThreadId | null) {
+    const session = threadId === null ? undefined : yield* mcpSessions.read(threadId);
+    const context = acpMcpContext(
+      session,
+      self,
+      flavor.mcpOverHttp,
+      flavor.deferMcpTools,
+      callLauncher,
+    );
+    if (flavor.rejectsStdioMcpServers !== true) return context;
+    const isHttp = (server: EffectAcpSchema.McpServer) =>
+      "type" in server && server.type === "http";
+    const stdio = context.userServers.filter((server) => !isHttp(server));
+    if (stdio.length === 0) return context;
+    yield* Effect.logWarning("ACP agent refuses stdio MCP servers; leaving them out", {
+      driver: flavor.driver,
+      mcpServers: stdio.map((server) => server.name),
+    });
+    return { ...context, userServers: context.userServers.filter(isHttp) };
+  });
   const driver = flavor.driver;
   const continuationRequests = options.continuationRequests;
 
@@ -2124,6 +2166,10 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
   return ProviderAdapter.ProviderAdapterV2.of({
     instanceId: options.instanceId,
     driver,
+    ...(flavor.abortsOnFailedMcpServer === true ? { abortsOnFailedMcpServer: true } : {}),
+    ...(flavor.failedMcpServerOf === undefined
+      ? {}
+      : { failedMcpServerOf: flavor.failedMcpServerOf }),
     checksVersionAtHandshake: flavor.checksVersionAtHandshake === true,
     getCapabilities: Effect.fn("AcpAdapter.getCapabilities")(function* () {
       return yield* readCapabilities;
@@ -2167,6 +2213,8 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
           itemIdentityVersion = thread.nativeMetadata?.itemIdentityVersion;
         };
         const terminalEnvironmentBySessionId = new Map<string, NodeJS.ProcessEnv>();
+        // The user MCP servers last reported as sent or left out, so each change is named once.
+        let reportedMcpServers = "";
         interface PendingTerminalEnvironment {
           readonly environment: NodeJS.ProcessEnv | undefined;
           readonly claimUnknownSession: boolean;
@@ -2929,6 +2977,7 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
             mcpServers: mcpContext.servers,
             acpMcpServers: mcpContext.acpServers,
             httpMcpServers: mcpContext.httpServers,
+            userMcpServers: mcpContext.userServers,
             ...(mcpContext.processEnvironment === undefined
               ? {}
               : { processEnvironment: mcpContext.processEnvironment }),
@@ -10003,6 +10052,33 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
                 }
               }
               return;
+            }
+            const mcpSession = yield* mcpSessions.read(context.input.threadId);
+            const skippedMcpServers = mcpSession?.skippedUserServers ?? [];
+            const sentMcpServers =
+              flavor.namesSentMcpServers === true
+                ? (mcpSession?.userServers ?? []).map((server) => server.id).join(", ")
+                : "";
+            const sentLine =
+              sentMcpServers === "" ? "" : `Gustaf sent MCP servers: ${sentMcpServers}.`;
+            const skippedKey = skippedMcpServers
+              .map(({ id, reason }) => `- ${id}: ${reason}`)
+              .join("\n");
+            if (`${sentLine}\n${skippedKey}` !== reportedMcpServers) {
+              reportedMcpServers = `${sentLine}\n${skippedKey}`;
+              if (skippedMcpServers.length > 0) {
+                yield* runtimeCallbackPermit.withPermit(
+                  emitNotice(context, {
+                    title:
+                      skippedMcpServers.length === 1
+                        ? `MCP server ${skippedMcpServers[0]!.id} was left out`
+                        : `${skippedMcpServers.length} MCP servers were left out`,
+                    description: `${skippedKey}\n\nFix or turn them off in Settings → MCP.${sentLine === "" ? "" : `\n\n${sentLine}`}`,
+                  }),
+                );
+              } else if (sentLine !== "") {
+                yield* runtimeCallbackPermit.withPermit(emitNotice(context, { title: sentLine }));
+              }
             }
             const checkPromptOutcome =
               flavor.watchPromptOutcome === undefined

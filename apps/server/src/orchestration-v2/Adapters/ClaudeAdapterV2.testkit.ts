@@ -951,6 +951,7 @@ function replayQueryRunnerService(
     subagentLaunchToolUseId: (input) => replay(() => queryRunner.subagentLaunchToolUseId(input)),
     subagentModel: () => Effect.succeed(null),
     assertComplete: replay(() => queryRunner.assertComplete()),
+    reconnectMcpServer: () => Effect.void,
   });
 }
 

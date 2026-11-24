@@ -129,6 +129,7 @@ import {
 } from "./features/settings/ScheduledTaskPickerScreens";
 import { SettingsKeyboardRouteScreen } from "./features/settings/SettingsKeyboardRouteScreen";
 import { SettingsLegalRouteScreen } from "./features/settings/SettingsLegalRouteScreen";
+import { SettingsMcpRouteScreen } from "./features/settings/SettingsMcpRouteScreen";
 import { SettingsVoiceRouteScreen } from "./features/settings/SettingsVoiceRouteScreen";
 import { SettingsVoiceModelsRouteScreen } from "./features/settings/SettingsVoiceModelsRouteScreen";
 import {
@@ -179,6 +180,7 @@ const ROUTE_TITLES: Readonly<Record<string, string>> = {
   SettingsEnvironmentAgentBehavior: msg("Threads"),
   SettingsWorktrees: msg("Worktrees"),
   SettingsLabs: msg("Labs"),
+  SettingsMcp: msg("MCP servers"),
   SettingsProviderAccounts: msg("Providers"),
   SettingsEnvironmentMaintenance: msg("Maintenance"),
   SettingsNotifications: msg("Notifications"),
@@ -285,6 +287,11 @@ const SETTINGS_SCREENS = {
   SettingsLabs: createNativeStackScreen({
     screen: SettingsLabsRouteScreen,
     linking: "settings/labs",
+    options: settingsPage(),
+  }),
+  SettingsMcp: createNativeStackScreen({
+    screen: SettingsMcpRouteScreen,
+    linking: "settings/mcp",
     options: settingsPage(),
   }),
   SettingsProviderAccounts: createNativeStackScreen({

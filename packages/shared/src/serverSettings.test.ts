@@ -1,5 +1,6 @@
 import {
   DEFAULT_SERVER_SETTINGS,
+  McpServerId,
   ProjectId,
   ProviderDriverKind,
   ProviderInstanceId,
@@ -578,6 +579,7 @@ describe("serverSettings helpers", () => {
 
   it("keeps a project's providerInstances override when a patch entry omits the key", () => {
     const instanceId = ProviderInstanceId.make("codex_work");
+    const serverId = McpServerId.make("figma");
     const projectId = ProjectId.make("project-a");
     const current = {
       ...DEFAULT_SERVER_SETTINGS,
@@ -585,6 +587,7 @@ describe("serverSettings helpers", () => {
         [projectId]: {
           newWorktreesStartFromOrigin: true,
           providerInstances: { [instanceId]: { enabled: false } },
+          mcpServers: { [serverId]: { enabled: true } },
         },
       },
     };
@@ -598,7 +601,37 @@ describe("serverSettings helpers", () => {
     expect(patched.projectSettingsOverrides[projectId]).toEqual({
       newWorktreesStartFromOrigin: false,
       providerInstances: { [instanceId]: { enabled: false } },
+      mcpServers: { [serverId]: { enabled: true } },
     });
+  });
+
+  it("preserves agent and tool restrictions when a legacy client toggles an MCP server", () => {
+    const id = McpServerId.make("figma");
+    const legacy = {
+      enabled: true,
+      transport: { type: "http" as const, url: "https://example.test/mcp", headers: {} },
+    };
+    const providers = [ProviderDriverKind.make("codex")];
+    const disabledTools = ["write"];
+    const current = decodeServerSettings({
+      mcpServers: { [id]: { ...legacy, providers, disabledTools } },
+    });
+    const toggled = applyServerSettingsPatch(
+      current,
+      decodeServerSettingsPatch({ mcpServers: { [id]: { ...legacy, enabled: false } } }),
+    );
+    expect(toggled.mcpServers[id]).toEqual({ ...legacy, enabled: false, providers, disabledTools });
+    expect(
+      applyServerSettingsPatch(toggled, { mcpServers: { [id]: legacy } }).mcpServers[id],
+    ).toEqual({ ...legacy, providers, disabledTools });
+    expect(
+      applyServerSettingsPatch(current, { mcpServers: { [id]: legacy } }).mcpServers[id],
+    ).toEqual(legacy);
+    expect(
+      applyServerSettingsPatch(current, {
+        mcpServers: { [id]: { ...legacy, enabled: false, providers: [], disabledTools: [] } },
+      }).mcpServers[id],
+    ).toEqual({ ...legacy, enabled: false, providers: [], disabledTools: [] });
   });
 
   // regression: #18334 a newer client must still see this server drop a key it does not know

@@ -99,6 +99,11 @@ import * as ManagedProjectFolders from "./project/ManagedProjectFolders.ts";
 import * as ScratchThreadPromotion from "./project/ScratchThreadPromotion.ts";
 import * as McpAppRequests from "./mcpApps/McpAppRequests.ts";
 import * as McpSignIn from "./mcpApps/McpSignIn.ts";
+import * as McpServerImport from "./mcpServers/McpServerImport.ts";
+import * as McpRegistry from "./mcpServers/McpRegistry.ts";
+import * as McpConnectors from "./mcpServers/McpConnectors.ts";
+import * as McpServerAuth from "./mcpServers/McpServerAuth.ts";
+import * as McpServerChecks from "./mcpServers/McpServerChecks.ts";
 import * as ModelManifest from "./provider/ModelManifest.ts";
 import * as Orchestrator from "./orchestration-v2/Orchestrator.ts";
 import * as OtlpEndpointCheck from "./observability/OtlpEndpointCheck.ts";
@@ -854,6 +859,11 @@ const layerUnusedConfigRpcServices = Layer.mergeAll(
   Layer.mock(HostResources.HostResources)({}),
   Layer.mock(McpAppRequests.McpAppRequests)({}),
   Layer.mock(McpSignIn.McpSignIn)({}),
+  Layer.mock(McpServerImport.McpServerImport)({}),
+  Layer.mock(McpRegistry.McpRegistry)({}),
+  Layer.mock(McpConnectors.McpConnectors)({}),
+  Layer.mock(McpServerChecks.McpServerChecks)({}),
+  Layer.mock(McpServerAuth.McpServerAuth)({}),
   Layer.mock(ModelManifest.ModelManifest)({}),
   Layer.mock(OrchestrationEventStore.OrchestrationEventStore)({}),
   Layer.mock(Orchestrator.OrchestratorV2)({}),

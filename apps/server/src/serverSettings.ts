@@ -723,11 +723,14 @@ const make = Effect.gen(function* () {
   const pathService = yield* Path.Path;
   const secretStore = yield* ServerSecretStore.ServerSecretStore;
   const sql = yield* SqlClient.SqlClient;
-  const {
-    settings: managed,
-    providers: managedProviders,
-    summary: managedPolicy,
-  } = yield* ManagedPolicy.ManagedPolicy;
+  const policy = yield* ManagedPolicy.ManagedPolicy;
+  const { settings: managed, providers: managedProviders, summary: managedPolicy } = policy;
+  // Turning one off stays allowed; saved ones are left out of sessions by McpUserServers.
+  const turnsOnLocalMcpServer = (patch: ServerSettingsPatch) =>
+    ManagedPolicy.deniedBy(policy, "localMcpServers") !== undefined &&
+    Object.values(patch.mcpServers ?? {}).some(
+      (entry) => entry?.enabled === true && entry.transport.type === "stdio",
+    );
   // Locks are laid over every settings value that leaves this service, never persisted.
   const toEffective = (settings: ServerSettings) =>
     resolveTextGenerationProvider(
@@ -1225,6 +1228,13 @@ const make = Effect.gen(function* () {
   ): Effect.Effect<ServerSettings, ServerSettingsError> =>
     writeSemaphore.withPermits(1)(
       Effect.gen(function* () {
+        if (turnsOnLocalMcpServer(patch)) {
+          return yield* new ServerSettingsError({
+            settingsPath,
+            operation: "use-disallowed-mcp-server",
+            managedBy: managedPolicy?.organization,
+          });
+        }
         const { settings: current, parseFailure } = yield* reloadSettings;
         if (Option.isSome(parseFailure)) {
           return yield* new ServerSettingsError({

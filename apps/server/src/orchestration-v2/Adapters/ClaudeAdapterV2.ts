@@ -951,6 +951,8 @@ export interface ClaudeAgentSdkQueryRunnerShape {
     input: ClaudeAgentSdkSubagentLookupInput,
   ) => Effect.Effect<string | null, ClaudeAgentSdkQueryRunnerError>;
   readonly assertComplete: Effect.Effect<void, ClaudeAgentSdkQueryRunnerError>;
+  /** Re-dials `server` in every open Claude process where it is not connected, after a sign-in. */
+  readonly reconnectMcpServer: (server: string) => Effect.Effect<void>;
 }
 
 export class ClaudeAgentSdkQueryRunner extends Context.Service<
@@ -1679,6 +1681,8 @@ export const layerQueryRunner: Layer.Layer<
       return { refresh: tracker.refresh, work, settle: tracker.settle, stop };
     };
 
+    const openQueries = new Set<ClaudeQuery>();
+
     // The open span below is the tracing boundary for both attempts.
     const openQuery = Effect.fnUntraced(function* (input: ClaudeAgentSdkQueryOpenInput) {
       const protocolLogger = makeClaudeAgentSdkProtocolLogger({
@@ -1914,6 +1918,9 @@ export const layerQueryRunner: Layer.Layer<
           ),
         ),
       );
+
+      openQueries.add(queryRuntime);
+      void processExit?.then(() => openQueries.delete(queryRuntime));
 
       return {
         messages: Stream.fromAsyncIterable(
@@ -2189,6 +2196,7 @@ export const layerQueryRunner: Layer.Layer<
           processExited || descendants === undefined ? Effect.void : descendants.refresh,
         ).pipe(
           Effect.andThen(Queue.shutdown(promptQueue)),
+          Effect.tap(() => Effect.sync(() => openQueries.delete(queryRuntime))),
           Effect.andThen(closeClaudeQuery(queryRuntime)),
           Effect.tap(() =>
             logProtocolEvent({
@@ -2204,6 +2212,25 @@ export const layerQueryRunner: Layer.Layer<
     });
 
     return ClaudeAgentSdkQueryRunner.of({
+      reconnectMcpServer: Effect.fn("ClaudeAgentSdkQueryRunner.reconnectMcpServer")(function* (
+        server: string,
+      ) {
+        yield* Effect.forEach(
+          [...openQueries],
+          (queryRuntime) =>
+            Effect.tryPromise({
+              try: async () => {
+                const statuses = await queryRuntime.mcpServerStatus();
+                const status = statuses.find((entry) => entry.name === server)?.status;
+                if (status !== undefined && status !== "connected" && status !== "disabled") {
+                  await queryRuntime.reconnectMcpServer(server);
+                }
+              },
+              catch: (cause) => queryRunnerError(cause, "reconnectMcpServer"),
+            }).pipe(Effect.timeout("30 seconds"), Effect.ignore),
+          { concurrency: 4, discard: true },
+        );
+      }),
       allocateSessionId: random.uuidV4(),
       open: Effect.fn("ClaudeAgentSdkQueryRunner.open")(function* (
         input: ClaudeAgentSdkQueryOpenInput,
@@ -2429,6 +2456,10 @@ function parseClaudeInteger(text: string): number {
 
 // Claude Code defers MCP tools behind ToolSearch, so the agent only finds
 // t3_background_wait when the system prompt says when to reach for it.
+// Claude Code tells agents to sign in with /mcp or claude.ai, neither of which a Gustaf user sees.
+const CLAUDE_MCP_SIGN_IN_INSTRUCTIONS =
+  "When an MCP server needs authentication, tell the user to sign in to it in Gustaf: Settings > MCP > Claude Code connectors > Sign in. Open threads reconnect after that.";
+
 const CLAUDE_BACKGROUND_WAIT_INSTRUCTIONS = `
 
 ### Background work you wait on
@@ -2634,6 +2665,7 @@ export function makeClaudeQueryOptions(input: {
           agentFeedback,
           runtimePolicy: { cwd: input.cwd, workspace: input.workspace },
         }) +
+          `\n\n${CLAUDE_MCP_SIGN_IN_INSTRUCTIONS}` +
           (input.mcpServers === undefined
             ? ""
             : T3_CODE_ORCHESTRATION_INSTRUCTIONS +
@@ -2779,6 +2811,8 @@ export const CLAUDE_READ_ONLY_T3_MCP_ALLOWED_TOOLS: ReadonlyArray<string> = [
 // request_secret can wait an hour; exceed Claude's default 60 s timeout.
 export const CLAUDE_T3_MCP_TOOL_TIMEOUT_MS = 65 * 60 * 1_000;
 
+const claudeMcpNamePart = (name: string) => name.replaceAll(/[^a-zA-Z0-9_-]/g, "_");
+
 // allowedTools pre-approves calls; tools controls availability. Pre-approve T3 tools for headless modes,
 // limited to annotated read-only tools in read-only sandboxes.
 
@@ -2788,6 +2822,7 @@ export function claudeMcpQueryOverrides(input: {
   readonly allowedTools?: ReadonlyArray<string>;
 }): {
   readonly allowedTools?: ReadonlyArray<string>;
+  readonly disallowedTools?: ReadonlyArray<string>;
   readonly mcpServers?: ClaudeQueryOptions["mcpServers"];
 } {
   const session = input.mcpSession;
@@ -2797,9 +2832,27 @@ export function claudeMcpQueryOverrides(input: {
   const mcpAllowedTools = input.readOnlySandbox
     ? CLAUDE_READ_ONLY_T3_MCP_ALLOWED_TOOLS
     : [CLAUDE_T3_MCP_TOOL_WILDCARD];
+  // User servers go through Claude's own permission flow, so they stay out of allowedTools.
+  const userServers = (session.userServers ?? []).map(
+    (server): [string, NonNullable<ClaudeQueryOptions["mcpServers"]>[string]] => [
+      server.id,
+      server.type === "stdio"
+        ? { type: "stdio", command: server.command, args: [...server.args], env: { ...server.env } }
+        : { type: "http", url: server.url, headers: { ...server.headers } },
+    ],
+  );
+  // Claude Code drops denied tools from the model's toolset; it names MCP tools like this.
+  const disallowedTools = (session.userServers ?? []).flatMap((server) =>
+    (server.disabledTools ?? []).map(
+      (tool) => `mcp__${claudeMcpNamePart(server.id)}__${claudeMcpNamePart(tool)}`,
+    ),
+  );
   return {
     allowedTools: Array.from(new Set([...(input.allowedTools ?? []), ...mcpAllowedTools])),
+    ...(disallowedTools.length === 0 ? {} : { disallowedTools }),
     mcpServers: {
+      // Listed first so `t3-code` always wins a name clash.
+      ...Object.fromEntries(userServers),
       "t3-code": {
         type: "http",
         url: session.endpoint,
@@ -3863,6 +3916,7 @@ export function claudeEffectiveQueryPolicyKey(
   queryPolicy: ClaudeRuntimeQueryPolicy,
   mcpOverrides: {
     readonly allowedTools?: ReadonlyArray<string>;
+    readonly disallowedTools?: ReadonlyArray<string>;
     readonly mcpServers?: ClaudeQueryOptions["mcpServers"];
   },
   // Folders are fixed when a query starts, so a changed list needs a new one.
@@ -3877,6 +3931,7 @@ export function claudeEffectiveQueryPolicyKey(
         : { allowedTools: mcpOverrides.allowedTools }),
     }),
     mcpServers: mcpOverrides.mcpServers,
+    disallowedTools: mcpOverrides.disallowedTools,
   });
 }
 
@@ -5967,6 +6022,17 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
   const customHome =
     adapterOptions.settings.homePath.trim().length > 0 ||
     adapterOptions.environment.CLAUDE_CONFIG_DIR !== hostEnvironment.CLAUDE_CONFIG_DIR;
+  // A custom home leaves out user settings, and with them the servers in its `.claude.json`.
+  // Claude keeps `.claude.json` in CLAUDE_CONFIG_DIR when set, else in the home directory.
+  const nativeMcpSources: McpProviderSession.NativeMcpSources | undefined = customHome
+    ? undefined
+    : {
+        provider: "claudeAgent",
+        homeDir: hostEnvironment.CLAUDE_CONFIG_DIR?.trim()
+          ? homePath
+          : yield* HostProcess.HomeDirectory,
+        includeProjectMcpJson: true,
+      };
   const announcedBypassDowngrades = new Set<ThreadId>();
   const readBypassSettings = (filePath: string) =>
     fileSystem.readFileString(filePath).pipe(
@@ -6175,6 +6241,8 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
   return ProviderAdapter.ProviderAdapterV2.of({
     instanceId: adapterOptions.instanceId,
     driver: CLAUDE_PROVIDER,
+    ...(nativeMcpSources === undefined ? {} : { nativeMcpSources }),
+    filtersMcpTools: true,
     getCapabilities: Effect.fn("ClaudeAdapterV2.getCapabilities")(function () {
       return Effect.succeed(ClaudeProviderCapabilitiesV2);
     }),
@@ -13620,6 +13688,9 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
             ...(mcpOverrides.mcpServers === undefined
               ? {}
               : { mcpServers: mcpOverrides.mcpServers }),
+            ...(mcpOverrides.disallowedTools === undefined
+              ? {}
+              : { disallowedTools: mcpOverrides.disallowedTools }),
             deviceToolsAvailable: mcpSession?.capabilities?.has("device") === true,
             permissionMode: queryPolicy.permissionMode,
             ...(queryPolicy.allowDangerouslySkipPermissions === undefined

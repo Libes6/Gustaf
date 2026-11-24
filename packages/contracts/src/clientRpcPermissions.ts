@@ -14,6 +14,7 @@ import {
   mcpClientScopes,
 } from "./auth.ts";
 import { PeerLinkLinkPairingInput } from "./peerLink.ts";
+import { McpImportInput } from "./mcpServer.ts";
 import { ORCHESTRATION_V2_WS_METHODS } from "./orchestrationV2.ts";
 import { WS_METHODS } from "./rpc.ts";
 
@@ -103,12 +104,27 @@ export const CLIENT_GUARDED_RPC_SCOPES = {
   [WS_METHODS.peerLinksPairLink]: AuthAccessWriteScope,
   // Send stores and sends a report from a thread's turn: the bar of running that thread.
   [WS_METHODS.agentFeedbackAnswerRequest]: AuthOrchestrationOperateScope,
+  // Both need settings:write too, and importing a stdio server terminal:operate; see below.
+  [WS_METHODS.mcpServersListImportable]: AuthProvidersManageScope,
+  [WS_METHODS.mcpServersImport]: AuthProvidersManageScope,
+  [WS_METHODS.mcpServersSearchRegistry]: AuthProvidersManageScope,
+  // Listing starts the provider's configured MCP servers; signing in stores provider credentials.
+  [WS_METHODS.mcpConnectorsList]: AuthProvidersManageScope,
+  [WS_METHODS.mcpConnectorsAuthorize]: AuthProvidersManageScope,
+  [WS_METHODS.mcpConnectorsSubmitCallback]: AuthProvidersManageScope,
+  // Checking starts each configured local server, as listing Claude's own servers does.
+  [WS_METHODS.mcpServersStatus]: AuthProvidersManageScope,
+  // Signing in stores a credential every provider is sent, as Claude's connector sign-in does.
+  [WS_METHODS.mcpServersSignIn]: AuthProvidersManageScope,
+  [WS_METHODS.mcpServersSubmitSignInCallback]: AuthProvidersManageScope,
+  [WS_METHODS.mcpServersSignOut]: AuthProvidersManageScope,
 } as const;
 export type ClientGuardedRpcTag = keyof typeof CLIENT_GUARDED_RPC_SCOPES;
 
 const decodePrepareThread = Schema.decodeUnknownSync(GitPreparePullRequestThreadInput);
 const decodeStackedAction = Schema.decodeUnknownSync(GitRunStackedActionInput);
 const decodeLinkPairing = Schema.decodeUnknownSync(PeerLinkLinkPairingInput);
+const decodeMcpImport = Schema.decodeUnknownSync(McpImportInput);
 
 export function clientRpcRequiredScopes(
   method: string,
@@ -134,6 +150,19 @@ export function clientRpcRequiredScopes(
   }
   if (method === WS_METHODS.guestShareCreate) {
     return [AuthAccessWriteScope, AuthOrchestrationReadScope];
+  }
+  // The same grants as editing these servers in settings: `requiredScopesForServerSettingsPatch`.
+  if (method === WS_METHODS.mcpServersListImportable) {
+    return [AuthSettingsWriteScope, AuthProvidersManageScope];
+  }
+  if (method === WS_METHODS.mcpServersImport) {
+    const stdio =
+      input === undefined || decodeMcpImport(input).entries.some((e) => e.transport === "stdio");
+    return [
+      AuthSettingsWriteScope,
+      AuthProvidersManageScope,
+      ...(stdio ? [AuthTerminalOperateScope] : []),
+    ];
   }
   return Object.hasOwn(CLIENT_GUARDED_RPC_SCOPES, method)
     ? [CLIENT_GUARDED_RPC_SCOPES[method as ClientGuardedRpcTag]]

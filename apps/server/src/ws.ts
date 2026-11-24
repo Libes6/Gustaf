@@ -127,6 +127,11 @@ import * as ThreadViewers from "./orchestration-v2/ThreadViewers.ts";
 import * as CommandOutputHub from "./orchestration-v2/CommandOutputHub.ts";
 import * as McpAppRequests from "./mcpApps/McpAppRequests.ts";
 import * as McpSignIn from "./mcpApps/McpSignIn.ts";
+import * as McpServerImport from "./mcpServers/McpServerImport.ts";
+import * as McpRegistry from "./mcpServers/McpRegistry.ts";
+import * as McpConnectors from "./mcpServers/McpConnectors.ts";
+import * as McpServerAuth from "./mcpServers/McpServerAuth.ts";
+import * as McpServerChecks from "./mcpServers/McpServerChecks.ts";
 import * as ProviderSessionManager from "./orchestration-v2/ProviderSessionManager.ts";
 import * as ThreadLaunchService from "./orchestration-v2/ThreadLaunchService.ts";
 import * as ThreadMessageIntake from "./orchestration-v2/ThreadMessageIntake.ts";
@@ -1473,6 +1478,11 @@ export const layerWsRpc = (
       const providerSessionsV2 = yield* ProviderSessionManager.ProviderSessionManagerV2;
       const mcpAppRequests = yield* McpAppRequests.McpAppRequests;
       const mcpSignIn = yield* McpSignIn.McpSignIn;
+      const mcpServerImport = yield* McpServerImport.McpServerImport;
+      const mcpRegistry = yield* McpRegistry.McpRegistry;
+      const mcpConnectors = yield* McpConnectors.McpConnectors;
+      const mcpServerChecks = yield* McpServerChecks.McpServerChecks;
+      const mcpServerAuth = yield* McpServerAuth.McpServerAuth;
       const analytics = yield* AnalyticsService.AnalyticsService;
       const originProps = clientAnalyticsProps;
       const recordClientCommandAnalytics = (command: OrchestrationV2Command) => {
@@ -2638,6 +2648,16 @@ export const layerWsRpc = (
         [WS_METHODS.mcpAppsReadResource]: (input) => mcpAppRequests.readResource(input),
         [WS_METHODS.providerMcpSignInStart]: (input) => mcpSignIn.start(input),
         [WS_METHODS.providerMcpSignInComplete]: (input) => mcpSignIn.complete(input),
+        [WS_METHODS.mcpServersListImportable]: (input) => mcpServerImport.list(input),
+        [WS_METHODS.mcpServersImport]: (input) => mcpServerImport.importServers(input),
+        [WS_METHODS.mcpServersSearchRegistry]: (input) => mcpRegistry.search(input),
+        [WS_METHODS.mcpServersStatus]: (input) => mcpServerChecks.list(input),
+        [WS_METHODS.mcpServersSignIn]: (input) => mcpServerAuth.signIn(input),
+        [WS_METHODS.mcpServersSubmitSignInCallback]: (input) => mcpServerAuth.completeSignIn(input),
+        [WS_METHODS.mcpServersSignOut]: (input) => mcpServerAuth.signOut(input),
+        [WS_METHODS.mcpConnectorsList]: (input) => mcpConnectors.list(input),
+        [WS_METHODS.mcpConnectorsAuthorize]: (input) => mcpConnectors.authorize(input),
+        [WS_METHODS.mcpConnectorsSubmitCallback]: (input) => mcpConnectors.submitCallback(input),
         [WS_METHODS.providerUploadFeedback]:
           /* Request instrumentation already owns the span; keep this helper in that context. */
           Effect.fnUntraced(

@@ -603,6 +603,10 @@
       "types": "./src/mcpApp.ts",
       "import": "./src/mcpApp.ts"
     },
+    "./mcpCatalog": {
+      "types": "./src/mcpCatalog.ts",
+      "import": "./src/mcpCatalog.ts"
+    },
     "./atomicWrite": {
       "types": "./src/atomicWrite.ts",
       "import": "./src/atomicWrite.ts"

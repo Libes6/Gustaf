@@ -67,4 +67,22 @@ describe("filterSettingsSections", () => {
   it("drops sections that start empty", () => {
     expect(filterSettingsSections([{ rows: [] }, ...SECTIONS], "").length).toBe(SECTIONS.length);
   });
+
+  it("matches SettingsMcp by its search keywords", () => {
+    const sections = [
+      {
+        title: "Agents",
+        rows: [
+          { id: "SettingsMcp", label: "MCP servers" },
+          { id: "SettingsProviderAccounts", label: "Providers" },
+        ],
+      },
+    ];
+    expect(
+      filterSettingsSections(sections, "stdio").map((section) => section.rows.map((row) => row.id)),
+    ).toEqual([["SettingsMcp"]]);
+    expect(
+      filterSettingsSections(sections, "http").map((section) => section.rows.map((row) => row.id)),
+    ).toEqual([["SettingsMcp"]]);
+  });
 });

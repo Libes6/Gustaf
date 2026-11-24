@@ -72,6 +72,43 @@ type SecretFieldsMapper = (
 ) => Record<string, unknown>;
 type ProviderEnvironment = NonNullable<ProviderInstanceConfig["environment"]>;
 
+/** The secret store entry for one MCP server's env variable or header; it moves with neither. */
+const mcpServerSecretName = (id: string, slot: "env" | "headers", key: string) =>
+  `mcp-server-${encode(id)}-${slot}-${encode(key)}`;
+
+/**
+ * Maps every env and header value of the MCP servers, literal or reference, with the secret
+ * name of its slot. Keys stay as written: env names are case-sensitive.
+ */
+function mapMcpServerSecretValues(
+  servers: ServerSettings["mcpServers"],
+  map: (value: SettingsSecretValue, secretName: string) => SettingsSecretValue,
+): ServerSettings["mcpServers"] {
+  const mapRecord = (
+    id: string,
+    slot: "env" | "headers",
+    values: Readonly<Record<string, SettingsSecretValue>>,
+  ) =>
+    Object.fromEntries(
+      Object.entries(values).map(([key, value]) => [
+        key,
+        map(value, mcpServerSecretName(id, slot, key)),
+      ]),
+    );
+  return Object.fromEntries(
+    Object.entries(servers).map(([id, server]) => [
+      id,
+      {
+        ...server,
+        transport:
+          server.transport.type === "stdio"
+            ? { ...server.transport, env: mapRecord(id, "env", server.transport.env) }
+            : { ...server.transport, headers: mapRecord(id, "headers", server.transport.headers) },
+      },
+    ]),
+  ) as ServerSettings["mcpServers"];
+}
+
 export function mapSettingsSecrets(
   settings: ServerSettings,
   map: (secret: SettingsSecret) => SecretValue,
@@ -97,7 +134,20 @@ export function mapSettingsSecrets(
     return next;
   };
 
-  return mapSecretFieldGroups(settings, mapFields, (instanceId, environment) =>
+  const mcpServers = mapMcpServerSecretValues(settings.mcpServers, (value, secretName) => {
+    // A secret reference is not itself secret; it is stored and shown as written.
+    if (isSecretReference(value)) return value;
+    const result = map({
+      secretName,
+      kind: "field",
+      value,
+      redacted: value === SECRET_REDACTED,
+      sensitive: true,
+    });
+    return result.redacted ? SECRET_REDACTED : result.value;
+  });
+
+  const mapped = mapSecretFieldGroups(settings, mapFields, (instanceId, environment) =>
     environment.map((variable) => {
       const { valueRedacted: _omit, ...rest } = variable;
       // A secret reference is not itself secret; storage sees the value cleared.
@@ -119,6 +169,7 @@ export function mapSettingsSecrets(
       };
     }),
   );
+  return { ...mapped, mcpServers };
 }
 
 /**
@@ -131,7 +182,7 @@ export function mapSettingsSecretValues(
 ): ServerSettings {
   const mapValue = (value: unknown, secretName: string) =>
     typeof value === "string" || isSecretReference(value) ? map(value, secretName) : value;
-  return mapSecretFieldGroups(settings, (fields, secretFields, name) => {
+  const mapped = mapSecretFieldGroups(settings, (fields, secretFields, name) => {
     const next = { ...fields };
     for (const field of secretFields) {
       if (!(field in next)) continue;
@@ -151,6 +202,7 @@ export function mapSettingsSecretValues(
     }
     return next;
   });
+  return { ...mapped, mcpServers: mapMcpServerSecretValues(settings.mcpServers, map) };
 }
 
 function mapSecretFieldGroups(

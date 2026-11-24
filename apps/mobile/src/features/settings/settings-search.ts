@@ -7,6 +7,13 @@ import type { SettingsPageTarget } from "./components/settings-page-targets";
 
 /** What each page holds besides its row's label, so search finds a setting by its own name. */
 const SETTINGS_SEARCH_TERMS = {
+  SettingsMcp: [
+    "mcp",
+    msg("tools", { $context: "settings search keyword" }),
+    msg("local", { $context: "settings search keyword" }),
+    "stdio",
+    "http",
+  ],
   SettingsAccount: [
     msg("account", { $context: "settings search keyword" }),
     msg("sign in", { $context: "settings search keyword" }),

@@ -190,6 +190,7 @@ it.effect.each(deliveries)(
           subagentLaunchToolUseId: () => Effect.succeed(null),
           subagentModel: () => Effect.succeed(null),
           assertComplete: Effect.void,
+          reconnectMcpServer: () => Effect.void,
         },
       });
       yield* Effect.gen(function* () {
@@ -539,6 +540,7 @@ it.effect("applies an effort change to the running Claude query without waiting 
         subagentLaunchToolUseId: () => Effect.succeed(null),
         subagentModel: () => Effect.succeed(null),
         assertComplete: Effect.void,
+        reconnectMcpServer: () => Effect.void,
       },
     });
     yield* Effect.gen(function* () {
@@ -658,6 +660,7 @@ const renamedClaudeSessionTitles = (options: { readonly renameDuringStartup: boo
         subagentLaunchToolUseId: () => Effect.succeed(null),
         subagentModel: () => Effect.succeed(null),
         assertComplete: Effect.void,
+        reconnectMcpServer: () => Effect.void,
       },
     });
     return yield* Effect.gen(function* () {
@@ -887,6 +890,7 @@ it.effect("offers a continuation for a later wake after a queued continuation is
             subagentLaunchToolUseId: () => Effect.succeed(null),
             subagentModel: () => Effect.succeed(null),
             assertComplete: Effect.void,
+            reconnectMcpServer: () => Effect.void,
           },
         }).pipe(Effect.provideContext(services));
         return [adapter];
@@ -1094,6 +1098,7 @@ it.effect.each([
         subagentLaunchToolUseId: () => Effect.succeed(null),
         subagentModel: () => Effect.succeed(null),
         assertComplete: Effect.void,
+        reconnectMcpServer: () => Effect.void,
       },
     });
     yield* Effect.gen(function* () {
@@ -1427,6 +1432,7 @@ const exitWhileIdle = (options: {
               subagentLaunchToolUseId: () => Effect.succeed(null),
               subagentModel: () => Effect.succeed(null),
               assertComplete: Effect.void,
+              reconnectMcpServer: () => Effect.void,
             },
           });
           return ProviderAdapterRegistry.layerSingle(adapter);

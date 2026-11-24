@@ -1270,6 +1270,7 @@ describe("ClaudeAdapterV2 Auto-accept edits", () => {
           subagentLaunchToolUseId: () => Effect.succeed(null),
           subagentModel: () => Effect.succeed(null),
           assertComplete: Effect.void,
+          reconnectMcpServer: () => Effect.void,
         },
       });
       const runtimePolicy = ProviderAdapter.ProviderAdapterV2RuntimePolicy.make({
@@ -1399,6 +1400,7 @@ describe("ClaudeAdapterV2 Auto-accept edits", () => {
           subagentLaunchToolUseId: () => Effect.succeed(null),
           subagentModel: () => Effect.succeed(null),
           assertComplete: Effect.void,
+          reconnectMcpServer: () => Effect.void,
         },
       });
       const runtimePolicy = ProviderAdapter.ProviderAdapterV2RuntimePolicy.make({
@@ -1529,6 +1531,7 @@ describe("ClaudeAdapterV2 append-system-prompt-file launch argument", () => {
         subagentLaunchToolUseId: () => Effect.succeed(null),
         subagentModel: () => Effect.succeed(null),
         assertComplete: Effect.void,
+        reconnectMcpServer: () => Effect.void,
       },
     });
     const runtimePolicy = ProviderAdapter.ProviderAdapterV2RuntimePolicy.make({
@@ -1821,6 +1824,7 @@ describe("ClaudeAdapterV2 provider installation gate", () => {
           subagentLaunchToolUseId: () => Effect.succeed(null),
           subagentModel: () => Effect.succeed(null),
           assertComplete: Effect.void,
+          reconnectMcpServer: () => Effect.void,
         },
       });
       const runtimePolicy = ProviderAdapter.ProviderAdapterV2RuntimePolicy.make({
@@ -2012,6 +2016,7 @@ const captureSdkExecutablePaths = Effect.fn("captureSdkExecutablePaths")(functio
       subagentLaunchToolUseId: () => Effect.succeed(null),
       subagentModel: () => Effect.succeed(null),
       assertComplete: Effect.void,
+      reconnectMcpServer: () => Effect.void,
     }),
   );
   const threadId = ThreadId.make("thread-claude-binary-path");
@@ -2107,6 +2112,7 @@ describe("ClaudeAdapterV2 resumeThread", () => {
             subagentLaunchToolUseId: () => Effect.succeed(null),
             subagentModel: () => Effect.succeed(null),
             assertComplete: Effect.void,
+            reconnectMcpServer: () => Effect.void,
           },
         });
         const threadId = ThreadId.make("thread-claude-empty-session");
@@ -2218,6 +2224,7 @@ describe("ClaudeAdapterV2 resume compaction", () => {
           subagentLaunchToolUseId: () => Effect.succeed(null),
           subagentModel: () => Effect.succeed(null),
           assertComplete: Effect.void,
+          reconnectMcpServer: () => Effect.void,
         },
       });
       const threadId = ThreadId.make("thread-claude-resume");
@@ -2611,6 +2618,7 @@ describe("ClaudeAdapterV2 attachments", () => {
             subagentLaunchToolUseId: () => Effect.succeed(null),
             subagentModel: () => Effect.succeed(null),
             assertComplete: Effect.void,
+            reconnectMcpServer: () => Effect.void,
           },
         });
         const threadId = ThreadId.make("thread-claude-attachments");
@@ -3160,6 +3168,7 @@ describe("ClaudeAdapterV2 native fork", () => {
           subagentLaunchToolUseId: () => Effect.succeed(null),
           subagentModel: () => Effect.succeed(null),
           assertComplete: Effect.void,
+          reconnectMcpServer: () => Effect.void,
         },
       });
       const providerSessionId = ProviderSessionId.make("provider-session-claude-fork");
@@ -3508,6 +3517,7 @@ describe("ClaudeAdapterV2 native session identity", () => {
             subagentLaunchToolUseId: () => Effect.succeed(null),
             subagentModel: () => Effect.succeed(null),
             assertComplete: Effect.void,
+            reconnectMcpServer: () => Effect.void,
           },
         });
         const threadId = ThreadId.make("thread-claude-session-identity");
@@ -4041,6 +4051,7 @@ describe("ClaudeAdapterV2 background wake turns", () => {
           subagentLaunchToolUseId: () => Effect.succeed(options?.subagentLaunchToolUseId ?? null),
           subagentModel: () => Effect.succeed(options?.subagentModel ?? null),
           assertComplete: Effect.void,
+          reconnectMcpServer: () => Effect.void,
         },
       });
       const threadId = ThreadId.make("thread-claude-wake");
@@ -15519,6 +15530,7 @@ describe("ClaudeAdapterV2 background wake turns", () => {
           subagentLaunchToolUseId: () => Effect.succeed(null),
           subagentModel: () => Effect.succeed(null),
           assertComplete: Effect.void,
+          reconnectMcpServer: () => Effect.void,
         },
       });
       const threadId = ThreadId.make("thread-claude-settled-stop-replaced");
@@ -15722,6 +15734,7 @@ describe("ClaudeAdapterV2 background wake turns", () => {
         subagentLaunchToolUseId: () => Effect.succeed(null),
         subagentModel: () => Effect.succeed(null),
         assertComplete: Effect.void,
+        reconnectMcpServer: () => Effect.void,
       },
     });
     const threadId = ThreadId.make(`thread-${name}`);
@@ -15937,6 +15950,7 @@ describe("ClaudeAdapterV2 background wake turns", () => {
             subagentLaunchToolUseId: () => Effect.succeed(null),
             subagentModel: () => Effect.succeed(null),
             assertComplete: Effect.void,
+            reconnectMcpServer: () => Effect.void,
           },
         });
         const appThreadA = ThreadId.make("thread-claude-roster-a");
@@ -19411,6 +19425,7 @@ describe("ClaudeAdapterV2 background wake turns", () => {
           subagentLaunchToolUseId: () => Effect.succeed(null),
           subagentModel: () => Effect.succeed(null),
           assertComplete: Effect.void,
+          reconnectMcpServer: () => Effect.void,
         },
       });
       const threadId = ThreadId.make(`thread-claude-${label}`);
@@ -22892,6 +22907,7 @@ describe("ClaudeAdapterV2 background wake turns", () => {
           subagentLaunchToolUseId: () => Effect.succeed(null),
           subagentModel: () => Effect.succeed(null),
           assertComplete: Effect.void,
+          reconnectMcpServer: () => Effect.void,
         },
       });
       const threadId = ThreadId.make("thread-claude-process-reset");
@@ -23073,6 +23089,7 @@ describe("ClaudeAdapterV2 background wake turns", () => {
             subagentLaunchToolUseId: () => Effect.succeed(null),
             subagentModel: () => Effect.succeed(null),
             assertComplete: Effect.void,
+            reconnectMcpServer: () => Effect.void,
           },
         });
         const threadId = ThreadId.make("thread-claude-buffer-replace");
@@ -23254,6 +23271,7 @@ describe("ClaudeAdapterV2 background wake turns", () => {
           subagentLaunchToolUseId: () => Effect.succeed(null),
           subagentModel: () => Effect.succeed(null),
           assertComplete: Effect.void,
+          reconnectMcpServer: () => Effect.void,
         },
       });
       const threadId = ThreadId.make("thread-claude-model-change-running-subagent");
@@ -23458,6 +23476,7 @@ describe("ClaudeAdapterV2 background wake turns", () => {
           subagentLaunchToolUseId: () => Effect.succeed(null),
           subagentModel: () => Effect.succeed(null),
           assertComplete: Effect.void,
+          reconnectMcpServer: () => Effect.void,
         },
       });
       const runtimePolicy = ProviderAdapter.ProviderAdapterV2RuntimePolicy.make({
@@ -23607,6 +23626,7 @@ describe("ClaudeAdapterV2 background wake turns", () => {
             subagentLaunchToolUseId: () => Effect.succeed(null),
             subagentModel: () => Effect.succeed(null),
             assertComplete: Effect.void,
+            reconnectMcpServer: () => Effect.void,
           },
         });
         const threadId = ThreadId.make("thread-claude-replace-open-fail");
@@ -23730,6 +23750,7 @@ describe("ClaudeAdapterV2 background wake turns", () => {
           subagentLaunchToolUseId: () => Effect.succeed(null),
           subagentModel: () => Effect.succeed(null),
           assertComplete: Effect.void,
+          reconnectMcpServer: () => Effect.void,
         },
       });
       const threadId = ThreadId.make("thread-claude-process-signal");
