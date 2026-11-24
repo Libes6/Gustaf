@@ -30,6 +30,7 @@ import { isRunningDatabaseMigrations } from "@t3tools/shared/databaseMigrationLo
 import { waitForHttpReady as waitForHttpReadyShared } from "@t3tools/shared/httpReadiness";
 
 import * as DesktopObservability from "../app/DesktopObservability.ts";
+import * as ComputerUseExecutor from "../computerUse/ComputerUseExecutor.ts";
 import * as DesktopTelemetryPublisher from "../telemetry/DesktopTelemetryPublisher.ts";
 import * as DesktopBrowserHost from "../preview/DesktopBrowserHost.ts";
 import * as DesktopWslEnvironment from "../wsl/DesktopWslEnvironment.ts";
@@ -202,6 +203,12 @@ interface RunBackendProcessOptions extends DesktopBackendStartConfig {
   readonly desktopTelemetryStream: Stream.Stream<Uint8Array>;
   readonly desktopBrowserStream?: Stream.Stream<Uint8Array>;
   readonly onDesktopBrowserCommand?: (line: string) => Effect.Effect<void>;
+  /** One per run, in the run's scope: closing it ends a computer-use session the run started. */
+  readonly connectComputerUse?: Effect.Effect<
+    ComputerUseExecutor.ComputerUseConnection,
+    never,
+    Scope.Scope
+  >;
   readonly onDesktopTelemetryControl?: (
     message: DesktopTelemetryControlMessageValue,
   ) => Effect.Effect<void>;
@@ -482,6 +489,24 @@ export const runBackendProcess = Effect.fn("runBackendProcess")(function* (
       additionalFds[`fd${options.bootstrap.desktopBrowserControlFd}`] = { type: "output" };
     }
   }
+  const computerUse =
+    options.bootstrapDelivery === "fd3" &&
+    options.bootstrap.desktopComputerUseFd !== undefined &&
+    options.bootstrap.desktopComputerUseControlFd !== undefined &&
+    options.connectComputerUse !== undefined
+      ? {
+          replyFd: options.bootstrap.desktopComputerUseFd,
+          requestFd: options.bootstrap.desktopComputerUseControlFd,
+          connection: yield* options.connectComputerUse,
+        }
+      : undefined;
+  if (computerUse !== undefined) {
+    additionalFds[`fd${computerUse.replyFd}`] = {
+      type: "input",
+      stream: computerUse.connection.output,
+    };
+    additionalFds[`fd${computerUse.requestFd}`] = { type: "output" };
+  }
   const command = ChildProcess.make(options.executablePath, options.args, {
     cwd: options.cwd,
     env: options.env,
@@ -567,6 +592,22 @@ export const runBackendProcess = Effect.fn("runBackendProcess")(function* (
       Effect.catchCause((cause) =>
         logBackendProcessWarning("desktop browser command stream stopped", {
           fd: browserFd,
+          cause: Cause.pretty(cause),
+        }),
+      ),
+      Effect.forkScoped,
+    );
+  }
+  if (computerUse !== undefined) {
+    // Requests are never logged: they carry text the agent types.
+    yield* handle.getOutputFd(computerUse.requestFd).pipe(
+      Stream.decodeText(),
+      Stream.splitLines,
+      Stream.filter((line) => line.length > 0),
+      Stream.runForEach(computerUse.connection.handleLine),
+      Effect.catchCause((cause) =>
+        logBackendProcessWarning("desktop computer-use request stream stopped", {
+          fd: computerUse.requestFd,
           cause: Cause.pretty(cause),
         }),
       ),
@@ -700,6 +741,7 @@ export const makeBackendInstance = Effect.fn("makeBackendInstance")(function* (
   | DesktopObservability.DesktopBackendOutputLogFactory
   | DesktopTelemetryPublisher.DesktopTelemetryPublisher
   | DesktopBrowserHost.DesktopBrowserHost
+  | ComputerUseExecutor.ComputerUseExecutor
   | DesktopWslEnvironment.DesktopWslEnvironment
   | Scope.Scope
 > {
@@ -709,6 +751,7 @@ export const makeBackendInstance = Effect.fn("makeBackendInstance")(function* (
   const backendOutputLog = yield* backendOutputLogFactory.forInstance(spec.id);
   const desktopTelemetryPublisher = yield* DesktopTelemetryPublisher.DesktopTelemetryPublisher;
   const desktopBrowserHost = yield* DesktopBrowserHost.DesktopBrowserHost;
+  const computerUse = yield* ComputerUseExecutor.ComputerUseExecutor;
   const wslEnvironment = yield* DesktopWslEnvironment.DesktopWslEnvironment;
   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
   const httpClient = yield* HttpClient.HttpClient;
@@ -977,6 +1020,7 @@ export const makeBackendInstance = Effect.fn("makeBackendInstance")(function* (
           desktopTelemetryStream: desktopTelemetryPublisher.encoded,
           desktopBrowserStream: desktopBrowserHost.events,
           onDesktopBrowserCommand: desktopBrowserHost.handleCommandLine,
+          connectComputerUse: computerUse.connect,
           onDesktopTelemetryControl: (message) =>
             desktopTelemetryPublisher.handleControlForSource(spec.id, message),
           onStarted: Effect.fn("desktop.backendInstance.onStarted")(function* (pid) {
