@@ -37,9 +37,17 @@ interface KeptToolResult {
   readonly output: Record<string, unknown>;
 }
 
+interface KeptRawToolResult {
+  readonly toolName: string;
+  readonly inputHash: string;
+  readonly result: unknown;
+}
+
 interface ToolResultState {
   readonly entries: ReadonlyMap<ThreadId, ReadonlyArray<KeptToolResult>>;
   readonly epochs: ReadonlyMap<ThreadId, number>;
+  /** Present once the thread's provider asked to keep full results (`keepToolResults`). */
+  readonly raw: ReadonlyMap<ThreadId, ReadonlyArray<KeptRawToolResult>>;
 }
 
 const hashText = (text: string) => NodeCrypto.createHash("sha256").update(text).digest("hex");
@@ -92,6 +100,28 @@ export class McpProviderSessions extends Context.Service<
       reported?: Record<string, unknown>,
     ) => Effect.Effect<Record<string, unknown> | undefined>;
     readonly clearToolResults: (threadId: ThreadId) => Effect.Effect<void>;
+    /**
+     * The thread's provider reports a stand-in for MCP results, so its full `t3-code` results are
+     * kept too, until the provider session changes.
+     */
+    readonly keepToolResults: (threadId: ThreadId) => Effect.Effect<void>;
+    /** Calls `encode` only for threads that keep full results; an undefined result is not kept. */
+    readonly recordRawToolResult: (
+      threadId: ThreadId,
+      toolName: string,
+      input: unknown,
+      encode: () => unknown,
+      options?: {
+        readonly providerSessionId?: string | undefined;
+        readonly epoch?: number | undefined;
+      },
+    ) => Effect.Effect<void>;
+    /** The oldest kept full result of a call with this tool and this input. */
+    readonly takeRawToolResult: (
+      threadId: ThreadId,
+      toolName: string,
+      input: unknown,
+    ) => Effect.Effect<{ readonly result: unknown } | undefined>;
   }
 >()("@t3tools/provider-core/server/McpProviderSessions") {}
 
@@ -171,12 +201,22 @@ const matchingToolResultIndex = (
   return matches.every((index) => kept[index]!.outputJson === firstOutput) ? matches[0]! : -1;
 };
 
-const clearThreadToolResults = (state: ToolResultState, threadId: ThreadId): ToolResultState => {
+const clearThreadToolResults = (
+  state: ToolResultState,
+  threadId: ThreadId,
+  options?: { readonly keepRawOptIn?: boolean },
+): ToolResultState => {
   const entries = new Map(state.entries);
   entries.delete(threadId);
   const epochs = new Map(state.epochs);
   epochs.set(threadId, (state.epochs.get(threadId) ?? 0) + 1);
-  return { entries, epochs };
+  const raw = new Map(state.raw);
+  if (options?.keepRawOptIn === true && raw.has(threadId)) {
+    raw.set(threadId, []);
+  } else {
+    raw.delete(threadId);
+  }
+  return { entries, epochs, raw };
 };
 
 const make = Effect.gen(function* () {
@@ -185,7 +225,17 @@ const make = Effect.gen(function* () {
   const toolResultState = yield* Ref.make<ToolResultState>({
     entries: new Map(),
     epochs: new Map(),
+    raw: new Map(),
   });
+  const activeSessionMismatch = (threadId: ThreadId, providerSessionId: string | undefined) =>
+    providerSessionId === undefined
+      ? Effect.succeed(false)
+      : Ref.get(sessions).pipe(
+          Effect.map((current) => {
+            const active = current.get(threadId);
+            return active !== undefined && active.providerSessionId !== providerSessionId;
+          }),
+        );
   return McpProviderSessions.of({
     set: Effect.fn("McpProviderSessions.set")(function* (config) {
       const current = yield* Ref.get(sessions);
@@ -327,8 +377,68 @@ const make = Effect.gen(function* () {
       },
     ),
     clearToolResults: Effect.fn("McpProviderSessions.clearToolResults")(function (threadId) {
-      return Ref.update(toolResultState, (state) => clearThreadToolResults(state, threadId));
+      return Ref.update(toolResultState, (state) =>
+        clearThreadToolResults(state, threadId, { keepRawOptIn: true }),
+      );
     }),
+    keepToolResults: Effect.fn("McpProviderSessions.keepToolResults")(function (threadId) {
+      return Ref.update(toolResultState, (state) =>
+        state.raw.has(threadId) ? state : { ...state, raw: new Map(state.raw).set(threadId, []) },
+      );
+    }),
+    recordRawToolResult: Effect.fn("McpProviderSessions.recordRawToolResult")(
+      function* (threadId, toolName, input, encode, options) {
+        if (!(yield* Ref.get(toolResultState)).raw.has(threadId)) return;
+        if (yield* activeSessionMismatch(threadId, options?.providerSessionId)) return;
+        const result = encode();
+        if (result === undefined) return;
+        const entry: KeptRawToolResult = {
+          toolName: resolveT3McpToolId(toolName) ?? toolName,
+          inputHash: hashToolInput(input),
+          result,
+        };
+        const expectedEpoch = options?.epoch;
+        yield* Ref.update(toolResultState, (state) => {
+          const current = state.raw.get(threadId);
+          if (
+            current === undefined ||
+            (expectedEpoch !== undefined && (state.epochs.get(threadId) ?? 0) !== expectedEpoch)
+          ) {
+            return state;
+          }
+          return {
+            ...state,
+            raw: new Map(state.raw).set(
+              threadId,
+              [...current, entry].slice(-MAX_KEPT_TOOL_RESULTS),
+            ),
+          };
+        });
+      },
+    ),
+    takeRawToolResult: Effect.fn("McpProviderSessions.takeRawToolResult")(
+      function (threadId, toolName, input) {
+        const canonicalTool = resolveT3McpToolId(toolName) ?? toolName;
+        const inputHash = hashToolInput(input);
+        return Ref.modify(toolResultState, (state) => {
+          const kept = state.raw.get(threadId) ?? [];
+          const index = kept.findIndex(
+            (entry) => entry.toolName === canonicalTool && entry.inputHash === inputHash,
+          );
+          if (index === -1) return [undefined, state];
+          return [
+            { result: kept[index]!.result },
+            {
+              ...state,
+              raw: new Map(state.raw).set(
+                threadId,
+                kept.filter((_, keptIndex) => keptIndex !== index),
+              ),
+            },
+          ];
+        });
+      },
+    ),
   });
 });
 

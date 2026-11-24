@@ -229,6 +229,7 @@ export function makeAntigravityAcpAdapterFlavor(
     mcpOverHttp: true,
     // agy answers every prompt with "The MCP server 'X' failed to initialize" instead.
     abortsOnFailedMcpServer: true,
+    replacesMcpResults: true,
     failedMcpServerOf: antigravityFailedMcpServer,
     // agy outside Gustaf reads ~/.gemini's MCP config, so threads say what Gustaf sent.
     namesSentMcpServers: true,

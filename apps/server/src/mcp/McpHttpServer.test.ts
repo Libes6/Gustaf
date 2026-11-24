@@ -18,6 +18,7 @@ import {
   RuntimeMode,
   ThreadId,
 } from "@t3tools/contracts";
+import * as McpProviderSessions from "@t3tools/provider-core/server/McpProviderSessions";
 import * as Context from "effect/Context";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
@@ -73,6 +74,7 @@ import { ThreadToolkit } from "./toolkits/thread/tools.ts";
 
 const environmentId = EnvironmentId.make("environment-mcp-test");
 const threadId = ThreadId.make("thread-mcp-test");
+const encodeCallToolResult = Schema.encodeSync(McpSchema.CallToolResult);
 const alternateTabId = PreviewTabId.make("tab-mcp-alternate");
 const decodeJsonText = Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Unknown));
 const invocation = {
@@ -639,6 +641,37 @@ it.effect("checks each preview_act action against that action's own input", () =
       expect(inputs.at(-2)).toEqual({ selector: "#name", text: "Ada" });
     }),
   ).pipe(Effect.provide(layerTest)),
+);
+
+it.effect("keeps a tool's full result for a thread whose provider asked for results", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const sessions = yield* McpProviderSessions.McpProviderSessions;
+      yield* serveSnapshots("mcp-kept-result-client", {});
+      const click = { action: "click", locator: "text=Send" };
+
+      yield* callTool("preview_act", click);
+      expect(yield* sessions.takeRawToolResult(threadId, "preview_act", click)).toBeUndefined();
+
+      yield* sessions.keepToolResults(threadId);
+      const result = yield* callTool("preview_act", click);
+      expect(
+        yield* sessions.takeRawToolResult(threadId, "preview_act", {
+          locator: "text=Send",
+          action: "click",
+        }),
+      ).toEqual({ result: encodeCallToolResult(result) });
+      expect(yield* sessions.takeRawToolResult(threadId, "preview_act", click)).toBeUndefined();
+
+      // A new turn starts empty but keeps the opt-in; clearing the provider session drops it.
+      yield* sessions.clearToolResults(threadId);
+      yield* callTool("preview_act", click);
+      expect(yield* sessions.takeRawToolResult(threadId, "preview_act", click)).toBeDefined();
+      yield* sessions.clear(threadId);
+      yield* callTool("preview_act", click);
+      expect(yield* sessions.takeRawToolResult(threadId, "preview_act", click)).toBeUndefined();
+    }),
+  ).pipe(Effect.provide(layerTest.pipe(Layer.provideMerge(McpProviderSessions.layer)))),
 );
 
 it.effect("rejects a hand-registered tool's undeclared argument before asking the browser", () =>
