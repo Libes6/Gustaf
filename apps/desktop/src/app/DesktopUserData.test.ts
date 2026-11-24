@@ -98,7 +98,7 @@ it.effect("keeps GPU caches built on the first launch of a fresh install", () =>
     const fs = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
     const appData = yield* fs.makeTempDirectoryScoped({ prefix: "t3-v2-fresh-" });
-    const userDataPath = path.join(appData, "t3code-v2");
+    const userDataPath = path.join(appData, "gustaf-electron");
 
     yield* clearStaleGpuCaches({ userDataPath, electronVersion: "44.10.1" });
     yield* fs.makeDirectory(path.join(userDataPath, "GPUCache"));
