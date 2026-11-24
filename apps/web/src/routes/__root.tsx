@@ -49,6 +49,7 @@ import {
   selectProjectGroupingSettings,
 } from "@t3tools/client-runtime/state/project-grouping";
 import { useUiStateStore } from "../uiStateStore";
+import { reportClientCrash } from "../observability/clientCrash";
 import { configureClientTracing } from "../observability/clientTracing";
 import { resolveInitialServerAuthGateState } from "../environments/primary";
 import { GUEST_PAGE_PATH } from "../guestPage";
@@ -252,6 +253,10 @@ function RootRouteErrorView({ error }: ErrorComponentProps) {
   // Router pathname rather than window.location: desktop uses hash history, where the window path is always "/".
   const pathname = useLocation({ select: (location) => location.pathname });
   const report = errorReport(error, pathname);
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- records the crash in the server's trace log once per error
+  useEffect(() => {
+    reportClientCrash("route", error, pathname);
+  }, [error, pathname]);
 
   return (
     <StandalonePage>

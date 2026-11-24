@@ -2474,6 +2474,21 @@ it.effect("reads worktrees from git that rejects worktree list -z", () =>
         paths.map((listed) => NodeFS.realpathSync.native(listed)),
         worktreePath,
       );
+
+      const records = yield* driver.listWorktrees(cwd);
+      assert.equal(records.find((entry) => entry.path === worktreePath)?.branch, "feature/old-git");
+      yield* git(cwd, ["-C", worktreePath, "checkout", "--detach"]).pipe(
+        Effect.provideService(GitVcsDriver.GitVcsDriver, driver),
+      );
+      assert.equal(
+        (yield* driver.listWorktrees(cwd)).find((entry) => entry.path === worktreePath)?.branch,
+        null,
+      );
+      NodeFS.rmSync(worktreePath, { recursive: true });
+      assert.equal(
+        (yield* driver.listWorktrees(cwd)).find((entry) => entry.path === worktreePath)?.prunable,
+        true,
+      );
     }),
   ).pipe(
     Effect.provide(

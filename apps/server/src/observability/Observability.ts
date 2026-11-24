@@ -54,6 +54,12 @@ export const layer = Layer.unwrap(
               durationMs: stats.durationMs,
             }),
         });
+        const crashSink = yield* makeTraceSink({
+          filePath: config.clientCrashLogPath,
+          maxBytes: 512 * 1024,
+          maxFiles: 1,
+          batchWindowMs: config.traceBatchWindowMs,
+        });
         const delegate =
           config.otlpTracesUrl === undefined
             ? undefined
@@ -78,7 +84,7 @@ export const layer = Layer.unwrap(
 
         return Layer.mergeAll(
           Layer.succeed(Tracer.Tracer, heapAttribution.tracer),
-          BrowserTraceCollector.layer(sink),
+          BrowserTraceCollector.layer(sink, crashSink),
         );
       }),
     ).pipe(Layer.provide(OtlpExporter.layerFlusher), Layer.provideMerge(layerSerialization));

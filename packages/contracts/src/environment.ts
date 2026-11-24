@@ -115,6 +115,8 @@ export const ExecutionEnvironmentCapabilities = Schema.Struct({
   projectWorktreeCleanup: Schema.optionalKey(Schema.Boolean),
   /** Honors `keepAwakeAlways`; older servers drop it, so hide the "Always" choice. */
   keepAwakeAlways: Schema.optionalKey(Schema.Boolean),
+  /** Serves `vcs.worktreeInventory`; hide the inventory where it is absent. */
+  worktreeInventory: Schema.optionalKey(Schema.Boolean),
   settledWorktreeCleanup: Schema.optionalKey(Schema.Boolean),
   worktreesDirectory: Schema.optionalKey(Schema.Boolean),
   /** Sent by macOS servers, which honor the fastWorktreeCheckout setting. */

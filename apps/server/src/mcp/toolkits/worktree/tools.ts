@@ -8,10 +8,12 @@ import {
   WorktreeMcpHandoffResult,
   WorktreeMcpStatusResult,
   ThreadId,
+  WorktreeInventoryResult,
 } from "@t3tools/contracts";
 import * as Schema from "effect/Schema";
 import * as ProjectService from "../../../project/ProjectService.ts";
 import * as ThreadManagementService from "../../../orchestration-v2/ThreadManagementService.ts";
+import * as WorktreeInventory from "../../../workspace/WorktreeInventory.ts";
 import { McpSchema, Tool, Toolkit } from "effect/ai";
 
 import * as McpInvocationContext from "../../McpInvocationContext.ts";
@@ -84,8 +86,28 @@ const WorktreeListTool = Tool.make("t3_worktree_list", {
 })
   .annotate(Tool.Readonly, true)
   .annotate(Tool.Destructive, false);
+const WorktreeInventoryTool = Tool.make("t3_worktree_inventory", {
+  description:
+    "Read all Git worktrees and durable thread/PR links in a thread's project, including detached, missing and deleted-thread paths. Omit threadId for this thread. File changes are checked only when inspectPath names a listed path. Does not delete or prune anything.",
+  parameters: Schema.Struct({
+    environmentId: OrchestratorMcpEnvironmentTarget,
+    threadId: Schema.optional(ThreadId),
+    inspectPath: Schema.optional(Schema.String),
+  }),
+  success: WorktreeInventoryResult,
+  failure: OrchestratorMcpFailure,
+  failureMode: "return",
+  dependencies: [
+    McpInvocationContext.McpInvocationContext,
+    ThreadManagementService.ThreadManagementService,
+    WorktreeInventory.WorktreeInventory,
+  ],
+})
+  .annotate(Tool.Readonly, true)
+  .annotate(Tool.Destructive, false);
 export const WorktreeToolkit = Toolkit.make(
   WorktreeHandoffTool,
   WorktreeStatusTool,
   WorktreeListTool,
+  WorktreeInventoryTool,
 );

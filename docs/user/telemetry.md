@@ -61,6 +61,14 @@ data is turned off, saved reports stay there and are not sent. `t3 feedback list
 reports, the thread each came from, and a line for each outline; `t3 feedback list --json` shows
 exactly what each one holds.
 
+## Local crash log
+
+When the web or desktop interface crashes or throws an unhandled error, the app records the error,
+its stack and the page it was on in the server's local logs (`userdata/logs/client-crashes.ndjson`).
+The log stays on that machine unless you set up your own trace export. To investigate a crash, ask
+an agent in a thread on that machine; it reads recent crashes and failing operations with the
+`t3_environment_errors_read` tool. Error text can quote a value the app was handling.
+
 ## Relay connection diagnostics
 
 T3 Code sends relay connection traces to Axiom to diagnose T3 Connect connectivity. These are
