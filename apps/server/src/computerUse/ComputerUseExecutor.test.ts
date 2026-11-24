@@ -87,7 +87,9 @@ describe("ComputerUseExecutor channel", () => {
       yield* desktop.close;
       expect(yield* PubSub.take(events)).toEqual({ _tag: "Disconnected" });
       expect((yield* Fiber.join(waiting)).code).toBe("failed");
-      expect((yield* Effect.flip(Effect.asVoid(desktop.executor.request({ op: "status" })))).code).toBe("failed");
+      expect(
+        (yield* Effect.flip(Effect.asVoid(desktop.executor.request({ op: "status" })))).code,
+      ).toBe("failed");
     }).pipe(Effect.scoped),
   );
 
@@ -95,7 +97,9 @@ describe("ComputerUseExecutor channel", () => {
     Effect.gen(function* () {
       const executor = yield* ComputerUseExecutor.ComputerUseExecutor;
       expect(executor.available).toBe(false);
-      expect((yield* Effect.flip(Effect.asVoid(executor.request({ op: "status" })))).code).toBe("unsupported");
+      expect((yield* Effect.flip(Effect.asVoid(executor.request({ op: "status" })))).code).toBe(
+        "unsupported",
+      );
     }).pipe(
       Effect.provide(
         ComputerUseExecutor.layer.pipe(
