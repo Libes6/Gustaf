@@ -10,13 +10,8 @@ import {
 } from "@t3tools/contracts";
 import { useAtomValue } from "@effect/atom-react";
 import { normalizeProviderAccentColor } from "@t3tools/client-runtime/state/provider-instance-display";
-import {
-  type LimitPace,
-  paceOf,
-  paceRemainingPercent,
-  remainingPercent,
-  type ResetCreditChoice,
-} from "@t3tools/shared/usageLimits";
+import { type LimitPace, paceOf, type ResetCreditChoice } from "@t3tools/shared/usageLimits";
+import { paceDisplayPercent, windowDisplayPercent } from "@t3tools/shared/usageLimitsDisplay";
 import { GaugeIcon, TrendingDownIcon, TrendingUpIcon } from "lucide-react";
 import { msg, T, useGT, useMessages } from "gt-react";
 import { Fragment, useLayoutEffect, useState } from "react";
@@ -131,33 +126,53 @@ function WindowBar({
   readonly now: number;
 }) {
   const timestampFormat = usePrimarySettings((settings) => settings.timestampFormat);
+  const display = usePrimarySettings((settings) => settings.usageLimitsDisplay);
   const gt = useGT();
   const m = useMessages();
-  const remaining = remainingPercent(window);
-  const timeLeft = paceRemainingPercent(window, now);
-  const [barRef, paceMark] = usePaceMark(timeLeft);
+  const shown = windowDisplayPercent(window, display);
+  // Even pace sits where the bar's fill would end if spending matched the clock.
+  const pace = paceDisplayPercent(window, now, display);
+  const [barRef, paceMark] = usePaceMark(pace);
   const resetsIn = formatResetsIn(window, now, m);
   const resetsAt = window.resetsAt
     ? formatUpcomingTimestamp(window.resetsAt, timestampFormat, now, undefined, m)
     : null;
   const label = window.label;
+  // Variable names are part of each message's key, so used and left read their own.
   const summary =
-    timeLeft === null
-      ? resetsIn
-        ? gt("{label}: {remaining}% left, {resetsIn}", { label, remaining, resetsIn })
-        : gt("{label}: {remaining}% left", { label, remaining })
-      : resetsIn
-        ? gt("{label}: {remaining}% left, {timeLeft}% of the window left, {resetsIn}", {
-            label,
-            remaining,
-            timeLeft,
-            resetsIn,
-          })
-        : gt("{label}: {remaining}% left, {timeLeft}% of the window left", {
-            label,
-            remaining,
-            timeLeft,
-          });
+    display === "used"
+      ? pace === null
+        ? resetsIn
+          ? gt("{label}: {used}% used, {resetsIn}", { label, used: shown, resetsIn })
+          : gt("{label}: {used}% used", { label, used: shown })
+        : resetsIn
+          ? gt("{label}: {used}% used, {elapsed}% of the window elapsed, {resetsIn}", {
+              label,
+              used: shown,
+              elapsed: pace,
+              resetsIn,
+            })
+          : gt("{label}: {used}% used, {elapsed}% of the window elapsed", {
+              label,
+              used: shown,
+              elapsed: pace,
+            })
+      : pace === null
+        ? resetsIn
+          ? gt("{label}: {remaining}% left, {resetsIn}", { label, remaining: shown, resetsIn })
+          : gt("{label}: {remaining}% left", { label, remaining: shown })
+        : resetsIn
+          ? gt("{label}: {remaining}% left, {timeLeft}% of the window left, {resetsIn}", {
+              label,
+              remaining: shown,
+              timeLeft: pace,
+              resetsIn,
+            })
+          : gt("{label}: {remaining}% left, {timeLeft}% of the window left", {
+              label,
+              remaining: shown,
+              timeLeft: pace,
+            });
 
   return (
     <Tooltip>
@@ -175,10 +190,10 @@ function WindowBar({
         {/* Clip both layers so the gap exposes even a translucent composer surface. */}
         <div className="absolute inset-0" style={paceMark?.gap}>
           <div className="absolute inset-x-0 inset-y-1.5 rounded-full bg-muted" />
-          {remaining > 0 ? (
+          {shown > 0 ? (
             <div
               className="absolute inset-y-1.5 left-0 rounded-full"
-              style={{ width: `${remaining}%`, backgroundColor: color }}
+              style={{ width: `${shown}%`, backgroundColor: color }}
             />
           ) : null}
         </div>
@@ -193,11 +208,21 @@ function WindowBar({
       <TooltipPopup side="top">
         <div className="flex flex-col gap-0.5">
           <span className="text-foreground">
-            {timeLeft !== null
-              ? gt("{remaining}% left · {timeLeft}% of the window left", { remaining, timeLeft })
-              : gt("{remaining}% left", { remaining })}
+            {display === "used"
+              ? pace === null
+                ? gt("{used}% used", { used: shown })
+                : gt("{used}% used · {elapsed}% of the window elapsed", {
+                    used: shown,
+                    elapsed: pace,
+                  })
+              : pace === null
+                ? gt("{remaining}% left", { remaining: shown })
+                : gt("{remaining}% left · {timeLeft}% of the window left", {
+                    remaining: shown,
+                    timeLeft: pace,
+                  })}
           </span>
-          {timeLeft !== null ? (
+          {pace !== null ? (
             <span className="text-muted-foreground">
               <T>The line is where even spending would be.</T>
             </span>
@@ -229,6 +254,7 @@ export function LimitWindows({
   readonly compact?: boolean;
 }) {
   const color = normalizeProviderAccentColor(accentColor) ?? barColor(driver);
+  const display = usePrimarySettings((settings) => settings.usageLimitsDisplay);
   const gt = useGT();
   const m = useMessages();
   return (
@@ -247,7 +273,9 @@ export function LimitWindows({
             <span className="flex min-w-0 items-center gap-2 text-xs">
               <span className="truncate text-muted-foreground">{window.label}</span>
               <span className="ms-auto shrink-0 font-medium text-foreground tabular-nums">
-                {gt("{remaining}% left", { remaining: remainingPercent(window) })}
+                {display === "used"
+                  ? gt("{used}% used", { used: windowDisplayPercent(window, display) })
+                  : gt("{remaining}% left", { remaining: windowDisplayPercent(window, display) })}
               </span>
             </span>
             <WindowBar color={color} window={window} now={now} />

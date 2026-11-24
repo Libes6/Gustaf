@@ -7,6 +7,7 @@ import {
   type ChatWidth,
   type HtmlPreviewWidth,
   type EffortDisplay,
+  type UsageLimitsDisplay,
   type EnvironmentIdentificationMode,
   MAX_APPEARANCE_CONTRAST,
   MAX_GLASS_OPACITY,
@@ -91,6 +92,11 @@ const HTML_PREVIEW_WIDTH_LABELS: Record<HtmlPreviewWidth, string> = {
 const EFFORT_DISPLAY_LABELS: Record<EffortDisplay, string> = {
   label: msg("Word", { $context: "show effort as a word" }),
   bars: msg("Bars", { $context: "show effort as bars" }),
+};
+
+const USAGE_LIMITS_DISPLAY_LABELS: Record<UsageLimitsDisplay, string> = {
+  used: msg("Used", { $context: "show limits as the share spent" }),
+  remaining: msg("Remaining", { $context: "show limits as the share left" }),
 };
 
 export function AppearanceSettingsPanel() {
@@ -381,6 +387,51 @@ export function AppearanceSettingsPanel() {
                 <SelectPopup align="end" alignItemWithTrigger={false}>
                   <SelectItem value="label">{gt("Word (default)")}</SelectItem>
                   <SelectItem value="bars">{m(EFFORT_DISPLAY_LABELS.bars)}</SelectItem>
+                </SelectPopup>
+              </Select>
+            </div>
+          }
+        />
+        <SettingsRow
+          {...searchableSetting("usage-limits-display")}
+          description={gt(
+            "Show provider usage limits as the share already used, or the share still remaining.",
+          )}
+          resetAction={
+            settings.usageLimitsDisplay !== DEFAULT_UNIFIED_SETTINGS.usageLimitsDisplay ? (
+              <SettingResetButton
+                ariaLabel={gt("Reset limits display to default")}
+                onClick={() =>
+                  updateSettings({
+                    usageLimitsDisplay: DEFAULT_UNIFIED_SETTINGS.usageLimitsDisplay,
+                  })
+                }
+              />
+            ) : null
+          }
+          control={
+            <div className="w-full sm:w-40">
+              <Select
+                value={settings.usageLimitsDisplay}
+                onValueChange={(value) => {
+                  if (value === "used" || value === "remaining")
+                    updateSettings({ usageLimitsDisplay: value });
+                }}
+              >
+                <SelectTrigger
+                  size="sm"
+                  className="w-full min-w-0"
+                  aria-label={gt("Limits display")}
+                >
+                  <SelectValue>
+                    {m(USAGE_LIMITS_DISPLAY_LABELS[settings.usageLimitsDisplay])}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectPopup align="end" alignItemWithTrigger={false}>
+                  <SelectItem value="used">{m(USAGE_LIMITS_DISPLAY_LABELS.used)}</SelectItem>
+                  <SelectItem value="remaining">
+                    {m(USAGE_LIMITS_DISPLAY_LABELS.remaining)}
+                  </SelectItem>
                 </SelectPopup>
               </Select>
             </div>

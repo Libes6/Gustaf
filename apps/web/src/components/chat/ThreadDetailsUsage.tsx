@@ -5,13 +5,12 @@ import type {
   ServerProviderUsageWindow,
   UsageLimitSourceSnapshots,
 } from "@t3tools/contracts";
+import { type LimitPace, type LimitPoolWindow, paceOf } from "@t3tools/shared/usageLimits";
 import {
-  type LimitPace,
-  type LimitPoolWindow,
-  paceOf,
-  paceRemainingPercent,
-  remainingPercent,
-} from "@t3tools/shared/usageLimits";
+  displayedPercent,
+  paceDisplayPercent,
+  windowDisplayPercent,
+} from "@t3tools/shared/usageLimitsDisplay";
 import { formatDuration, limitsNotice } from "@t3tools/shared/usageLimitsCopy";
 import { Link } from "@tanstack/react-router";
 import { msg, useGT, useLocale, useMessages } from "gt-react";
@@ -50,7 +49,7 @@ function limitTone(left: number): UsageTone {
   return null;
 }
 
-/** The selected provider's limit windows. Each row reads as room left and opens the usage page. */
+/** The selected provider's limit windows. Each row reads as share spent or left, per the limits display setting, and opens the usage page. */
 export function ThreadDetailsUsage({
   providerInstanceId,
   model,
@@ -182,27 +181,36 @@ function LimitRow({
   const gt = useGT();
   const m = useMessages();
   const timestampFormat = usePrimarySettings((settings) => settings.timestampFormat);
-  const left = remainingPercent(window);
+  const display = usePrimarySettings((settings) => settings.usageLimitsDisplay);
+  const left = windowDisplayPercent(window, "remaining");
+  const shown = windowDisplayPercent(window, display);
   const pace = paceOf(window, now);
-  const timeLeft = paceRemainingPercent(window, now);
+  const windowShare = paceDisplayPercent(window, now, display);
   const resetsAt = window.resetsAt ? Date.parse(window.resetsAt) : Number.NaN;
   return (
     <UsageRow
       label={window.label}
-      fill={left}
+      fill={shown}
       tone={limitTone(left)}
-      tick={timeLeft}
-      value={`${left}%`}
-      ariaValue={gt("{left}% left", { left })}
+      tick={windowShare}
+      value={`${shown}%`}
+      ariaValue={
+        display === "used" ? gt("{used}% used", { used: shown }) : gt("{left}% left", { left })
+      }
       opensUsage
       tooltip={
         <>
           <span className="text-foreground">
-            {gt("{label}: {left}% left", { label: window.label, left })}
+            {display === "used"
+              ? gt("{label}: {used}% used", { label: window.label, used: shown })
+              : gt("{label}: {left}% left", { label: window.label, left })}
           </span>
-          {pace && timeLeft !== null ? (
+          {pace && windowShare !== null ? (
             <span className="text-muted-foreground">
-              {m(PACE_LABEL[pace])} · {gt("{timeLeft}% of the window left", { timeLeft })}
+              {m(PACE_LABEL[pace])} ·{" "}
+              {display === "used"
+                ? gt("{elapsed}% of the window elapsed", { elapsed: windowShare })
+                : gt("{timeLeft}% of the window left", { timeLeft: windowShare })}
             </span>
           ) : null}
           {window.resetsAt && resetsAt > now ? (
@@ -223,7 +231,9 @@ function PoolRow({ window, now }: { readonly window: LimitPoolWindow; readonly n
   const gt = useGT();
   const m = useMessages();
   const timestampFormat = usePrimarySettings((settings) => settings.timestampFormat);
+  const display = usePrimarySettings((settings) => settings.usageLimitsDisplay);
   const left = window.remainingPercent;
+  const shown = displayedPercent(left, display);
   const accounts = window.members.length;
   const from = poolSources(window);
   const sourceLabels = [...from.hubs, ...(from.signedIn ? [gt("Signed-in accounts")] : [])];
@@ -239,21 +249,31 @@ function PoolRow({ window, now }: { readonly window: LimitPoolWindow; readonly n
   return (
     <UsageRow
       label={window.label}
-      fill={left}
+      fill={shown}
       tone={limitTone(left)}
-      value={`${left}%`}
-      ariaValue={gt("{left}% left", { left })}
+      value={`${shown}%`}
+      ariaValue={
+        display === "used" ? gt("{used}% used", { used: shown }) : gt("{left}% left", { left })
+      }
       opensUsage
       tooltip={
         <>
           <span className="text-foreground">
-            {accounts > 1
-              ? gt("{label}: {left}% left across {accounts} accounts", {
-                  label: window.label,
-                  left,
-                  accounts,
-                })
-              : gt("{label}: {left}% left", { label: window.label, left })}
+            {display === "used"
+              ? accounts > 1
+                ? gt("{label}: {used}% used across {accounts} accounts", {
+                    label: window.label,
+                    used: shown,
+                    accounts,
+                  })
+                : gt("{label}: {used}% used", { label: window.label, used: shown })
+              : accounts > 1
+                ? gt("{label}: {left}% left across {accounts} accounts", {
+                    label: window.label,
+                    left,
+                    accounts,
+                  })
+                : gt("{label}: {left}% left", { label: window.label, left })}
           </span>
           {window.pace ? (
             <span className="text-muted-foreground">{m(PACE_LABEL[window.pace])}</span>

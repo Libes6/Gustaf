@@ -610,3 +610,19 @@ describe("MCP server settings", () => {
     ).toEqual(["settings:write"]);
   });
 });
+
+describe("usageLimitsDisplay", () => {
+  it("defaults to used for saved client settings that predate it", () => {
+    expect(decodeClientSettings({}).usageLimitsDisplay).toBe("used");
+  });
+
+  it("accepts both modes and rejects anything else", () => {
+    expect(decodeClientSettings({ usageLimitsDisplay: "remaining" }).usageLimitsDisplay).toBe(
+      "remaining",
+    );
+    expect(decodeClientSettingsPatch({ usageLimitsDisplay: "used" })).toEqual({
+      usageLimitsDisplay: "used",
+    });
+    expect(() => decodeClientSettingsPatch({ usageLimitsDisplay: "left" })).toThrow();
+  });
+});

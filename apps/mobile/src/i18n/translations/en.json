@@ -5181,9 +5181,12 @@
   "b16fdf56b16d99c9": "On pace",
   "90f977e97ae8b6c6": "Under pace",
   "897aceb6c7196649": "Account",
+  "49d4bcb2d2b83296": "Segment {index}, {account}, {used}% used",
+  "9c0ac4a1f954f2d2": "Segment {index}, {account}, {used}% used, {elapsed}% of the window elapsed",
   "811008ce95331531": "Segment {index}, {account}, {remaining}% left",
   "bfb2d0ef476d295b": "Segment {index}, {account}, {remaining}% left, {timeLeft}% of the window left",
   "e71c96e5114f7718": "Show account details",
+  "bd6c82c03dec4724": "{credits, plural, other {{credits} reset credits banked}}",
   "27cd137302298f71": "Segment {index}, {account}, {remaining}% left, {resetsIn}, {credits, plural, other {{credits} reset credits banked}}",
   "288ade531cfcf90c": "Segment {index}, {account}, {remaining}% left, {resetsIn}",
   "f78edbddd70ee41d": "Segment {index}, {account}, {remaining}% left, {credits, plural, other {{credits} reset credits banked}}",
@@ -5194,6 +5197,22 @@
   "0d3e9f1f27c0e780": "Reveal account email",
   "9217e0c91cee3cf8": "Signed in",
   "5f12a194d158f9b1": "Source",
+  "8ee47ebca67e9746": [
+    {
+      "t": "Text",
+      "i": 1,
+      "c": [
+        {
+          "i": 2,
+          "k": "_gt_value_2",
+          "v": "v"
+        },
+        "%"
+      ]
+    },
+    " ",
+    "used"
+  ],
   "65a7507ffde6d3f8": [
     {
       "t": "Text",
@@ -5219,6 +5238,14 @@
     " could not refresh limits. Showing the last known values."
   ],
   "726ece0c7139ce8a": "This account is no longer reporting limits on the selected environments.",
+  "e6a37782de1fc4b2": [
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    "% used"
+  ],
   "412e3b93454812aa": [
     {
       "i": 1,
@@ -5235,6 +5262,15 @@
       "k": "_gt_value_1",
       "v": "v"
     }
+  ],
+  "9da6c2afc7c2b0af": [
+    "Even pace: ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    "% used by now"
   ],
   "23d0be01844d163c": [
     "Even pace: ",
@@ -5721,5 +5757,9 @@
   "ad208e3e32c85029": "Hide all",
   "3328503592789bed": "Zen",
   "856812e7e1fc445e": "Tool calls in chat",
-  "8d545d54c0a9e950": "Hide the commands, edits, and searches agents run. Hide successful keeps failures. Zen shows only final answers. Approvals, questions, and errors always show."
+  "8d545d54c0a9e950": "Hide the commands, edits, and searches agents run. Hide successful keeps failures. Zen shows only final answers. Approvals, questions, and errors always show.",
+  "3bf0ac76660c56ce": "Used",
+  "d9682ef2ec10531b": "Remaining",
+  "4cdfe0199374068d": "Limits display",
+  "69946ab015dfc3a1": "Show provider usage limits as the share already used, or the share still remaining."
 }
