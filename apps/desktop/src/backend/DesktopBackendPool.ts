@@ -32,6 +32,7 @@ import * as DesktopState from "../app/DesktopState.ts";
 import * as DesktopAppSettings from "../settings/DesktopAppSettings.ts";
 import * as DesktopTelemetryPublisher from "../telemetry/DesktopTelemetryPublisher.ts";
 import * as DesktopBrowserHost from "../preview/DesktopBrowserHost.ts";
+import * as ComputerUseExecutor from "../computerUse/ComputerUseExecutor.ts";
 import * as DesktopWindow from "../window/DesktopWindow.ts";
 import * as DesktopWslEnvironment from "../wsl/DesktopWslEnvironment.ts";
 import * as ElectronDialog from "../electron/ElectronDialog.ts";
@@ -116,6 +117,7 @@ export type BackendInstanceFactoryRequirements =
   | DesktopObservability.DesktopBackendOutputLogFactory
   | DesktopTelemetryPublisher.DesktopTelemetryPublisher
   | DesktopBrowserHost.DesktopBrowserHost
+  | ComputerUseExecutor.ComputerUseExecutor
   | DesktopWslEnvironment.DesktopWslEnvironment;
 
 interface ActiveRegisteredInstance {

@@ -34,6 +34,7 @@ import * as DesktopBackendManager from "./DesktopBackendManager.ts";
 import * as DesktopObservability from "../app/DesktopObservability.ts";
 import * as DesktopTelemetryPublisher from "../telemetry/DesktopTelemetryPublisher.ts";
 import * as DesktopBrowserHost from "../preview/DesktopBrowserHost.ts";
+import * as ComputerUseExecutor from "../computerUse/ComputerUseExecutor.ts";
 import * as DesktopWslEnvironment from "../wsl/DesktopWslEnvironment.ts";
 
 const decodeDesktopBackendBootstrap = Schema.decodeEffect(
@@ -137,6 +138,7 @@ function decodeBootstrap(raw: string) {
 
 interface MakeInstanceInput {
   readonly spawnerLayer: Layer.Layer<ChildProcessSpawner.ChildProcessSpawner>;
+  readonly computerUse?: Partial<ComputerUseExecutor.ComputerUseExecutor["Service"]>;
   readonly httpClientLayer?: Layer.Layer<HttpClient.HttpClient>;
   readonly backendOutputLog?: Partial<DesktopObservability.DesktopBackendOutputLogShape>;
   readonly onReady?: Effect.Effect<void>;
@@ -191,6 +193,7 @@ function makeTestInstance(input: MakeInstanceInput) {
       ...input.desktopTelemetryPublisher,
     }),
     DesktopBrowserHost.layer,
+    Layer.mock(ComputerUseExecutor.ComputerUseExecutor, input.computerUse ?? {}),
     DesktopWslEnvironment.layerTest(
       input.pruneRuntimes === undefined ? {} : { pruneRuntimes: input.pruneRuntimes },
     ),
@@ -368,6 +371,68 @@ describe("DesktopBackendManager", () => {
         telemetryJson,
         '{"version":1,"type":"desktopTelemetryHello","electronPid":123}\n',
       );
+    }),
+  );
+
+  it.effect("gives a macOS primary backend the computer-use pair for its own run", () =>
+    Effect.gen(function* () {
+      const replies = yield* Deferred.make<string>();
+      const requests = yield* Queue.unbounded<string>();
+      const closed = yield* Deferred.make<void>();
+      const exit = yield* Deferred.make<ChildProcessSpawner.ExitCode>();
+      const request = '{"id":1,"op":"status"}';
+      let fds: ChildProcess.CommandOptions["additionalFds"];
+      const instance = yield* makeTestInstance({
+        config: {
+          ...baseConfig,
+          bootstrap: {
+            ...baseConfig.bootstrap,
+            desktopComputerUseFd: 8,
+            desktopComputerUseControlFd: 9,
+          },
+        },
+        computerUse: {
+          connect: Effect.addFinalizer(() => Deferred.succeed(closed, undefined)).pipe(
+            Effect.as({
+              output: Stream.encodeText(Stream.make('{"event":"status"}\n')),
+              handleLine: (line: string) => Queue.offer(requests, line).pipe(Effect.asVoid),
+            }),
+          ),
+        },
+        spawnerLayer: Layer.succeed(
+          ChildProcessSpawner.ChildProcessSpawner,
+          ChildProcessSpawner.make((command) =>
+            Effect.gen(function* () {
+              if (command._tag !== "StandardCommand") return yield* Effect.die("unexpected pipe");
+              fds = command.options.additionalFds;
+              const fd8 = fds?.fd8;
+              if (fd8?.type === "input" && fd8.stream) {
+                yield* Deferred.succeed(
+                  replies,
+                  yield* fd8.stream.pipe(Stream.decodeText(), Stream.mkString),
+                );
+              }
+              return makeProcess({
+                exitCode: Deferred.await(exit),
+                getOutputFd: (fd) =>
+                  fd === 9
+                    ? Stream.encodeText(Stream.make(`${request}\n`))
+                    : readyControlChannel(fd),
+              });
+            }),
+          ),
+        ),
+      });
+
+      yield* instance.start;
+      assert.equal(yield* Queue.take(requests), request);
+      assert.equal(yield* Deferred.await(replies), '{"event":"status"}\n');
+      assert.equal(fds?.fd9?.type, "output");
+      assert.isFalse(yield* Deferred.isDone(closed));
+      // The session belongs to this run: its end closes the connection.
+      yield* Deferred.succeed(exit, ChildProcessSpawner.ExitCode(1));
+      yield* Deferred.await(closed);
+      yield* instance.stop();
     }),
   );
 

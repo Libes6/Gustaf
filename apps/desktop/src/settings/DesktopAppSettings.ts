@@ -28,6 +28,8 @@ import { desktopUpdateChannelOf } from "@t3tools/shared/cliRelease";
 import { isValidDistroName } from "../wsl/wslPathParsing.ts";
 
 export interface DesktopSettings {
+  /** The Mac's computer-use switch; a session never survives a restart. */
+  readonly computerUseEnabled: boolean;
   readonly localEnvironmentEnabled: boolean;
   readonly linuxPasswordStore: LinuxPasswordStorePreference;
   readonly mainWindowBounds: DesktopWindowBounds | null;
@@ -69,6 +71,7 @@ export const DEFAULT_MAIN_WINDOW_SIZE = {
 } as const;
 
 export const DEFAULT_DESKTOP_SETTINGS: DesktopSettings = {
+  computerUseEnabled: false,
   localEnvironmentEnabled: true,
   linuxPasswordStore: DEFAULT_LINUX_PASSWORD_STORE,
   mainWindowBounds: null,
@@ -96,6 +99,7 @@ const optionalReadableKey = <S extends Schema.Top>(schema: S) =>
   Schema.optionalKey(schema.pipe(Schema.catchDecoding(() => Effect.succeedNone)));
 
 const DesktopSettingsDocument = Schema.Struct({
+  computerUseEnabled: optionalReadableKey(Schema.Boolean),
   localEnvironmentEnabled: optionalReadableKey(Schema.Boolean),
   linuxPasswordStore: optionalReadableKey(Schema.Unknown),
   mainWindowBounds: optionalReadableKey(Schema.NullOr(DesktopWindowBoundsDocument)),
@@ -154,6 +158,9 @@ export class DesktopAppSettings extends Context.Service<
     readonly load: Effect.Effect<DesktopSettings>;
     readonly get: Effect.Effect<DesktopSettings>;
     readonly setLocalEnvironmentEnabled: (
+      enabled: boolean,
+    ) => Effect.Effect<DesktopSettingsChange, DesktopSettingsWriteError>;
+    readonly setComputerUseEnabled: (
       enabled: boolean,
     ) => Effect.Effect<DesktopSettingsChange, DesktopSettingsWriteError>;
     readonly setMainWindowBounds: (
@@ -225,6 +232,7 @@ function normalizeDesktopSettingsDocument(
     (parsed.wslBackendEnabled === undefined && parsed.wslMode === "wsl");
 
   return {
+    computerUseEnabled: parsed.computerUseEnabled === true,
     localEnvironmentEnabled: parsed.localEnvironmentEnabled !== false,
     linuxPasswordStore: normalizeLinuxPasswordStorePreference(parsed.linuxPasswordStore),
     mainWindowBounds,
@@ -248,6 +256,10 @@ function toDesktopSettingsDocument(
   defaults: DesktopSettings,
 ): DesktopSettingsDocument {
   const document: Mutable<DesktopSettingsDocument> = {};
+
+  if (settings.computerUseEnabled !== defaults.computerUseEnabled) {
+    document.computerUseEnabled = settings.computerUseEnabled;
+  }
 
   if (settings.localEnvironmentEnabled !== defaults.localEnvironmentEnabled) {
     document.localEnvironmentEnabled = settings.localEnvironmentEnabled;
@@ -380,6 +392,12 @@ function setLocalEnvironmentEnabled(settings: DesktopSettings, enabled: boolean)
   return settings.localEnvironmentEnabled === enabled
     ? settings
     : { ...settings, localEnvironmentEnabled: enabled };
+}
+
+function setComputerUseEnabled(settings: DesktopSettings, enabled: boolean): DesktopSettings {
+  return settings.computerUseEnabled === enabled
+    ? settings
+    : { ...settings, computerUseEnabled: enabled };
 }
 
 function applyWslWindowsFallback(settings: DesktopSettings): DesktopSettings {
@@ -599,6 +617,11 @@ export const make = Effect.gen(function* () {
         return yield* persist((settings) => setLocalEnvironmentEnabled(settings, enabled));
       },
     ),
+    setComputerUseEnabled: Effect.fn("desktop.settings.setComputerUseEnabled")(function* (enabled) {
+      yield* Effect.annotateCurrentSpan({ enabled });
+
+      return yield* persist((settings) => setComputerUseEnabled(settings, enabled));
+    }),
     applyWslWindowsFallback: persist(applyWslWindowsFallback).pipe(
       Effect.withSpan("desktop.settings.applyWslWindowsFallback"),
     ),
@@ -660,6 +683,11 @@ export const layerTest = (initialSettings: DesktopSettings = DEFAULT_DESKTOP_SET
         setLocalEnvironmentEnabled: Effect.fn("DesktopAppSettings.setLocalEnvironmentEnabled")(
           function (enabled) {
             return update((settings) => setLocalEnvironmentEnabled(settings, enabled));
+          },
+        ),
+        setComputerUseEnabled: Effect.fn("DesktopAppSettings.setComputerUseEnabled")(
+          function (enabled) {
+            return update((settings) => setComputerUseEnabled(settings, enabled));
           },
         ),
         applyWslWindowsFallback: update(applyWslWindowsFallback),

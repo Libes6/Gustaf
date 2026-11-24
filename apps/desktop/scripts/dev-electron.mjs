@@ -65,6 +65,11 @@ NodeChildProcess.execFileSync(
   [NodePath.join(desktopDir, "scripts/build-apple-speech.mjs")],
   { stdio: "inherit" },
 );
+NodeChildProcess.execFileSync(
+  process.execPath,
+  [NodePath.join(desktopDir, "scripts/build-computer-use.mjs")],
+  { stdio: "inherit" },
+);
 
 await waitForResources({
   baseDir: desktopDir,
