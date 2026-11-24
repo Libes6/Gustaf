@@ -169,7 +169,10 @@ it.effect("returns the screen as image content and turns tool calls into actions
     const offImage = yield* Effect.flip(
       call("computer_mouse", { action: "click", captureId: "c7", x: -1, y: 2 }),
     );
-    expect(offImage._tag).toBe("InvalidParams");
+    expect(offImage).toMatchObject({
+      _tag: "InvalidParams",
+      message: expect.stringContaining("greater than or equal to 0"),
+    });
     expect(actions).toHaveLength(6);
 
     // The service's reason reaches the agent, so it can tell the user what to do.
@@ -197,7 +200,10 @@ it.effect.each([
       const refused = yield* Effect.flip(
         call(name, { action: "click", captureId: "c7", x: 1, y: 1 }, invocation(scope)),
       );
-      expect(refused._tag).toBe("InvalidParams");
+      expect(refused).toMatchObject({
+        _tag: "InvalidParams",
+        message: expect.stringContaining("not found"),
+      });
     }
     expect(actions).toEqual([]);
   }).pipe(Effect.scoped, Effect.provide(makeLayer(actions)));
