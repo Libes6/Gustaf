@@ -113,6 +113,8 @@ export const ExecutionEnvironmentCapabilities = Schema.Struct({
   /** Serves `server.checkSecretSource`; hide the secret check where it is absent. */
   secretSourceCheck: Schema.optionalKey(Schema.Boolean),
   projectWorktreeCleanup: Schema.optionalKey(Schema.Boolean),
+  /** Honors `keepAwakeAlways`; older servers drop it, so hide the "Always" choice. */
+  keepAwakeAlways: Schema.optionalKey(Schema.Boolean),
   settledWorktreeCleanup: Schema.optionalKey(Schema.Boolean),
   worktreesDirectory: Schema.optionalKey(Schema.Boolean),
   /** Sent by macOS servers, which honor the fastWorktreeCheckout setting. */

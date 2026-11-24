@@ -120,6 +120,21 @@ protection takes effect at once. The server's protection from the kernel's
 out-of-memory killer takes effect after `t3 service restart`. `t3 service status` reports whether
 the protection is in place, and `t3 service protect --undo` removes it.
 
+## Keep the computer awake
+
+**Settings → Maintenance → Keep computer awake** decides whether the machine that runs the server
+may go to sleep. The choice is per machine, and the mobile app has the same setting under
+**Maintenance**.
+
+- **While agents work** (the default) keeps it awake during agent runs and for a minute after the
+  last one ends.
+- **Always** keeps it awake for as long as the server runs, so you can reach it from your phone or
+  another computer.
+- **Off** lets it sleep as usual, which pauses running agents.
+
+Closing a laptop lid still puts it to sleep. macOS uses `caffeinate` and Windows uses the system
+power API. Linux needs `systemd-inhibit` (systemd-logind); without it the setting has no effect.
+
 ## Troubleshooting
 
 Start with `t3 service status` on the host. It prints the log path and, on Linux,

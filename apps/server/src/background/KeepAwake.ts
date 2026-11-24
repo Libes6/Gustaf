@@ -11,6 +11,7 @@ import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 import * as SqlClient from "effect/sql/SqlClient";
 
+import { keepAwakeModeOf, type KeepAwakeMode } from "@t3tools/contracts/settings";
 import * as HostProcess from "@t3tools/shared/HostProcess";
 
 import * as OrchestrationEventStore from "../persistence/OrchestrationEventStore.ts";
@@ -92,6 +93,10 @@ export function inhibitorCommand(
       return undefined;
   }
 }
+
+/** Whether the inhibitor should be held, before the release grace. */
+export const wantsAwake = (mode: KeepAwakeMode, agentsWorking: boolean): boolean =>
+  mode === "always" || (mode === "while-agents-work" && agentsWorking);
 
 /**
  * Runs `hold` while `wanted` is true and for `grace` after it turns false; a true inside the
@@ -190,17 +195,14 @@ export const layer = Layer.effectDiscard(
       ),
       Stream.retry(backoff),
     );
-    const enabled = Stream.unwrap(
+    const mode = Stream.unwrap(
       Effect.gen(function* () {
         const changes = yield* settings.subscribeChanges;
         const current = yield* settings.getSettings.pipe(
-          Effect.map((value) => value.keepAwakeWhileAgentsWork),
-          Effect.orElseSucceed(() => true),
+          Effect.map(keepAwakeModeOf),
+          Effect.orElseSucceed((): KeepAwakeMode => "while-agents-work"),
         );
-        return Stream.concat(
-          Stream.succeed(current),
-          Stream.map(changes, (value) => value.keepAwakeWhileAgentsWork),
-        );
+        return Stream.concat(Stream.succeed(current), Stream.map(changes, keepAwakeModeOf));
       }),
     );
 
@@ -246,10 +248,9 @@ export const layer = Layer.effectDiscard(
     );
 
     yield* forkParked(
-      holdWhileWanted(
-        Stream.zipLatestWith(enabled, active, (on, busy) => on && busy),
-        hold,
-      ).pipe(Effect.catchCause((cause) => Effect.logWarning("keep-awake stopped", { cause }))),
+      holdWhileWanted(Stream.zipLatestWith(mode, active, wantsAwake), hold).pipe(
+        Effect.catchCause((cause) => Effect.logWarning("keep-awake stopped", { cause })),
+      ),
     );
   }),
 );

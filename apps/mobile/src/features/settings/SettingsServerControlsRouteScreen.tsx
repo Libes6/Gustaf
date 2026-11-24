@@ -6,6 +6,9 @@ import { readEnvironmentScope, useEnvironmentsWithScope } from "../../state/sess
 import { ScreenScrollView as ScrollView } from "../../components/ui/ScreenScrollView";
 import { AppText as Text } from "../../components/ui/AppText";
 import {
+  keepAwakeModeOf,
+  keepAwakeModePatch,
+  type KeepAwakeMode,
   type ResponseStreamingMode,
   type ServerSettings,
   type ServerSettingsPatch,
@@ -138,6 +141,32 @@ const STREAMING_CHOICES: ReadonlyArray<{
     mode: "paragraph",
     label: msg("Finished paragraphs"),
     description: msg("Show each paragraph or code block as it completes."),
+  },
+];
+
+const KEEP_AWAKE_CHOICES: ReadonlyArray<{
+  readonly mode: KeepAwakeMode;
+  readonly label: string;
+  readonly description: string;
+}> = [
+  {
+    mode: "off",
+    label: msg("Off", { $context: "keep the computer awake: never" }),
+    description: msg("The computer sleeps as usual, which pauses running agents."),
+  },
+  {
+    mode: "while-agents-work",
+    label: msg("While agents work"),
+    description: msg(
+      "Stop the computer from sleeping while agents work. Closing a laptop lid still sleeps it.",
+    ),
+  },
+  {
+    mode: "always",
+    label: msg("Always", { $context: "keep the computer awake: always" }),
+    description: msg(
+      "Keeps the computer awake as long as the server runs, for example to reach it from your phone. Closing a laptop lid still puts it to sleep.",
+    ),
   },
 ];
 
@@ -274,6 +303,15 @@ function ServerSettingsDetail(props: { readonly page: SettingsPage }) {
     });
   };
   const disabled = !canWriteSettings || pendingWrites > 0 || !hasConnectedSelection;
+  const referenceKeepAwake = reference === null ? null : keepAwakeModeOf(reference.settings);
+  const keepAwakeMode = displayTargets.every(
+    (target) => keepAwakeModeOf(target.settings) === referenceKeepAwake,
+  )
+    ? referenceKeepAwake
+    : null;
+  const keepAwakeAlwaysSupported = targets.every(
+    (target) => target.environment.serverConfig.environment.capabilities.keepAwakeAlways === true,
+  );
   const managed = (...keys: string[]) => managedSettingReason(targets, keys, m);
   // A locked row keeps its explanation and says who manages it.
   const managedSubtitle = (key: string, subtitle: string) => {
@@ -578,23 +616,36 @@ function ServerSettingsDetail(props: { readonly page: SettingsPage }) {
                       onValueChange={(value) => write({ continueThreadsAfterServerUpdate: value })}
                     />
                   </View>
-                  <View className="border-t border-border-subtle">
-                    <SettingsSwitchRow
-                      icon="bolt.circle"
-                      label={gt("Keep awake while agents work")}
-                      subtitle={managedSubtitle(
-                        "keepAwakeWhileAgentsWork",
-                        projectSelected
-                          ? gt("Environment-wide setting. Select All projects to change it.")
-                          : gt(
-                              "Stop the computer from sleeping while agents work. Closing a laptop lid still sleeps it.",
-                            ),
-                      )}
-                      value={uniform("keepAwakeWhileAgentsWork")}
-                      disabled={disabledFor("keepAwakeWhileAgentsWork")}
-                      onValueChange={(value) => write({ keepAwakeWhileAgentsWork: value })}
+                </SettingsSection>
+                <SettingsSection
+                  title={gt("Keep computer awake")}
+                  footer={
+                    managed("keepAwakeWhileAgentsWork", "keepAwakeAlways") ??
+                    (projectSelected
+                      ? gt("Environment-wide setting. Select All projects to change it.")
+                      : undefined)
+                  }
+                  trailing={
+                    pendingWrites === 0 && keepAwakeMode === null ? (
+                      <MixedValuesLabel projectSelected={projectSelected} />
+                    ) : null
+                  }
+                >
+                  {KEEP_AWAKE_CHOICES.filter(
+                    (choice) => choice.mode !== "always" || keepAwakeAlwaysSupported,
+                  ).map((choice, index) => (
+                    <SettingsChoiceRow
+                      key={choice.mode}
+                      label={m(choice.label)}
+                      description={m(choice.description)}
+                      selected={keepAwakeMode === choice.mode}
+                      separated={index > 0}
+                      disabled={
+                        disabledFor("keepAwakeWhileAgentsWork") || disabledFor("keepAwakeAlways")
+                      }
+                      onPress={() => write(keepAwakeModePatch(choice.mode))}
                     />
-                  </View>
+                  ))}
                 </SettingsSection>
               </>
             ) : null}

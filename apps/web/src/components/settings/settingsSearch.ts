@@ -888,10 +888,13 @@ export const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "keep-awake-while-agents-work",
-    title: msg("Keep awake while agents work"),
+    title: msg("Keep computer awake"),
     to: "/settings/maintenance",
     scope: "environment-defaults",
-    searchTerms: [msg("caffeinate sleep prevent stay awake power laptop lid inhibit")],
+    searchTerms: [
+      msg("caffeinate sleep prevent stay awake power laptop lid inhibit"),
+      msg("always while agents work off"),
+    ],
   },
   {
     id: "background-activity",
