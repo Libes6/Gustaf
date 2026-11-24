@@ -13,12 +13,12 @@ const repoRoot = NodePath.resolve(desktopDir, "..", "..");
 const devBundleIdSuffix = NodePath.basename(repoRoot)
   .toLowerCase()
   .replaceAll(/[^a-z0-9]+/g, "");
-const APP_DISPLAY_NAME = isDevelopment ? "T3 Code (Dev)" : "T3 Code (Beta)";
+const APP_DISPLAY_NAME = isDevelopment ? "Gustaf (Dev)" : "Gustaf (Beta)";
 const APP_BUNDLE_ID = isDevelopment
   ? `com.t3tools.t3code.dev.${devBundleIdSuffix || "local"}`
   : "com.t3tools.t3code";
 const APP_PROTOCOL_SCHEMES = isDevelopment ? ["t3code-dev"] : ["t3code"];
-const LAUNCHER_VERSION = 20;
+const LAUNCHER_VERSION = 21;
 const developmentMacIconPngPath = NodePath.join(
   repoRoot,
   "assets",
@@ -206,7 +206,7 @@ function resolveMacLauncherIconPaths(runtimeDir, development = isDevelopment) {
     sourceIconPath: development ? developmentMacIconPngPath : productionMacIconPngPath,
     generatedIconPath: NodePath.posix.join(
       runtimeDir,
-      development ? "icon-dev.icns" : "icon-prod.icns",
+      development ? "icon-gustaf-dev.icns" : "icon-gustaf-prod.icns",
     ),
   };
 }
@@ -268,8 +268,8 @@ function resolveMacBundleInfoPlistStrings(executableName) {
     CFBundleExecutable: executableName,
     CFBundleIconFile: "icon.icns",
     NSScreenCaptureUsageDescription:
-      "T3 Code captures the active window when you use the snapshot shortcut, and shows this Mac's screen to an agent in a thread you allow to control it.",
-    NSDocumentsFolderUsageDescription: "T3 Code reads project files you open in the desktop app.",
+      "Gustaf captures the active window when you use the snapshot shortcut, and shows this Mac's screen to an agent in a thread you allow to control it.",
+    NSDocumentsFolderUsageDescription: "Gustaf reads project files you open in the desktop app.",
   };
 }
 
@@ -345,6 +345,10 @@ function buildMacLauncher(electronBinaryPath) {
   const sourceAppBundlePath = NodePath.resolve(NodePath.dirname(electronBinaryPath), "../..");
   const runtimeDir = NodePath.join(desktopDir, ".electron-runtime");
   const targetAppBundlePath = NodePath.join(runtimeDir, `${APP_DISPLAY_NAME}.app`);
+  // Same bundle id as the renamed bundle: a leftover copy would compete for LaunchServices.
+  for (const legacyName of ["T3 Code (Dev)", "T3 Code (Beta)"]) {
+    NodeFS.rmSync(NodePath.join(runtimeDir, `${legacyName}.app`), { recursive: true, force: true });
+  }
   const developmentPaths = resolveMacLauncherPaths(targetAppBundlePath);
   const runtimeElectronBinaryPath = developmentPaths.runtimeElectronBinaryPath;
   const launcherBinaryPath = isDevelopment

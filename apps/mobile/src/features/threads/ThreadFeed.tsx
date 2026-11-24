@@ -2387,7 +2387,7 @@ function renderFeedEntry(
         >
           {presentation.attribution === "t3code" ? (
             <Text className="mb-1 pr-1 font-t3-medium text-2xs text-foreground-muted opacity-60">
-              {m(msg("Sent by T3 Code"))}
+              {m(msg("Sent by Gustaf"))}
             </Text>
           ) : null}
           {presentation.guestName !== undefined ? (
