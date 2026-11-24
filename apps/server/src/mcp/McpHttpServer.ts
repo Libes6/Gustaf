@@ -68,6 +68,8 @@ import { FeedbackToolkit } from "./toolkits/feedback/tools.ts";
 import * as Feedback from "../feedback/FeedbackService.ts";
 import { EnvironmentToolkit } from "./toolkits/environment/tools.ts";
 import * as EnvironmentHandlers from "./toolkits/environment/handlers.ts";
+import { SubscriptionsToolkit } from "./toolkits/subscriptions/tools.ts";
+import * as SubscriptionsHandlers from "./toolkits/subscriptions/handlers.ts";
 import { ThemeToolkit } from "./toolkits/theme/tools.ts";
 import * as ThemeHandlers from "./toolkits/theme/handlers.ts";
 import { ProjectToolkit } from "./toolkits/project/tools.ts";
@@ -1482,6 +1484,11 @@ export const layerPullRequestsToolkit = toolkitRegistration(
 
 const layerIssuesToolkit = toolkitRegistration(IssuesToolkit, IssuesHandlers.layer);
 
+const layerSubscriptionsToolkit = toolkitRegistration(
+  SubscriptionsToolkit,
+  SubscriptionsHandlers.layer,
+);
+
 const layerDeviceStandardToolkitRegistration = toolkitRegistration(
   DeviceStandardToolkit,
   DeviceHandlers.layerStandard,
@@ -1541,6 +1548,7 @@ export const layerTools = Layer.mergeAll(
   layerWorktreeToolkitRegistration,
   layerPullRequestsToolkit,
   layerIssuesToolkit,
+  layerSubscriptionsToolkit,
   layerDeviceToolkit,
   layerHtmlToolkit,
   layerMessageToolkit,

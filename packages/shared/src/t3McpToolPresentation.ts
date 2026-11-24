@@ -50,6 +50,9 @@ export type T3McpToolSummaryAction =
   | "project-update"
   | "project-delete"
   | "project-clone"
+  | "subscription-list"
+  | "subscription-update"
+  | "subscription-delete"
   | "environment-read"
   | "environment-links"
   | "environment-link"
@@ -429,6 +432,15 @@ const T3_MCP_TOOLS: Readonly<Record<string, T3McpToolDefinition>> = {
   t3_project_update: tool(["Update", "Updating", "Updated", "a project"], "project-update"),
   t3_project_delete: tool(["Delete", "Deleting", "Deleted", "a project"], "project-delete"),
   t3_project_clone: tool(["Clone", "Cloning", "Cloned", "a repository"], "project-clone"),
+  t3_subscriptions_list: tool(["List", "Listing", "Listed", "subscriptions"], "subscription-list"),
+  t3_subscriptions_upsert: tool(
+    ["Save", "Saving", "Saved", "a subscription"],
+    "subscription-update",
+  ),
+  t3_subscriptions_delete: tool(
+    ["Delete", "Deleting", "Deleted", "a subscription"],
+    "subscription-delete",
+  ),
   t3_attachment_prepare_upload: tool(
     ["Prepare", "Preparing", "Prepared", "an attachment upload"],
     "attachment-prepare",

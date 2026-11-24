@@ -39,6 +39,7 @@ export type SettingsPath =
   | "/settings/access"
   | "/settings/mcp"
   | "/settings/secrets"
+  | "/settings/subscriptions"
   | "/settings/maintenance"
   | "/settings/labs"
   | "/settings/account"
@@ -121,6 +122,7 @@ export const SETTINGS_SECTION_LABELS: Readonly<Record<SettingsPath, string>> = {
   "/settings/access": msg("Sharing & access"),
   "/settings/mcp": msg("MCP"),
   "/settings/secrets": msg("Secrets"),
+  "/settings/subscriptions": msg("Subscriptions"),
   "/settings/maintenance": msg("Maintenance"),
   "/settings/labs": msg("Labs"),
   "/settings/account": msg("Account"),
@@ -180,7 +182,13 @@ const ALL_SETTINGS_NAV_GROUPS: ReadonlyArray<SettingsNavGroup> = [
   {
     heading: msg("More"),
     headingHidden: true,
-    paths: ["/settings/maintenance", "/settings/labs", "/settings/about", "/settings/archived"],
+    paths: [
+      "/settings/subscriptions",
+      "/settings/maintenance",
+      "/settings/labs",
+      "/settings/about",
+      "/settings/archived",
+    ],
   },
 ];
 
@@ -1138,6 +1146,16 @@ export const SETTINGS_SEARCH_ITEMS = [
     to: "/settings/scheduled-tasks",
   },
   {
+    id: "subscriptions",
+    title: msg("Subscriptions"),
+    to: "/settings/subscriptions",
+    searchTerms: [
+      msg(
+        "billing payments renewal charge price cost money monthly yearly claude chatgpt cursor spotify telegram",
+      ),
+    ],
+  },
+  {
     id: "agent-browser-access",
     title: msg("Agent browser access"),
     to: "/settings/browser",
@@ -1557,6 +1575,7 @@ const SETTINGS_CATEGORY_SCOPES: Readonly<Record<SettingsPath, SettingsSearchScop
   "/settings/connections": "connections",
   "/settings/access": "connections",
   "/settings/secrets": null,
+  "/settings/subscriptions": null,
   "/settings/mcp": null,
   "/settings/scheduled-tasks": null,
   "/settings/maintenance": null,

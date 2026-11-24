@@ -379,6 +379,10 @@
       "types": "./src/image.ts",
       "import": "./src/image.ts"
     },
+    "./subscriptions": {
+      "types": "./src/subscriptions.ts",
+      "import": "./src/subscriptions.ts"
+    },
     "./chatList": {
       "types": "./src/chatList.ts",
       "import": "./src/chatList.ts"
