@@ -107,11 +107,29 @@ const ListPage = Schema.Struct({
 const Tools = Schema.Array(
   Schema.Struct({
     name: Schema.String,
+    description: Schema.optional(Schema.NullOr(Schema.String)),
+    inputSchema: Schema.optional(Schema.Unknown),
     annotations: Schema.optional(
       Schema.NullOr(Schema.Struct({ readOnlyHint: Schema.optional(Schema.Boolean) })),
     ),
   }),
 );
+
+const BYTES_PER_TOKEN = 3.7;
+
+/**
+ * What a provider that lists every tool up front puts in the model's context: the fields the model
+ * reads, as JSON, like `AgentContextBudget.test.ts` counts them. A rough size, not a tokenizer's.
+ */
+export const approximateToolTokens = (tools: typeof Tools.Type): number => {
+  const encoder = new TextEncoder();
+  const bytes = tools.reduce(
+    (sum, { name, description, inputSchema }) =>
+      sum + encoder.encode(JSON.stringify({ name, description, inputSchema })).length,
+    0,
+  );
+  return Math.round(bytes / BYTES_PER_TOKEN);
+};
 
 const decodeOrFail =
   <S extends Schema.Decoder<unknown>>(schema: S, what: string) =>
@@ -174,6 +192,7 @@ const inspect = Effect.fn("McpServerChecks.inspect")(function* (rpc: JsonRpc) {
         : { name: tool.name, readOnly: tool.annotations.readOnlyHint },
     ),
     resourceCount: resources.length,
+    ...(tools.length === 0 ? {} : { approxTokens: approximateToolTokens(tools) }),
   };
 });
 
@@ -401,11 +420,12 @@ const make = Effect.gen(function* () {
             ),
           ),
       }),
-      Effect.map(({ tools, resourceCount }): McpServerStatus => ({
+      Effect.map(({ tools, resourceCount, approxTokens }): McpServerStatus => ({
         id,
         status: "connected",
         tools,
         resourceCount,
+        ...(approxTokens === undefined ? {} : { approxTokens }),
       })),
       Effect.catchTags({
         ProbeFailure: (failure) =>

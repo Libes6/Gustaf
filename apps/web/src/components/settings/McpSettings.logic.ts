@@ -8,6 +8,12 @@ import {
 
 export type McpToolGroupMode = "all" | "none" | "custom";
 
+/** A server this heavy is worth a warning where a provider loads every tool up front. */
+const MCP_HEAVY_SERVER_TOKENS = 10_000;
+
+export const isHeavyMcpServer = (status: Pick<McpServerStatus, "approxTokens">): boolean =>
+  (status.approxTokens ?? 0) > MCP_HEAVY_SERVER_TOKENS;
+
 /** Which config changes ask for a new status check; switching tools does not. */
 export function mcpStatusKey(config: McpServerConfig | undefined): string {
   if (config === undefined) return "";
@@ -90,3 +96,7 @@ export function mcpToolFilterUnsupported(
     (driver) => !MCP_TOOL_FILTER_DRIVERS.includes(driver),
   );
 }
+
+/** Codex starts the servers of its own config.toml itself, so Gustaf's switches do not reach them. */
+export const codexLoadsOwnServers = (installed: ReadonlyArray<ProviderDriverKind>): boolean =>
+  installed.some((driver) => driver === "codex");

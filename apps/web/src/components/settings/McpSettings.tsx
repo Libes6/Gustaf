@@ -41,13 +41,16 @@ import { useManagedPolicy } from "../../state/managedPolicy";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Switch } from "../ui/switch";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { SecretInput } from "./SecretInput";
 import { useSettingsScope } from "./SettingsScopeContext";
 import { McpConnectorsSection } from "./McpConnectorsSection";
 import { McpMarketplaceDialog } from "./McpMarketplaceDialog";
 import {
   currentMcpStatus,
+  codexLoadsOwnServers,
   groupMcpTools,
+  isHeavyMcpServer,
   mcpStatusKey,
   mcpToolFilterUnsupported,
   mcpToolGroupMode,
@@ -310,17 +313,39 @@ function McpEnvironmentSettings({
       case "connected": {
         const tools = String(status.tools?.length ?? 0);
         return (
-          <McpStatusLine
-            dot="bg-success"
-            text={
-              (status.resourceCount
-                ? gt("Tools: {tools}, resources: {resources}", {
-                    tools,
-                    resources: status.resourceCount,
-                  })
-                : gt("Tools: {tools}", { tools })) + off
-            }
-          />
+          <>
+            <McpStatusLine
+              dot="bg-success"
+              text={
+                (status.resourceCount
+                  ? gt("Tools: {tools}, resources: {resources}", {
+                      tools,
+                      resources: status.resourceCount,
+                    })
+                  : gt("Tools: {tools}", { tools })) + off
+              }
+            />
+            {status.approxTokens !== undefined && (
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <span
+                      className={`mt-0.5 block pl-3 ${isHeavyMcpServer(status) ? "text-warning" : ""}`}
+                    />
+                  }
+                >
+                  {gt("≈ {tokens} tokens if the provider does not defer loading", {
+                    tokens: status.approxTokens.toLocaleString(),
+                  })}
+                </TooltipTrigger>
+                <TooltipPopup>
+                  {gt(
+                    "Claude and Codex defer tool schemas and Antigravity loads them lazily, so they usually cost less. Other agents may add all of it to every thread.",
+                  )}
+                </TooltipPopup>
+              </Tooltip>
+            )}
+          </>
         );
       }
       case "needs-auth":
@@ -437,6 +462,13 @@ function McpEnvironmentSettings({
         <p className="px-4 py-3 text-sm text-muted-foreground">
           {gt("Servers belong to this environment. Changes apply to new provider sessions.")}
         </p>
+        {codexLoadsOwnServers(installedDrivers) && (
+          <p className="px-4 pb-3 text-sm text-muted-foreground">
+            {gt(
+              "Codex also starts the servers in its own config.toml, whatever the switches here say. Turn those off in Codex.",
+            )}
+          </p>
+        )}
         {!canEdit && <p role="status">{gt("Requires settings:write and providers:manage.")}</p>}
         {!localAllowed && (
           <p role="status">

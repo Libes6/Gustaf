@@ -38,7 +38,7 @@ const PreviewListTool = Tool.make("t3_preview_list", {
 })
   .annotate(Tool.Readonly, true)
   .annotate(Tool.Destructive, false)
-  .annotate(McpSchema.EnabledWhen, McpInvocationContext.hiddenFromOutsideClients);
+  .annotate(McpSchema.EnabledWhen, McpInvocationContext.hiddenWithoutBrowser);
 const PreviewCloseTool = Tool.make("t3_preview_close", {
   ...shared,
   description:
@@ -47,5 +47,5 @@ const PreviewCloseTool = Tool.make("t3_preview_close", {
   success: Schema.Struct({}),
 })
   .annotate(Tool.Destructive, true)
-  .annotate(McpSchema.EnabledWhen, McpInvocationContext.hiddenFromOutsideClients);
+  .annotate(McpSchema.EnabledWhen, McpInvocationContext.hiddenWithoutBrowser);
 export const PreviewControlsToolkit = Toolkit.make(PreviewListTool, PreviewCloseTool);

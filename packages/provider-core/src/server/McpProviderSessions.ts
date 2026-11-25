@@ -15,6 +15,9 @@ import type { McpProviderSessionConfig } from "./mcpSession.ts";
 // Other providers may never consume these references.
 const MAX_KEPT_HTML_RENDERS = 64;
 const MAX_KEPT_TOOL_RESULTS = 64;
+// Full results hold screenshots as base64, so count bytes too: the oldest go first.
+const MAX_KEPT_RAW_BYTES_PER_THREAD = 16 * 1024 * 1024;
+const MAX_KEPT_RAW_ENTRY_BYTES = 4 * 1024 * 1024;
 
 // Antigravity truncates long HTML arguments to a marked tail of at most 8,000 characters.
 const BOUNDED_TEXT_MARKER = "[Earlier output truncated]\n\n";
@@ -41,7 +44,46 @@ interface KeptRawToolResult {
   readonly toolName: string;
   readonly inputHash: string;
   readonly result: unknown;
+  readonly bytes: number;
 }
+
+const jsonBytes = (value: unknown) => Buffer.byteLength(JSON.stringify(value) ?? "", "utf8");
+
+/**
+ * A result over the per-entry limit keeps its text and drops its images, which are what make it
+ * big. One that is still over has nothing worth keeping: the provider's own description stands.
+ */
+const boundRawResult = (result: unknown): { result: unknown; bytes: number } | undefined => {
+  const bytes = jsonBytes(result);
+  if (bytes <= MAX_KEPT_RAW_ENTRY_BYTES) return { result, bytes };
+  if (!Predicate.isObject(result) || !Array.isArray((result as { content?: unknown }).content)) {
+    return undefined;
+  }
+  const content = (result as { content: ReadonlyArray<unknown> }).content.map((block) =>
+    Predicate.isObject(block) && (block as { type?: unknown }).type === "image"
+      ? { type: "text", text: "[Image too large to keep]" }
+      : block,
+  );
+  const bounded = { ...result, content };
+  const boundedBytes = jsonBytes(bounded);
+  return boundedBytes <= MAX_KEPT_RAW_ENTRY_BYTES
+    ? { result: bounded, bytes: boundedBytes }
+    : undefined;
+};
+
+/** Newest entries that fit the count and byte limits; the entry just added is always newest. */
+const evictRawResults = (entries: ReadonlyArray<KeptRawToolResult>) => {
+  const kept: Array<KeptRawToolResult> = [];
+  let bytes = 0;
+  for (let index = entries.length - 1; index >= 0; index--) {
+    const entry = entries[index]!;
+    if (kept.length >= MAX_KEPT_TOOL_RESULTS || bytes + entry.bytes > MAX_KEPT_RAW_BYTES_PER_THREAD)
+      break;
+    kept.unshift(entry);
+    bytes += entry.bytes;
+  }
+  return kept;
+};
 
 interface ToolResultState {
   readonly entries: ReadonlyMap<ThreadId, ReadonlyArray<KeptToolResult>>;
@@ -390,12 +432,15 @@ const make = Effect.gen(function* () {
       function* (threadId, toolName, input, encode, options) {
         if (!(yield* Ref.get(toolResultState)).raw.has(threadId)) return;
         if (yield* activeSessionMismatch(threadId, options?.providerSessionId)) return;
-        const result = encode();
-        if (result === undefined) return;
+        const encoded = encode();
+        if (encoded === undefined) return;
+        const bounded = boundRawResult(encoded);
+        if (bounded === undefined) return;
         const entry: KeptRawToolResult = {
           toolName: resolveT3McpToolId(toolName) ?? toolName,
           inputHash: hashToolInput(input),
-          result,
+          result: bounded.result,
+          bytes: bounded.bytes,
         };
         const expectedEpoch = options?.epoch;
         yield* Ref.update(toolResultState, (state) => {
@@ -408,10 +453,7 @@ const make = Effect.gen(function* () {
           }
           return {
             ...state,
-            raw: new Map(state.raw).set(
-              threadId,
-              [...current, entry].slice(-MAX_KEPT_TOOL_RESULTS),
-            ),
+            raw: new Map(state.raw).set(threadId, evictRawResults([...current, entry])),
           };
         });
       },

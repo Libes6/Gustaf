@@ -46,7 +46,7 @@ const DeviceListTool = Tool.make("device_list", {
   .annotate(Tool.Destructive, false)
   .annotate(Tool.Idempotent, true)
   .annotate(Tool.OpenWorld, false)
-  .annotate(McpSchema.EnabledWhen, McpInvocationContext.hiddenFromOutsideClients);
+  .annotate(McpSchema.EnabledWhen, McpInvocationContext.hiddenWithoutDevice);
 
 const DeviceOpenTool = Tool.make("device_open", {
   description:
@@ -68,7 +68,7 @@ const DeviceOpenTool = Tool.make("device_open", {
   .annotate(Tool.Destructive, false)
   .annotate(Tool.Idempotent, true)
   .annotate(Tool.OpenWorld, true)
-  .annotate(McpSchema.EnabledWhen, McpInvocationContext.hiddenFromOutsideClients);
+  .annotate(McpSchema.EnabledWhen, McpInvocationContext.hiddenWithoutDevice);
 
 export const DeviceScreenshotTool = Tool.make("device_screenshot", {
   description:
@@ -83,7 +83,7 @@ export const DeviceScreenshotTool = Tool.make("device_screenshot", {
   .annotate(Tool.Destructive, false)
   .annotate(Tool.Idempotent, true)
   .annotate(Tool.OpenWorld, true)
-  .annotate(McpSchema.EnabledWhen, McpInvocationContext.hiddenFromOutsideClients);
+  .annotate(McpSchema.EnabledWhen, McpInvocationContext.hiddenWithoutDevice);
 
 const DeviceCloseTool = Tool.make("device_close", {
   description:
@@ -98,7 +98,7 @@ const DeviceCloseTool = Tool.make("device_close", {
   .annotate(Tool.Destructive, true)
   .annotate(Tool.Idempotent, true)
   .annotate(Tool.OpenWorld, true)
-  .annotate(McpSchema.EnabledWhen, McpInvocationContext.hiddenFromOutsideClients);
+  .annotate(McpSchema.EnabledWhen, McpInvocationContext.hiddenWithoutDevice);
 
 export const DeviceStandardToolkit = Toolkit.make(DeviceListTool, DeviceOpenTool, DeviceCloseTool);
 

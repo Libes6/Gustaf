@@ -329,6 +329,11 @@ the error it stopped with. Gustaf checks when you open the section and after you
 and keeps the answer until you select **Refresh**. A check starts local servers briefly, so an `npx`
 server may first download its package.
 
+A connected server also shows what its tools add to the model's context, about 3.7 bytes of tool
+names, descriptions and schemas per token. A server above about 10,000 tokens is highlighted. The
+figure applies where an agent loads every tool up front; Claude and Codex defer tool schemas and
+Antigravity loads them lazily, so they usually cost less. Switched-off tools are still counted.
+
 A local server whose command does not exist on the environment is left out of every agent's
 sessions. Antigravity refuses to answer at all while one of its servers fails to start, so it also
 leaves out servers whose last check failed or needs a sign-in. An Antigravity thread names the
@@ -340,6 +345,9 @@ into reads and writes by what the server declares, and a tool the server adds la
 on. While the server is not connected, **Tools** lists only the tools you switched off, so you can
 switch them back on. Only Claude and Codex hide switched-off tools; other agents still get every
 tool, and the window names them. Running threads may keep the old list until their next session.
+
+Codex also starts the servers in its own `config.toml`, whatever the switches in **Settings → MCP** say;
+turn those off in Codex.
 
 Enable servers for the whole environment or override their enabled state for a project. Mobile
 Settings lists each environment's servers and lets you switch them on or off for that environment;
