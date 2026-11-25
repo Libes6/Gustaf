@@ -404,7 +404,7 @@ const make = Effect.fn("RelayHost.make")(function* (
       if (device === undefined) return Effect.void;
       const last = device.lastSeenAt === undefined ? 0 : Date.parse(device.lastSeenAt);
       if (nowMs - last < LAST_SEEN_WRITE_INTERVAL_MS) return Effect.void;
-      const seen = new Date(nowMs).toISOString();
+      const seen = DateTime.formatIso(DateTime.makeUnsafe(nowMs));
       return updateDevices((current) =>
         current.map((candidate) =>
           candidate.key === key ? { ...candidate, lastSeenAt: seen } : candidate,
@@ -555,15 +555,19 @@ const make = Effect.fn("RelayHost.make")(function* (
     }
     const linkAccess = approval.view.peerLink?.access;
     // A link's code carries the access the user is allowing, and this computer's policy may cap it.
-    const issued = yield* failIssue(
+    const credential = yield* failIssue(
       approval,
       linkAccess === undefined
-        ? issuePairingToken(approval.view.name, approval.key, false)
-        : auth.issuePairingCredential({
-            access: linkAccess,
-            purpose: "peer-link",
-            label: `Link · ${approval.view.name} (relay)`,
-          }),
+        ? issuePairingToken(approval.view.name, approval.key, false).pipe(
+            Effect.map((link) => link.credential),
+          )
+        : auth
+            .issuePairingCredential({
+              access: linkAccess,
+              purpose: "peer-link",
+              label: `Link · ${approval.view.name} (relay)`,
+            })
+            .pipe(Effect.map((link) => link.credential)),
     );
     const allowedAt = DateTime.formatIso(yield* DateTime.now);
     yield* updateDevices((current) => {
@@ -580,7 +584,7 @@ const make = Effect.fn("RelayHost.make")(function* (
         },
       ];
     });
-    approval.settle(ready(issued.credential));
+    approval.settle(ready(credential));
     return yield* status();
   });
 
