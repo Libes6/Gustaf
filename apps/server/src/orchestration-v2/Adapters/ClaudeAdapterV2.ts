@@ -9200,7 +9200,8 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
             if (
               status.status !== "needs-auth" ||
               status.scope === "claudeai" ||
-              status.source === "plugin"
+              status.source === "plugin" ||
+              status.name.startsWith("plugin:")
             )
               continue;
             const key = `${liveQuery.nativeThreadId}\u0000${status.name}`;
