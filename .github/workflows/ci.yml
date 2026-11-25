@@ -36,7 +36,6 @@ jobs:
       test_web: ${{ steps.detect.outputs.test_web }}
       test_server: ${{ steps.detect.outputs.test_server }}
       rust: ${{ steps.detect.outputs.rust }}
-      release_smoke: ${{ steps.detect.outputs.release_smoke }}
       mobile_native: ${{ steps.detect.outputs.mobile_native }}
     steps:
       # Only the package manifests the script reads to build the dependency graph.
@@ -546,28 +545,6 @@ jobs:
       - name: Lint mobile native sources
         run: vp run lint:mobile
 
-  release_smoke:
-    name: Release Smoke
-    needs: changes
-    if: ${{ !cancelled() && needs.changes.outputs.release_smoke != 'false' }}
-    runs-on: ubuntu-24.04
-    timeout-minutes: 20
-    steps:
-      - name: Checkout
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
-        with:
-          sparse-checkout: |
-            /*
-            !/.repos/
-            !/apps/mobile/modules/t3-terminal/Vendor/**/*.a
-          sparse-checkout-cone-mode: false
-
-      - name: Setup Vite+
-        uses: ./.github/actions/setup-ci-deps
-
-      - name: Exercise release-only workflow steps
-        run: node scripts/release-smoke.ts
-
   # Branch protection requires this job by its name, `Check`. It fails when any
   # other job fails, is cancelled, or is skipped without a reason, so splitting
   # or resharding jobs needs no ruleset change. Add every new job to `needs`.
@@ -576,18 +553,7 @@ jobs:
   check:
     name: Check
     if: ${{ always() }}
-    needs:
-      [
-        changes,
-        lint,
-        build,
-        test,
-        test_web,
-        test_server,
-        rust,
-        mobile_native_static_analysis,
-        release_smoke,
-      ]
+    needs: [changes, lint, build, test, test_web, test_server, rust, mobile_native_static_analysis]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:

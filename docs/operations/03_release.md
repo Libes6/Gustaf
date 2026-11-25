@@ -57,4 +57,4 @@ Delete the release and its tag (`gh release delete vX.Y.Z --cleanup-tag`). `rele
 ## Known gaps
 
 - The in-app update path has not been exercised on a real installed app on every platform; the first release after a change here should be installed and updated once by hand per platform.
-- A few scripts (`release-smoke.ts`, `resolve-nightly-release.ts`, `build-npm-launcher.ts`) still describe T3's nightly and npm pipeline; nothing in the Gustaf release uses them. `ci.yml` runs `release-smoke.ts` anyway.
+- A few scripts (`release-smoke.ts`, `resolve-nightly-release.ts`, `build-npm-launcher.ts`) still describe T3's nightly and npm pipeline; nothing in the Gustaf release uses them. `release-smoke.ts` already fails (it needs a deleted test file and an unused pnpm patch), so CI does not run it.
