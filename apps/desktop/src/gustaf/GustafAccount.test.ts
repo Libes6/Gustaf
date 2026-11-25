@@ -302,6 +302,7 @@ describe("GustafAccount service", () => {
             const cred = yield* account.getRelayClientCredential;
             assert.strictEqual(cred.deviceId, "dev-1");
             assert.strictEqual(cred.deviceToken, "gdt_device-secret-tok");
+            assert.strictEqual(cred.relayUrl, "https://cloud.example.test");
 
             // Wait briefly for detached relay sync fiber, or trigger deterministic sync directly
             yield* account.syncRelayCredentialToBackend;

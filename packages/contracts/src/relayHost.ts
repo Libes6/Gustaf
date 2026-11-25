@@ -11,10 +11,20 @@ export const RelayHostDevice = Schema.Struct({
   approvedAt: Schema.String,
   /** Compare with the code the phone shows to rule out a relay in the middle. */
   safetyCode: Schema.String,
+  /** When it last opened a tunnel here. Absent on servers from before trusted devices. */
+  lastSeenAt: Schema.optional(Schema.String),
+  /**
+   * Whether this computer's user allowed it once in a way that "Trust my other devices" can
+   * repeat: a pinned key. Absent on servers from before trusted devices.
+   */
+  trusted: Schema.optional(Schema.Boolean),
 });
 export type RelayHostDevice = typeof RelayHostDevice.Type;
 
-/** A device that scanned this computer's QR code, or asks to link its agents here, and waits for the user's answer. */
+/**
+ * A device that scanned this computer's QR code, asked to pair from its account's computer list,
+ * or asks to link its agents here, and waits for the user's answer.
+ */
 export const RelayHostPendingDevice = Schema.Struct({
   id: TrimmedNonEmptyString,
   name: Schema.String,
@@ -22,6 +32,11 @@ export const RelayHostPendingDevice = Schema.Struct({
   safetyCode: Schema.String,
   /** Set when the device asks to link its agents here instead of pairing as a client. */
   peerLink: Schema.optional(Schema.Struct({ access: AuthMcpClientAccess })),
+  /**
+   * Set when the device asked from its account's computer list instead of scanning the QR code,
+   * so nothing but its safety code vouches for it.
+   */
+  viaAccount: Schema.optional(Schema.Boolean),
 });
 export type RelayHostPendingDevice = typeof RelayHostPendingDevice.Type;
 
@@ -49,6 +64,8 @@ export const RelayHostStatus = Schema.Struct({
   devices: Schema.Array(RelayHostDevice),
   pending: Schema.Array(RelayHostPendingDevice),
   offer: Schema.optional(RelayHostPairingOffer),
+  /** "Trust my other devices": off unless the user turned it on. Absent on older servers. */
+  trustOtherDevices: Schema.optional(Schema.Boolean),
 });
 export type RelayHostStatus = typeof RelayHostStatus.Type;
 
@@ -68,3 +85,7 @@ export type RelayHostDecisionInput = typeof RelayHostDecisionInput.Type;
 
 export const RelayHostRevokeInput = Schema.Struct({ key: TrimmedNonEmptyString });
 export type RelayHostRevokeInput = typeof RelayHostRevokeInput.Type;
+
+/** Turns "Trust my other devices" on or off; off also ends the sessions it let in. */
+export const RelayHostTrustInput = Schema.Struct({ enabled: Schema.Boolean });
+export type RelayHostTrustInput = typeof RelayHostTrustInput.Type;

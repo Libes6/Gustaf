@@ -48,6 +48,7 @@ import {
   RelayHostPairingOffer,
   RelayHostRevokeInput,
   RelayHostStatus,
+  RelayHostTrustInput,
 } from "./relayHost.ts";
 import {
   ExecutionEnvironmentDescriptor,
@@ -1159,6 +1160,14 @@ class EnvironmentRelayHostHttpApi extends HttpApiGroup.make("relayHost")
     HttpApiEndpoint.post("revokeDevice", "/api/relay-host/devices/revoke", {
       headers: OptionalBearerHeaders,
       payload: RelayHostRevokeInput,
+      success: RelayHostStatus,
+      error: RelayHostErrors,
+    }).middleware(EnvironmentAuthenticatedAuth),
+  )
+  .add(
+    HttpApiEndpoint.put("setTrust", "/api/relay-host/trust", {
+      headers: OptionalBearerHeaders,
+      payload: RelayHostTrustInput,
       success: RelayHostStatus,
       error: RelayHostErrors,
     }).middleware(EnvironmentAuthenticatedAuth),

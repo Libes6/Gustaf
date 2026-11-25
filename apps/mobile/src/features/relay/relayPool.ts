@@ -18,6 +18,7 @@ export const gustafRelay = makeGustafRelayClient({
     }
     return device.token;
   },
+  relayUrl: async () => (await import("../account/accountApi")).resolveAccountApiUrl(),
   native: async () => {
     const [{ getRandomBytes }, { phoneDisplayName }] = await Promise.all([
       import("expo-crypto"),

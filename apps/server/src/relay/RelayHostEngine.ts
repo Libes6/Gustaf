@@ -547,6 +547,7 @@ function parseHello(payload: Uint8Array): RelayClientHello | null {
       name,
       ...(typeof value.pairingSecret === "string" ? { pairingSecret: value.pairingSecret } : {}),
       ...(typeof access === "string" ? { peerLink: { access } } : {}),
+      ...(value.accountPairing === true ? { accountPairing: true as const } : {}),
     };
   } catch {
     return null;

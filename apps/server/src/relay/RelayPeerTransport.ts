@@ -7,6 +7,7 @@ import {
   noiseKeyPairFromSecret,
   relaySafetyCode,
 } from "@t3tools/shared/relayNoise";
+import { parseRelayComputers } from "@t3tools/shared/relayComputers";
 import { toBase64Url } from "@t3tools/shared/relayTunnel";
 import {
   type RelayTunnelClientOptions,
@@ -154,33 +155,10 @@ async function listComputers(credential: {
   });
   if (response.status === 401) return { machines: [], problem: "signed_out" };
   if (!response.ok) return { machines: [], problem: "unavailable" };
-  const body = (await response.json()) as {
-    readonly online?: ReadonlyArray<unknown>;
-    readonly computers?: ReadonlyArray<{
-      readonly id?: unknown;
-      readonly name?: unknown;
-      readonly online?: unknown;
-    }>;
+  const listed = parseRelayComputers(await response.json());
+  return {
+    machines: listed.filter((machine) => machine.deviceId !== credential.deviceId),
   };
-  const online = new Set((body.online ?? []).filter((id): id is string => typeof id === "string"));
-  // An API from before names were listed only knows which computers are online.
-  const listed =
-    body.computers?.flatMap((computer) =>
-      typeof computer.id === "string"
-        ? [
-            {
-              deviceId: computer.id,
-              name:
-                typeof computer.name === "string" && computer.name.trim() !== ""
-                  ? computer.name.trim().slice(0, 100)
-                  : `Computer ${computer.id.slice(0, 8)}`,
-              online: computer.online === true || online.has(computer.id),
-            },
-          ]
-        : [],
-    ) ??
-    [...online].map((id) => ({ deviceId: id, name: `Computer ${id.slice(0, 8)}`, online: true }));
-  return { machines: listed.filter((machine) => machine.deviceId !== credential.deviceId) };
 }
 
 const make = Effect.gen(function* () {

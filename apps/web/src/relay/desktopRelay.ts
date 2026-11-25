@@ -24,6 +24,8 @@ function makeDesktopRelay() {
         );
       }
     },
+    relayUrl: async () => (await relayClient.credential()).relayUrl,
+    selfDeviceId: async () => (await relayClient.credential()).deviceId,
     native: async () => ({
       name: (await relayClient.credential()).deviceName,
       randomBytes: (length) => crypto.getRandomValues(new Uint8Array(length)),
