@@ -71,8 +71,6 @@ const ALLOWED: Readonly<Record<string, string>> = {
     "T3 Connect plan link; rendered only when hasCloudPublicConfig() is true.",
   "packages/contracts/src/environmentHttp.ts":
     "Troubleshooting doc link attached to T3 Connect errors.",
-  "packages/contracts/src/t3ProjectFile.ts":
-    "JSON Schema id and editor hint for t3.json; read by the user's editor, never by the app.",
   "packages/shared/src/connectAuth.ts":
     "Default hosted-app origin for generated links and the T3 Connect CLI sign-in.",
   "packages/shared/src/providerAuthReturnUrl.ts":
