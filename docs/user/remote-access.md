@@ -462,7 +462,10 @@ asked to link a machine by name offers the same computers on its card.
 
 Everything else works as for any link: the access you pick, **Forget** and
 one-way links. **Also link back…** is not offered for these: to let the other
-computer's agents work here, link from there, and you allow it here. Traffic goes through the relay end to end
+computer's agents work here, link from there, and you allow it here. On the
+other computer, revoking the link's “T3 Code · …” session under Authorized
+clients ends the link; revoking the computer itself under **Any network (Gustaf
+relay)** also stops it opening a tunnel there. Traffic goes through the relay end to end
 encrypted and counts toward your account's monthly relay traffic and its limit
 of open connections; when a computer is offline, signed out, over a limit, on a
 Gustaf from before relay links, or on another account, the link says so, and it
