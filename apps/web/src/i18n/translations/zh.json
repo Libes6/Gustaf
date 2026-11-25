@@ -6305,7 +6305,7 @@
   "bd2304f25f6f999e": "{selected, plural, other {已选择 {selected}/{total} 个}}",
   "228cd9fd55a55070": "无法再次检查项目。{error}",
   "1cc599c5f5874014": "手机",
-  "0f7c08d8284fee68": "适用于 iPhone 和 Android 的 Gustaf 应用",
+  "ef7cbba6708dcd66": "适用于 iPhone 和 Android 的 Gustaf 应用",
   "431bee88ecc944e4": "检查 T3 Connect",
   "c747696796f64468": "T3 Connect 已开启，但应用无法访问这台电脑。",
   "96557a906f6167b9": "已登录。请共享这台电脑，以便应用访问。",
@@ -6388,7 +6388,7 @@
     },
     " 历史记录"
   ],
-  "0070a15f6b693068": "在手机上使用 Gustaf",
+  "9342a2a15019e51a": "在手机上使用 Gustaf",
   "37c66042ce1906da": "用手机扫码获取应用。",
   "1b4364ef89b07f35": "无法检查 T3 Connect。",
   "7b10d40dd15938e5": "你的手机可以访问这台电脑。请在应用中登录同一账号。",

@@ -6299,7 +6299,7 @@
   "bd2304f25f6f999e": "{selected, plural, one {{selected} von {total} ausgewählt} other {{selected} von {total} ausgewählt}}",
   "228cd9fd55a55070": "Projekte konnten nicht erneut geprüft werden. {error}",
   "1cc599c5f5874014": "Smartphone",
-  "0f7c08d8284fee68": "T3-Code-App für iPhone und Android",
+  "ef7cbba6708dcd66": "Gustaf-App für iPhone und Android",
   "431bee88ecc944e4": "T3 Connect prüfen",
   "c747696796f64468": "T3 Connect ist aktiv, aber die App kann diesen Computer nicht erreichen.",
   "96557a906f6167b9": "Angemeldet. Gib diesen Computer frei, damit die App ihn erreichen kann.",
@@ -6379,7 +6379,7 @@
     },
     "-Verlauf"
   ],
-  "0070a15f6b693068": "Gustaf auf dem Smartphone nutzen",
+  "9342a2a15019e51a": "Gustaf auf dem Smartphone nutzen",
   "37c66042ce1906da": "Scanne mit deinem Smartphone, um die App zu holen.",
   "1b4364ef89b07f35": "T3 Connect konnte nicht geprüft werden.",
   "7b10d40dd15938e5": "Dein Smartphone kann diesen Computer erreichen. Melde dich in der App mit demselben Konto an.",
