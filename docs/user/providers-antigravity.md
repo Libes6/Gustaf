@@ -1,7 +1,7 @@
 # Antigravity
 
 Gustaf runs Google's official Antigravity ACP agent on your selected environment.
-T3 manages its own CLI installation and sign-in, separate from your terminal or IDE. Google controls
+Gustaf manages its own CLI installation and sign-in, separate from your terminal or IDE. Google controls
 which models and account access are available through this agent.
 
 ## Set up Antigravity
@@ -58,11 +58,11 @@ Leave the field blank to use the managed runtime, or a compatible executable on
 ## Update the managed runtime
 
 In web or desktop provider settings, choose **Update Antigravity** when an update
-is available. T3 checks Google's CLI release channel while provider update checks
+is available. Gustaf checks Google's CLI release channel while provider update checks
 are enabled. Installing or reinstalling also checks that channel. Updates keep
 your profile and existing runtime available if the new release fails validation.
 
-T3 needs Antigravity 1.5 or newer and recommends 1.5.12 or newer. Sessions do not
+Gustaf needs Antigravity 1.5 or newer and recommends 1.5.12 or newer. Sessions do not
 start on an older runtime: update the managed runtime here, or update the executable
 a custom binary path or `PATH` points at. You may need to sign in again after
 updating from a runtime older than 1.5. Threads already running finish with their
@@ -150,7 +150,7 @@ objective. Antigravity keeps working until it completes the goal or you cancel i
 
 Use Stop to interrupt a running goal, then ask Antigravity to stop pursuing it
 before starting more work. Ordinary follow-ups wait until the running turn ends.
-T3 does not support Antigravity goal status, pause, resume, or clear commands.
+Gustaf does not support Antigravity goal status, pause, resume, or clear commands.
 
 ## Check access and troubleshoot
 

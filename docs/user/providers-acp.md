@@ -42,13 +42,13 @@ without expanding shell expressions.
 ## Where agents run
 
 Registry agents always run on the machine that hosts your Gustaf server. That stays true when you
-connect through `app.t3.codes`, T3 Connect, or a relay.
+connect through T3 Connect or a relay.
 
 Agents install under `tools/<agent-id>/<version>/` inside T3 home. Gustaf verifies SHA-256 when the Registry entry
 provides one; entries without a checksum retain the Registry's HTTPS distribution guarantee.
-Registry `npx` and `uvx` packages use T3-owned npm prefixes and Python tool directories at the exact
+Registry `npx` and `uvx` packages use Gustaf-owned npm prefixes and Python tool directories at the exact
 version published by the Registry. Their commands are available in a new server terminal for
-sign-in and direct use. Removing an agent's last provider instance removes T3-managed binary files
+sign-in and direct use. Removing an agent's last provider instance removes Gustaf-managed binary files
 but keeps package installs. To use an existing local binary, set **Executable override** explicitly.
 
 ## Signing in
@@ -93,7 +93,7 @@ running. Commands the agent names with a `$` prefix appear in Gustaf's `$` skill
 ## Native sessions
 
 When an agent advertises ACP session listing and import support, expand its provider card,
-choose a project, and select **List sessions**. Importing one creates a deterministic T3 thread
+choose a project, and select **List sessions**. Importing one creates a deterministic Gustaf thread
 backed by that native session. Importing the same agent session again returns the existing thread,
 including when another client performs the import.
 
@@ -121,7 +121,7 @@ Devin runs its commands through Gustaf's terminals, and those commands follow th
 permission mode. For other agents, Gustaf shows the command, output, and exit status the agent
 reports but does not run or stop their terminals.
 
-Registry agents can schedule work and use T3's MCP tools. Child-task presentation depends on what
+Registry agents can schedule work and use Gustaf's MCP tools. Child-task presentation depends on what
 the agent exposes: ACP has no portable native subagent-lineage contract, so richer delegation views
 remain agent-specific.
 
@@ -131,7 +131,7 @@ Checkpoint rollback restores your files as usual. ACP agents cannot rewind their
 so the next turn after a rollback starts a fresh agent session and Gustaf sends it the kept
 conversation, without the turns you rolled back.
 
-Registry instances are not used for T3's app-owned text generation, such as thread titles, commit
+Registry instances are not used for Gustaf's app-owned text generation, such as thread titles, commit
 messages, branch names, or pull request descriptions. Configure a text-generation-capable provider
 for those actions.
 

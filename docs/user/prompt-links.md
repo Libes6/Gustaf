@@ -12,12 +12,13 @@ Open the command palette and choose **Copy prompt link**. It copies the draft in
 When the project is on GitHub, **Copy prompt link with repo and model** also adds the repository
 and the model you picked. Sent messages have a **Copy prompt link** button too.
 
-You can also write a link by hand:
+You can also write a link by hand. `<host>` is the address of a hosted web app; Gustaf does
+not run one of its own:
 
 ```
-https://app.t3.codes/new?prompt=Rate%20my%20swearing
-https://app.t3.codes/new?prompt=Fix%20the%20build&repo=owner/name&provider=codex&model=gpt-5.5
-https://app.t3.codes/new?pr=owner/name/123&prompt=Fix%20the%20failing%20check
+https://<host>/new?prompt=Rate%20my%20swearing
+https://<host>/new?prompt=Fix%20the%20build&repo=owner/name&provider=codex&model=gpt-5.5
+https://<host>/new?pr=owner/name/123&prompt=Fix%20the%20failing%20check
 ```
 
 | Parameter  | Meaning                                                                       |
@@ -32,9 +33,8 @@ Encode the prompt for a URL. In JavaScript, use `encodeURIComponent`.
 
 ## Open a link
 
-On app.t3.codes, the link first asks where to open it: the desktop or mobile app, this browser
-when it is connected to a machine, or the download page. Select **Remember my choice** to skip
-this step next time.
+With [Gustaf as your default browser](./default-browser.md), a link opens in the desktop app as a
+draft. Gustaf has no hosted web app, so there is no page that asks where to open a link.
 
 - **No `repo`**: the draft opens without a project, on the machine you used last.
 - **`repo`**: the draft opens in your most recently used project for that repository. A fork
@@ -47,7 +47,7 @@ this step next time.
   worktree. Gustaf checks the code out only after you confirm, because the checkout runs your
   setup script on it.
 
-A thread link with a prompt, such as `https://app.t3.codes/<environment>/<thread>?prompt=…`,
+A thread link with a prompt, such as `https://<host>/<environment>/<thread>?prompt=…`,
 puts the prompt in that thread's composer. If you already typed a draft there, Gustaf asks
 before it replaces it.
 
@@ -57,8 +57,7 @@ malicious.
 
 ## Share a thread
 
-**Copy thread** copies a link such as `https://app.t3.codes/threads/<environment>/<thread>`. Paste
+**Copy thread** copies a link such as `https://<host>/threads/<environment>/<thread>`. Paste
 it anywhere, such as Slack, a GitHub comment, or your notes. On a phone with Gustaf installed, it
-opens the thread in the app. Elsewhere, opening it asks where to open it, like a prompt link, then
-opens the thread. Only someone connected to the machine that runs the thread can see it. In Gustaf,
+opens the thread in the app. Only someone connected to the machine that runs the thread can see it. In Gustaf,
 a thread link in a message opens the thread in the app.

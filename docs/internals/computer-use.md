@@ -49,7 +49,7 @@ with a Swift helper ([`native/computer-use`](../../native/computer-use)); the wi
 ## macOS identity: whose permissions these are
 
 - Grants belong to the signed bundle: `io.github.libes6.gustaf` for installed builds. A dev run
-  is its own bundle, `com.t3tools.t3code.dev.<checkout folder>` shown as "T3 Code (Dev)", so each
+  is its own bundle, `com.t3tools.t3code.dev.<checkout folder>` shown as "Gustaf (Dev)", so each
   worktree needs its own grants and a grant to the installed app does not cover it.
 - Gustaf is signed without a Developer ID unless the release has `CSC_LINK`, so macOS may forget
   both grants after every update and the user grants them again.

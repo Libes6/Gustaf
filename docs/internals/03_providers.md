@@ -31,7 +31,7 @@ clients read declared capabilities, never provider names.
   subagent capabilities the provider lacks so orchestration degrades cleanly (for example, portable
   context handoff for forks). A capability left enabled that fails at runtime is a bug.
 - **Never emulate missing permission modes.** Expose only modes the provider enforces natively; do
-  not fake a mode by auto-answering approvals in T3. Unoffered stored modes fall back to Supervised.
+  not fake a mode by auto-answering approvals in Gustaf. Unoffered stored modes fall back to Supervised.
   Pass native approval and question option IDs through unchanged, and ensure every request can be
   declined.
 - **Hide plan mode unless it produces proposed-plan cards.**
@@ -55,7 +55,7 @@ clients read declared capabilities, never provider names.
   read-only installs (such as Nix) manual-only.
 - **Attachments stay outside the project workspace.** Never copy uploads into the project tree to
   bypass a provider's sandbox or approval rules.
-- **T3 MCP tools.** Inject the thread's authenticated MCP server so agents can reach T3 tools, and
+- **Gustaf MCP tools.** Inject the thread's authenticated MCP server so agents can reach Gustaf tools, and
   keep turns working if that server is unreachable.
 - **User MCP servers reach an agent only when a session opens.** A server's list, its per-agent
   selection and a signed-in server's token are fixed at `session/new` (or the adapter's equivalent),
@@ -94,7 +94,7 @@ Traps that have broken multiple adapters:
 - **Early Stop.** Cancelling before the provider registers the prompt can be ignored or strand a
   session. Gate cancellation on the provider's turn-started signal.
 - **Work outliving a turn.** Background tasks, subagents, and provider-initiated continuations can
-  report after T3's turn settles. Route subagent updates by subagent (not active run), request
+  report after Gustaf's turn settles. Route subagent updates by subagent (not active run), request
   continuations when needed, and report pending background work so idle cleanup does not kill the
   session.
 - **Terminal settlement.** Every terminal path (completion, Stop, provider error, process exit) must

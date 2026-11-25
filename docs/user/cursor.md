@@ -21,7 +21,7 @@ and installed plugins under `~/.cursor/plugins`. A project's own Cursor config, 
 `.cursor/mcp.json`, loads only in **Full access**; in the other
 [permission modes](./permission-modes.md) a checkout cannot start MCP servers. Plugin tools
 can appear without a login; OAuth MCP servers still need credentials. Run `agent mcp login <server>`
-with the cwd set to the T3 project root (tokens land in
+with the cwd set to the Gustaf project root (tokens land in
 `~/.cursor/projects/<folder-slug>/mcp-auth.json`). Cursor desktop Connections auth does not write
 that file, and the local SDK cannot complete interactive MCP OAuth itself—auth attempts fail with
 messages such as "MCP authentication is not supported in local SDK runs" or that the auth server

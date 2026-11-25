@@ -1,7 +1,7 @@
 # Product usage data and privacy
 
 Gustaf sends no product analytics. It has no built-in analytics endpoint, no crash reporter, and
-no connection to T3 Code's services (T3 Connect, its hosted app, or its relay). Your prompts, code,
+no connection to the services of the upstream T3 Code project (T3 Connect, its hosted app, or its relay). Your prompts, code,
 and files go from your machine to your providers, not to Gustaf.
 
 ## What reaches Gustaf Cloud
