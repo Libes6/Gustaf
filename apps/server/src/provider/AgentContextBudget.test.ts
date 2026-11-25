@@ -1,12 +1,13 @@
 import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { expect, it } from "@effect/vitest";
-import { ProviderInstanceId } from "@t3tools/contracts";
+import { EnvironmentId, ProviderInstanceId, ThreadId } from "@t3tools/contracts";
 import { McpProviderSessions } from "@t3tools/provider-core/server/McpProviderSessions";
 import * as NodeSqliteClient from "@t3tools/shared/nodeSqliteClient";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-import { McpServer } from "effect/ai";
+import * as Context from "effect/Context";
+import { McpSchema, McpServer } from "effect/ai";
 
 import { AssetSigner } from "../assets/AssetSigner.ts";
 import { ServerSecretStore } from "../auth/ServerSecretStore.ts";
@@ -18,6 +19,7 @@ import { GitManager } from "../git/GitManager.ts";
 import { GitWorkflowService } from "../git/GitWorkflowService.ts";
 import { TaskFolders } from "../workspace/TaskFolders.ts";
 import * as McpHttpServer from "../mcp/McpHttpServer.ts";
+import * as McpInvocationContext from "../mcp/McpInvocationContext.ts";
 import { PreviewAutomationBroker } from "../mcp/PreviewAutomationBroker.ts";
 import {
   CLAUDE_PROVIDER,
@@ -155,29 +157,112 @@ it.effect("only request_secret and send_to_user ask Claude Code to load them up 
   }).pipe(Effect.provide(layerAdvertisedTools)),
 );
 
+// What a thread's tool list holds in each situation. The first is an ordinary thread with the
+// agent browser, devices and a forge; the others take one thing away. The list is what a client
+// that loads every tool up front puts in the model's context, so deferring clients cost less.
+const threadScope = (
+  overrides: Partial<Omit<McpInvocationContext.McpInvocationScope, "capabilities">> & {
+    readonly subagent?: boolean;
+    readonly capabilities?: ReadonlyArray<McpInvocationContext.McpCapability>;
+  } = {},
+): McpInvocationContext.McpInvocationScope => {
+  const { subagent, capabilities, ...scope } = overrides;
+  return {
+    environmentId: EnvironmentId.make("environment-budget"),
+    requestNamespace: "provider-session-budget",
+    thread: {
+      threadId: ThreadId.make("thread-budget"),
+      providerSessionId: "provider-session-budget",
+      providerInstanceId: ProviderInstanceId.make("codex"),
+      ...(subagent === true ? { subagent: true } : {}),
+    },
+    client: undefined,
+    capabilities: new Set(
+      capabilities ?? [
+        "preview",
+        "orchestration",
+        "worktree",
+        "device",
+        "pull-requests",
+        "issues",
+        "background-wait",
+      ],
+    ),
+    issuedAt: 1,
+    // Linked environments, agent feedback and workflows are betas that start off.
+    linkedEnvironments: false,
+    agentFeedback: "off",
+    workflows: false,
+    forge: true,
+    ...scope,
+  };
+};
+
+const modelFacingTools = (tools: ReadonlyArray<{ readonly tool: McpSchema.Tool }>) =>
+  utf8Bytes(
+    JSON.stringify(
+      // The model sees these fields. outputSchema and annotations are protocol metadata.
+      tools.map(({ tool }) => ({
+        name: tool.name,
+        description: tool.description,
+        inputSchema: tool.inputSchema,
+      })),
+    ),
+  );
+
 // CI rejects a PR that raises any value above main's agentContextBudget.json, so growth
 // needs the agent-context-increase label. Lower the values when the text shrinks.
 it.effect("agent context matches the committed budget", () =>
   Effect.gen(function* () {
     const mcp = yield* McpServer.McpServer;
+    // Exactly what /mcp lists to a thread: each tool's predicate reads the request's scope.
+    const listedTo = (scope: McpInvocationContext.McpInvocationScope) =>
+      Effect.sync(() =>
+        mcp.tools.filter(({ annotations }) => {
+          const enabledWhen = Context.getOrUndefined(annotations, McpSchema.EnabledWhen);
+          return (
+            enabledWhen === undefined || enabledWhen({ protocolVersion: "", capabilities: {} })
+          );
+        }),
+      ).pipe(Effect.provideService(McpInvocationContext.McpInvocationContext, scope));
     const measured = {
       claudeSystemAppendBytes: utf8Bytes(claudeSystemAppend()),
       codexAdditionalContextBytes: utf8Bytes(codexAdditionalContext()),
-      // The model sees these fields. outputSchema and annotations are protocol metadata.
-      mcpToolListJsonBytes: utf8Bytes(
-        JSON.stringify(
-          mcp.tools.map(({ tool }) => ({
-            name: tool.name,
-            description: tool.description,
-            inputSchema: tool.inputSchema,
-          })),
+      // Every tool the server registers, whoever would see it.
+      mcpToolListJsonBytes: modelFacingTools(mcp.tools),
+      mcpToolListJsonBytesNormalThread: modelFacingTools(yield* listedTo(threadScope())),
+      mcpToolListJsonBytesDelegatedChild: modelFacingTools(
+        yield* listedTo(threadScope({ subagent: true })),
+      ),
+      mcpToolListJsonBytesNoBrowserOrDevices: modelFacingTools(
+        yield* listedTo(
+          threadScope({
+            capabilities: [
+              "orchestration",
+              "worktree",
+              "pull-requests",
+              "issues",
+              "background-wait",
+            ],
+          }),
         ),
       ),
+      // `forge` is the only forge switch: a project on no forge T3 reads loses the PR and CI tools.
+      mcpToolListJsonBytesNoForge: modelFacingTools(yield* listedTo(threadScope({ forge: false }))),
     };
 
     expect(
       measured,
       "Set agentContextBudget.json to the measured values. Before you cut text to fit, run the evals that cover it (evals/README.md).",
     ).toEqual(budget);
+    // A scenario that saves nothing means its scope stopped hiding what it should.
+    for (const scenario of [
+      measured.mcpToolListJsonBytesDelegatedChild,
+      measured.mcpToolListJsonBytesNoBrowserOrDevices,
+      measured.mcpToolListJsonBytesNoForge,
+    ]) {
+      expect(scenario).toBeLessThan(measured.mcpToolListJsonBytesNormalThread);
+    }
+    expect(measured.mcpToolListJsonBytesNormalThread).toBeLessThan(measured.mcpToolListJsonBytes);
   }).pipe(Effect.provide(layerAdvertisedTools)),
 );
