@@ -62,7 +62,7 @@ The most common defect in this repo is a change that works on the path you teste
 - **Contracts.** Wire changes go in `packages/contracts` so server, web, mobile, and desktop follow.
 - **Reverse states.** Every way in needs a way out and a way to see it (snooze/unsnooze, close/reopen). A one-way door is a bug.
 - **Connection modes.** Local, remote/relay, and tunnel; multi-device and multi-environment.
-- **Languages.** Translate user-facing copy in `apps/{web,mobile}/src/i18n/translations` (`vp run i18n:generate` / `vp run i18n:check`) and `apps/marketing/src/i18n`. See [14_i18n.md](docs/internals/14_i18n.md).
+- **Languages.** Translate user-facing copy in `apps/{web,mobile}/src/i18n/translations` (`vp run i18n:generate` / `vp run i18n:check`). See [14_i18n.md](docs/internals/14_i18n.md).
 - **Docs.** Check whether the change makes existing guidance inaccurate. Follow [Documentation](#documentation).
 
 ## Dev servers and test data
@@ -115,7 +115,7 @@ Most code changes do not need an internal documentation change. Agents can read 
 ## Where code lives
 
 - `apps/server` - WebSocket, event-sourced orchestration (`Orchestrator` → `EventSink` → `EffectWorker`), providers, checkpointing. Read [02_effect-services.md](docs/internals/02_effect-services.md) and `.repos/effect/LLMS.md`.
-- `apps/web` - React/Vite UI. `apps/desktop` wraps it; `apps/mobile` is React Native; `apps/marketing` is the site.
+- `apps/web` - React/Vite UI. `apps/desktop` wraps it; `apps/mobile` is React Native.
 - `packages/contracts` - Effect/Schema wire contracts plus small derived helpers. No heavy runtime logic.
 - `packages/shared` - shared runtime utils, subpath exports, no barrel.
 - `packages/client-runtime` - client connection and domain state shared by web and mobile.

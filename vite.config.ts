@@ -527,8 +527,6 @@ export default defineConfig({
           "**/*.{test,spec}.{ts,tsx,js,jsx,mts,cts,mjs,cjs}",
           "**/testkit/**",
           "**/_generated/**",
-          // Real user quotes stay verbatim.
-          "apps/marketing/src/lib/tweets.ts",
         ],
         rules: { "t3code/no-em-dash-copy": "error" },
       },

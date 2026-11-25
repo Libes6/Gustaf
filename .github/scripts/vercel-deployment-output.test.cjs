@@ -10,13 +10,10 @@ const preview = readFileSync(join(__dirname, "../workflows/web-preview.yml"), "u
 const stepPattern =
   /        name: (?:Build staged deployment|Deploy preview)\n        shell: bash\n(?:        env:\n(?:          .*\n)+)?        run: \|\n((?:          .*\n|\n)+)/g;
 const steps = [
-  ...Array.from(release.matchAll(stepPattern), (match, index) => [
-    index === 0 ? "hosted web" : "marketing",
-    match[1],
-  ]),
+  ...Array.from(release.matchAll(stepPattern), (match) => ["hosted web", match[1]]),
   ...Array.from(preview.matchAll(stepPattern), (match) => ["web preview", match[1]]),
 ];
-assert.equal(steps.length, 3, "Expected both release steps and the preview step");
+assert.equal(steps.length, 2, "Expected the release step and the preview step");
 
 const url = "https://t3code-fixture-pinglabs.vercel.app";
 const warning = 'Error while parsing config file: "/runner/t3code/pnpm-lock.yaml"';
