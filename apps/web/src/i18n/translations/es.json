@@ -9257,6 +9257,7 @@
   "24be5fb19797874f": "Tools: {tools}, resources: {resources}",
   "2e246f97346a422d": "Tools: {tools}",
   "e7907aed68dbae0d": "≈ {tokens} tokens if the provider does not defer loading",
+  "341c5c730ba00bd5": "≈ {tokens} tokens if the provider does not defer loading; ≈ {all} for {names}, which cannot switch off tools",
   "c6e0c3cc685b82c0": "Claude and Codex defer tool schemas and Antigravity loads them lazily, so they usually cost less. Other agents may add all of it to every thread.",
   "88217452c2dc5426": "Could not read: {paths}",
   "724baefb1716842b": "MCP servers",

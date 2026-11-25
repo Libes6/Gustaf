@@ -63,6 +63,12 @@ clients read declared capabilities, never provider names.
   [session manager](../../apps/server/src/orchestration-v2/ProviderSessionManager.ts) reopens an idle
   per-thread session before the next message; Codex shares one session between threads, so a thread
   there keeps the old token until that session closes.
+- **Only Claude and Codex filter a user server's tools by name.** They take the list in their own
+  session options (`filtersMcpTools`). ACP's `McpServer` carries only a name, command, args and env
+  or a url and headers, with no field for tools, and `_meta` is agent-specific. The Cursor SDK's and
+  OpenCode's server configs have none either. Set `filtersMcpTools` on an adapter only after its
+  agent's documented option is wired and tested; the web client reads
+  `MCP_TOOL_FILTER_DRIVERS` to say which agents still load every tool.
 - **Antigravity merges MCP servers from two places.** The agent combines the servers in `session/new`
   with `$GEMINI_HOME/config/mcp_config.json`, and a client server replaces a config server of the
   same name. The profile must not hold that file, or its servers load beside the user's list unseen.

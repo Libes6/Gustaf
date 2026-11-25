@@ -51,6 +51,7 @@ import {
   codexLoadsOwnServers,
   groupMcpTools,
   isHeavyMcpServer,
+  mcpServerWeight,
   mcpStatusKey,
   mcpToolFilterUnsupported,
   mcpToolGroupMode,
@@ -307,6 +308,11 @@ function McpEnvironmentSettings({
         <McpStatusLine dot="bg-muted-foreground/40" text={gt("Checking…")} />
       );
     }
+    const unsupported = mcpToolFilterUnsupported(
+      settings.mcpServers[id]?.providers,
+      installedDrivers,
+    );
+    const weight = mcpServerWeight(status, settings.mcpServers[id], unsupported);
     const offCount = settings.mcpServers[id]?.disabledTools?.length ?? 0;
     const off = offCount ? gt(" ({count} off)", { count: offCount }) : "";
     switch (status.status) {
@@ -325,18 +331,27 @@ function McpEnvironmentSettings({
                   : gt("Tools: {tools}", { tools })) + off
               }
             />
-            {status.approxTokens !== undefined && (
+            {weight !== undefined && (
               <Tooltip>
                 <TooltipTrigger
                   render={
                     <span
-                      className={`mt-0.5 block pl-3 ${isHeavyMcpServer(status) ? "text-warning" : ""}`}
+                      className={`mt-0.5 block pl-3 ${isHeavyMcpServer({ approxTokens: weight.unfiltered ?? weight.tokens }) ? "text-warning" : ""}`}
                     />
                   }
                 >
-                  {gt("≈ {tokens} tokens if the provider does not defer loading", {
-                    tokens: status.approxTokens.toLocaleString(),
-                  })}
+                  {weight.unfiltered === undefined
+                    ? gt("≈ {tokens} tokens if the provider does not defer loading", {
+                        tokens: weight.tokens.toLocaleString(),
+                      })
+                    : gt(
+                        "≈ {tokens} tokens if the provider does not defer loading; ≈ {all} for {names}, which cannot switch off tools",
+                        {
+                          tokens: weight.tokens.toLocaleString(),
+                          all: weight.unfiltered.toLocaleString(),
+                          names: unsupported.map(driverName).join(", "),
+                        },
+                      )}
                 </TooltipTrigger>
                 <TooltipPopup>
                   {gt(
