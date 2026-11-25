@@ -433,6 +433,42 @@ from that machine's **Settings → Sharing & access**. An address you type alway
 needs a pasted code. From a terminal, use
 `t3 environment link <address> --pairing-code <code> --access <mode>`.
 
+### Link another computer of your Gustaf account, with no address
+
+If both computers are signed in to the same Gustaf account, the Gustaf relay
+can link them with no address, no Tailscale and no pairing code. Sign each in
+first: the desktop app under **Account**, or on a computer with no screen,
+`gustaf relay login` in a terminal (it opens a browser on that computer, so over
+SSH forward the port it prints). Both also need Linked environments turned on.
+
+In **Link**, the computers on your account are listed under your saved machines
+as **Gustaf relay**; one that is offline is shown but cannot be picked. Pick
+one, choose the access, and press **Link**. Gustaf then asks the other
+computer's own user to allow it: its **Settings → Sharing & access → Any
+network (Gustaf relay)** shows **Allow “…” to link its agents here?**, with the
+access and a safety code. Both computers show the same safety code; allow it
+only when the codes match and you just started this link. Being signed in to
+the same account is never enough by itself, so every link, including linking
+again, is allowed on the other computer. The request waits up to five minutes
+and goes away if you cancel.
+
+On a computer with no screen, allow it from a terminal there:
+`gustaf relay requests` lists what waits, with the safety code, and
+`gustaf relay allow <id>` (or `deny`) answers; the first characters of the id
+are enough. From a terminal on the linking computer, `t3 environment machines`
+lists the account's computers and `t3 environment link --relay <name or device
+id> --access <mode>` links one, printing the safety code to compare. An agent
+asked to link a machine by name offers the same computers on its card.
+
+Everything else works as for any link: the access you pick, **Forget** and
+one-way links. **Also link back…** is not offered for these: to let the other
+computer's agents work here, link from there, and you allow it here. Traffic goes through the relay end to end
+encrypted and counts toward your account's monthly relay traffic and its limit
+of open connections; when a computer is offline, signed out, over a limit, on a
+Gustaf from before relay links, or on another account, the link says so, and it
+reconnects by itself when the relay or the computer comes back. A link made
+this way shows as **Gustaf relay** instead of an address.
+
 To link many machines at once, choose **Link several…** (it appears once this
 app has two other machines saved). Tick the machines, pick one access level for
 all of them, and confirm once. A machine can be ticked when this app is

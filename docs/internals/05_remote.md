@@ -42,6 +42,33 @@ side lists and revokes it in Sharing & access like any other session, and owns i
   [`PeerThreadRelay`](../../apps/server/src/peer/PeerThreadRelay.ts) proxies the same stream format
   read-only so there is no second transcript schema to maintain.
 
+### Peer links over the Gustaf relay
+
+A link's address can be the relay's made-up origin (`relayVirtualBaseUrl`) instead of a URL, so a
+server links to another computer of the same Gustaf account with no address and no pairing code.
+The server's own HTTP client routes that origin into a Noise tunnel
+([`RelayPeerTransport`](../../apps/server/src/relay/RelayPeerTransport.ts)); everything above it
+(probes, OAuth, `/mcp`, thread streams) is unchanged.
+
+- **The account proves nothing about who is asking.** Any holder of an account's device token can
+  open a channel to any of its hosts, so a host never lets an unknown key in on that basis. A
+  request to link waits for the host's own user, every time, known key or not; the approved code is
+  a typed link pairing code for exactly the access the user saw. It is held only while Linked
+  environments is on, a few at a time, one per key, and dropped when the requester leaves.
+- **First contact trusts the key the relay presents, and the safety code is the check.** There is no
+  QR code to carry the host's key, so the requester takes it on first use and shows the code both
+  keys produce; the host shows the same one. After approval the key is pinned and later tunnels
+  fail on any other. Linking again re-pins, so the user compares the codes again.
+- **The OAuth sign-in omits `resource` over the tunnel.** The host derives its own address from
+  the request it receives, which the relay replays against loopback, so it would never equal the
+  made-up origin; the endpoint treats the indicator as optional.
+- **Responses stream.** Thread streams are event streams, so the server's tunnel clients hand a
+  response over at its headers (`streamResponses`). Phone clients cannot build a streamed
+  `Response` and keep collecting bodies.
+- **The relay's machine list names the account's computers.** `GET /v1/relay/hosts` answers a
+  device token with `online` ids and, since links, `computers` with names; a client older than that
+  answers ids only.
+
 ## Hosted web is a client
 
 Gustaf ships no hosted web app. A build that serves one sets `VITE_HOSTED_APP_URL` (web) or
