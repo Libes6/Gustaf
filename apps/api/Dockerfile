@@ -5,7 +5,7 @@ RUN npm install --global pnpm@12.14.0
 COPY . .
 RUN pnpm install --filter @gustaf/api --frozen-lockfile --ignore-scripts
 RUN pnpm --filter @gustaf/api build && pnpm --filter @gustaf/api test
-RUN pnpm --filter @gustaf/api deploy --legacy --prod --ignore-scripts --config.allowUnusedPatches=true /runtime
+RUN pnpm --filter @gustaf/api deploy --legacy --prod --ignore-scripts --config.allowUnusedPatches=true --config.strictPeerDependencies=false /runtime
 
 FROM node:26.12.1-bookworm-slim AS runtime
 RUN apt-get update && apt-get install --yes --no-install-recommends curl ca-certificates && apt-get clean
