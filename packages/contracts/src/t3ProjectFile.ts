@@ -23,10 +23,10 @@ const trimmedNonEmpty = (annotations: { readonly description: string }, maxLengt
 
 export const T3ProjectFileScript = Schema.Struct({
   name: trimmedNonEmpty({
-    description: "Display name for the script, shown in the T3 Code scripts menu.",
+    description: "Display name for the script, shown in the Gustaf scripts menu.",
   }),
   command: trimmedNonEmpty({
-    description: "Shell command executed in a T3 Code terminal at the project root.",
+    description: "Shell command executed in a Gustaf terminal at the project root.",
   }),
   icon: Schema.optionalKey(
     ProjectScriptIcon.annotate({
@@ -70,7 +70,7 @@ export const T3ProjectFileScript = Schema.Struct({
     }),
   ),
 }).annotate({
-  description: "A project script that team members can import into T3 Code.",
+  description: "A project script that team members can import into Gustaf.",
 });
 export type T3ProjectFileScript = typeof T3ProjectFileScript.Type;
 
@@ -84,7 +84,7 @@ export const T3ProjectFile = Schema.Struct({
     trimmedNonEmpty(
       {
         description:
-          'Workspace-relative path to the project icon (e.g. "assets/logo.svg"). Checked before T3 Code\'s built-in icon locations.',
+          'Workspace-relative path to the project icon (e.g. "assets/logo.svg"). Checked before Gustaf\'s built-in icon locations.',
       },
       T3_PROJECT_FILE_PATH_MAX_LENGTH,
     ),
@@ -92,19 +92,19 @@ export const T3ProjectFile = Schema.Struct({
   defaultThreadEnvMode: Schema.optionalKey(
     ThreadEnvMode.annotate({
       description:
-        'Where new threads start for this repository: "worktree" for a fresh git worktree, "local" for the current checkout. A per-project setting in T3 Code overrides this; when neither is set, the global default applies.',
+        'Where new threads start for this repository: "worktree" for a fresh git worktree, "local" for the current checkout. A per-project setting in Gustaf overrides this; when neither is set, the global default applies.',
     }),
   ),
   worktreeSubmodules: Schema.optionalKey(
     WorktreeSubmodules.annotate({
       description:
-        'How new worktrees populate git submodules: "recursive" (the default) initializes nested submodules too, "top-level" initializes only those declared by this repository, and "none" leaves every submodule empty for a setup script to handle. A project or environment setting in T3 Code overrides this.',
+        'How new worktrees populate git submodules: "recursive" (the default) initializes nested submodules too, "top-level" initializes only those declared by this repository, and "none" leaves every submodule empty for a setup script to handle. A project or environment setting in Gustaf overrides this.',
     }),
   ),
   ignoreRepositories: Schema.optionalKey(
     Schema.Array(Schema.String).annotate({
       description:
-        "Repositories inside the project folder that T3 Code should leave out of the project, as paths relative to it, such as vendor/big. They are then neither reviewed on their own nor given worktrees.",
+        "Repositories inside the project folder that Gustaf should leave out of the project, as paths relative to it, such as vendor/big. They are then neither reviewed on their own nor given worktrees.",
     }),
   ),
   worktreeLayout: Schema.optionalKey(
@@ -112,7 +112,7 @@ export const T3ProjectFile = Schema.Struct({
       create: trimmedNonEmpty(
         {
           description:
-            "Shell command that lays out a thread's folder for a project tracking several repositories, in place of T3 Code's own worktrees and links. It runs in the project folder with T3_WORKTREE_ROOT (the folder to fill), T3_WORKTREE_PROJECT_PATH (where the project folder goes inside it), T3_WORKTREE_BRANCH, T3_WORKTREE_BASE, T3_WORKTREE_REPOSITORIES (the chosen repositories, one path per line) and T3_PROJECT_ROOT set. Each of the project's repositories it checks out at the same relative place is adopted as the thread's checkout of it, and must be a git worktree of that repository on T3_WORKTREE_BRANCH. It runs again when the folder goes missing, so it must cope with the branch already existing. It has ten minutes.",
+            "Shell command that lays out a thread's folder for a project tracking several repositories, in place of Gustaf's own worktrees and links. It runs in the project folder with T3_WORKTREE_ROOT (the folder to fill), T3_WORKTREE_PROJECT_PATH (where the project folder goes inside it), T3_WORKTREE_BRANCH, T3_WORKTREE_BASE, T3_WORKTREE_REPOSITORIES (the chosen repositories, one path per line) and T3_PROJECT_ROOT set. Each of the project's repositories it checks out at the same relative place is adopted as the thread's checkout of it, and must be a git worktree of that repository on T3_WORKTREE_BRANCH. It runs again when the folder goes missing, so it must cope with the branch already existing. It has ten minutes.",
         },
         T3_PROJECT_FILE_COMMAND_MAX_LENGTH,
       ),
@@ -120,7 +120,7 @@ export const T3ProjectFile = Schema.Struct({
         trimmedNonEmpty(
           {
             description:
-              "Shell command that takes the thread's folder down again, with the same variables. It can run on a folder that is partly gone, and should delete what create generated. T3 Code removes the checkouts it leaves behind.",
+              "Shell command that takes the thread's folder down again, with the same variables. It can run on a folder that is partly gone, and should delete what create generated. Gustaf removes the checkouts it leaves behind.",
           },
           T3_PROJECT_FILE_COMMAND_MAX_LENGTH,
         ),
@@ -142,13 +142,13 @@ export const T3ProjectFile = Schema.Struct({
   scripts: Schema.optionalKey(
     Schema.Array(T3ProjectFileScript)
       .annotate({
-        description: "Project scripts shared with everyone who opens this repository in T3 Code.",
+        description: "Project scripts shared with everyone who opens this repository in Gustaf.",
       })
       .check(Schema.isMaxLength(T3_PROJECT_FILE_MAX_SCRIPTS)),
   ),
 }).annotate({
   title: "T3 project file",
-  description: "Checked-in project configuration for T3 Code (t3.json at the repository root).",
+  description: "Checked-in project configuration for Gustaf (t3.json at the repository root).",
 });
 export type T3ProjectFile = typeof T3ProjectFile.Type;
 

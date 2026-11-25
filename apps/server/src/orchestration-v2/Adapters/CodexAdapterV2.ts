@@ -9275,7 +9275,7 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
                   catch: () =>
                     new ProviderMcpSignInError({
                       server,
-                      detail: `Codex returned a sign-in page for ${server} that T3 Code can't open.`,
+                      detail: `Codex returned a sign-in page for ${server} that Gustaf can't open.`,
                     }),
                 });
                 const redirectUri = params.get("redirect_uri");
