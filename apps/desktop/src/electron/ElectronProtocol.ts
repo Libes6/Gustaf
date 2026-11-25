@@ -17,8 +17,11 @@ import {
 } from "@t3tools/shared/wallpaperFrame";
 
 export const DESKTOP_HOST = "app";
-const DESKTOP_PRODUCTION_SCHEME = "t3code";
-const DESKTOP_DEVELOPMENT_SCHEME = "t3code-dev";
+const DESKTOP_PRODUCTION_SCHEME = "gustaf";
+const DESKTOP_DEVELOPMENT_SCHEME = "gustaf-dev";
+/** Links printed by older servers, and the renderer origin (`t3code://app`) before Gustaf took back its own scheme. */
+export const LEGACY_APP_LINK_PREFIX = "t3code:";
+export const LEGACY_RENDERER_ORIGIN = `t3code://${DESKTOP_HOST}`;
 
 export function getDesktopScheme(isDevelopment: boolean): string {
   return isDevelopment ? DESKTOP_DEVELOPMENT_SCHEME : DESKTOP_PRODUCTION_SCHEME;

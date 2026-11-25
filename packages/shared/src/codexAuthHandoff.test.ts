@@ -47,6 +47,10 @@ describe("Codex desktop handoff", () => {
   it("rejects other handlers, schemes, arbitrary return sites, and non-OpenAI authorization", () => {
     const link = codexAuthHandoffUrl(input);
     expect(readCodexAuthHandoff(link, true)).toBeUndefined();
+    expect(link.startsWith("gustaf://auth/codex?")).toBe(true);
+    expect(codexAuthHandoffUrl(input, true).startsWith("gustaf-dev://auth/codex?")).toBe(true);
+    expect(readCodexAuthHandoff(codexAuthHandoffUrl(input, true), true)).toEqual(input);
+    expect(readCodexAuthHandoff(link.replace("gustaf:", "t3code:"), false)).toBeUndefined();
     expect(readCodexAuthHandoff(link.replace("auth/codex", "auth/other"), false)).toBeUndefined();
     expect(
       readCodexAuthHandoff(

@@ -10,7 +10,10 @@ import * as ElectronProtocol from "../electron/ElectronProtocol.ts";
 import { readChromiumLocalStorage } from "./chromiumLocalStorage.ts";
 import * as DesktopEnvironment from "./DesktopEnvironment.ts";
 
-/** Reads the V1 profile without opening it in Chromium, even while V1 runs. */
+/**
+ * Brings Local Storage written under the `t3code://app` origin into `gustaf://app`: the V1 profile,
+ * and this profile's own data from before the scheme changed. Reads without opening either in Chromium.
+ */
 export class DesktopLegacyLocalStorage extends Context.Service<
   DesktopLegacyLocalStorage,
   {
@@ -20,7 +23,7 @@ export class DesktopLegacyLocalStorage extends Context.Service<
   }
 >()("@t3tools/desktop/app/DesktopLegacyLocalStorage") {}
 
-const MARKER_FILE_NAME = "v1-local-storage-imported";
+const MARKER_FILE_NAME = "legacy-origin-local-storage-imported";
 const V1_PROFILE_NAMES = ["T3 Code (Alpha)", "t3code"];
 
 const make = Effect.gen(function* () {
@@ -59,6 +62,18 @@ const make = Effect.gen(function* () {
     return newest?.directory ?? null;
   });
 
+  /** Oldest first, so the profile's own data wins over V1 for any key both hold. */
+  const findLegacySources = Effect.fn("DesktopLegacyLocalStorage.findLegacySources")(function* (
+    userDataPath: string,
+  ) {
+    const own = path.join(userDataPath, "Local Storage", "leveldb");
+    const v1 = yield* findV1LocalStorage;
+    return [
+      ...(v1 === null ? [] : [v1]),
+      ...(Option.isSome(yield* newestFileMtime(own)) ? [own] : []),
+    ];
+  });
+
   const writeMarker = Effect.gen(function* () {
     const marker = yield* Ref.get(markerPath);
     if (Option.isNone(marker)) return;
@@ -76,23 +91,28 @@ const make = Effect.gen(function* () {
     const marker = path.join(userDataPath, MARKER_FILE_NAME);
     if (yield* fs.exists(marker).pipe(Effect.orElseSucceed(() => true))) return;
     yield* Ref.set(markerPath, Option.some(marker));
-    const directory = yield* findV1LocalStorage;
-    if (directory === null) return yield* writeMarker;
-    const origin = ElectronProtocol.getDesktopUrl(false).replace(/\/$/, "");
-    const read = yield* readChromiumLocalStorage(directory, origin).pipe(
-      Effect.provideService(FileSystem.FileSystem, fs),
-      Effect.provideService(Path.Path, path),
-      Effect.tapError((error) =>
-        Effect.logWarning("Could not read V1 Local Storage; will retry next launch", error),
-      ),
-      Effect.option,
-    );
-    if (Option.isNone(read)) return;
-    yield* Effect.logInfo("V1 Local Storage ready to import", {
-      directory,
-      keys: read.value.size,
+    const directories = yield* findLegacySources(userDataPath);
+    if (directories.length === 0) return yield* writeMarker;
+    const origin = ElectronProtocol.LEGACY_RENDERER_ORIGIN;
+    const merged: Record<string, string> = {};
+    for (const directory of directories) {
+      const read = yield* readChromiumLocalStorage(directory, origin).pipe(
+        Effect.provideService(FileSystem.FileSystem, fs),
+        Effect.provideService(Path.Path, path),
+        Effect.tapError((error) =>
+          Effect.logWarning("Could not read legacy Local Storage; will retry next launch", error),
+        ),
+        Effect.option,
+      );
+      // A partial import would be marked complete, so any unreadable source waits for the next launch.
+      if (Option.isNone(read)) return;
+      Object.assign(merged, Object.fromEntries(read.value));
+    }
+    yield* Effect.logInfo("Legacy Local Storage ready to import", {
+      directories,
+      keys: Object.keys(merged).length,
     });
-    yield* Ref.set(items, Option.some(Object.fromEntries(read.value)));
+    yield* Ref.set(items, Option.some(merged));
   });
 
   return DesktopLegacyLocalStorage.of({
