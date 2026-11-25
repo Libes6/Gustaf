@@ -1069,7 +1069,8 @@ export function resolveWindowsServerAsarIgnoreGlobs(arch: typeof BuildArch.Type)
   ];
 }
 
-export const WINDOWS_PACKAGED_PAYLOAD_FILE_LIMIT = 80;
+// Gustaf's first Windows build measured 107 files; the limit only guards against runaway growth.
+export const WINDOWS_PACKAGED_PAYLOAD_FILE_LIMIT = 120;
 export const WINDOWS_SERVER_RESOURCE_SOURCE_DIR = "apps/desktop/prod-resources/windows-server";
 export const WINDOWS_SERVER_EXTRA_RESOURCES = [
   {
