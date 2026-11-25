@@ -30,6 +30,7 @@ import {
   parseWslRuntimeArchiveMembers,
   readWorkspaceConfig,
   createBuildConfig,
+  resolveUpdaterConfig,
   DESKTOP_FILE_EXCLUSIONS,
   InvalidMacPasskeyRpDomainError,
   InvalidMacPasskeyPublishableKeyError,
@@ -504,47 +505,12 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
     }),
   );
 
-  it.effect("omits update feeds for pull request preview builds", () =>
+  it.effect("leaves update feeds to Gustaf's own updater, never electron-builder's", () =>
     Effect.gen(function* () {
-      const preview = yield* createBuildConfig(
-        "mac",
-        "dmg",
-        "0.0.33-pr.8182.1",
-        false,
-        false,
-        undefined,
-        undefined,
-      );
-      const release = yield* createBuildConfig(
-        "mac",
-        "dmg",
-        "0.0.33",
-        false,
-        false,
-        undefined,
-        undefined,
-      );
-
-      const previewChannel = yield* createBuildConfig(
-        "mac",
-        "dmg",
-        "0.0.41-preview.20260912.1589",
-        false,
-        false,
-        undefined,
-        undefined,
-      );
-
-      assert.isNull(preview.publish);
-      assert.isNull(previewChannel.publish);
-      assert.deepStrictEqual(release.publish, [
-        {
-          provider: "github",
-          owner: "pingdotgg",
-          repo: "t3code",
-          releaseType: "release",
-        },
-      ]);
+      for (const version of ["0.0.33", "0.0.33-pr.8182.1", "0.0.41-preview.20260912.1589"]) {
+        const config = yield* createBuildConfig("mac", "dmg", version, false, false, undefined);
+        assert.isNull(config.publish);
+      }
     }).pipe(
       Effect.provide(
         ConfigProvider.layer(
@@ -554,6 +520,49 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
     ),
   );
 
+  it.effect("ships the updater config only when the build has an update key", () =>
+    Effect.gen(function* () {
+      const resources = (config: Record<string, unknown>) =>
+        (config.extraResources as ReadonlyArray<{ to: string }>).map((entry) => entry.to);
+      const without = yield* createBuildConfig(
+        "linux",
+        "AppImage",
+        "0.0.33",
+        false,
+        false,
+        undefined,
+      );
+      const withKey = yield* createBuildConfig(
+        "linux",
+        "AppImage",
+        "0.0.33",
+        false,
+        true,
+        undefined,
+      );
+      assert.notInclude(resources(without), "gustaf-updater.json");
+      assert.include(resources(withKey), "gustaf-updater.json");
+    }),
+  );
+
+  it("accepts a minisign public key as Tauri prints it, as a .pub file, or as a bare line", () => {
+    const line = "RWS2VY9OwDypWXTFtGhA1MX62+nhmjJNOmEo+IKx26fT8J7/E0qB/QVA";
+    const file = `untrusted comment: minisign public key: 59A93CC04E8F55B6\n${line}\n`;
+    for (const publicKey of [line, file, Buffer.from(file).toString("base64")]) {
+      assert.deepStrictEqual(resolveUpdaterConfig({ publicKey, manifestUrl: undefined }), {
+        publicKey: publicKey.trim(),
+      });
+    }
+    assert.isUndefined(resolveUpdaterConfig({ publicKey: "  ", manifestUrl: undefined }));
+    assert.isUndefined(resolveUpdaterConfig({ publicKey: undefined, manifestUrl: undefined }));
+    assert.throws(() => resolveUpdaterConfig({ publicKey: "oops", manifestUrl: undefined }));
+    assert.strictEqual(
+      resolveUpdaterConfig({ publicKey: line, manifestUrl: "http://localhost:3000/latest.json" })
+        ?.manifestUrl,
+      "http://localhost:3000/latest.json",
+    );
+  });
+
   it.effect("names the Electron window class in the Linux desktop entry", () =>
     Effect.gen(function* () {
       const linux = yield* createBuildConfig(
@@ -562,7 +571,6 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
         "0.0.33",
         false,
         false,
-        undefined,
         undefined,
       );
 
@@ -574,43 +582,11 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
     }),
   );
 
-  it.effect("names updatable AppImages without a version and apart per channel", () =>
-    Effect.gen(function* () {
-      const appImageName = (version: string) =>
-        createBuildConfig("linux", "AppImage", version, false, false, undefined, undefined).pipe(
-          Effect.map((config) => (config.appImage as { artifactName: string }).artifactName),
-        );
-
-      const stable = yield* appImageName("0.0.37");
-      const nightly = yield* appImageName("0.0.38-nightly.20261026.3740");
-
-      assert.notInclude(stable, "${version}");
-      assert.notInclude(nightly, "${version}");
-      assert.notEqual(stable, nightly);
-      assert.match(stable, /^Gustaf-/u);
-      assert.match(nightly, /^Gustaf-Nightly-/u);
-    }).pipe(
-      Effect.provide(
-        ConfigProvider.layer(
-          ConfigProvider.fromEnv({ env: { GITHUB_REPOSITORY: "pingdotgg/t3code" } }),
-        ),
-      ),
-    ),
-  );
-
   it.effect("declares Calendar and Apple Events access for hosted commands in macOS builds", () =>
     Effect.gen(function* () {
       for (const version of ["0.1.0", "0.1.1-nightly.20261019.1"]) {
         for (const signed of [false, true]) {
-          const config = yield* createBuildConfig(
-            "mac",
-            "dmg",
-            version,
-            signed,
-            false,
-            undefined,
-            undefined,
-          );
+          const config = yield* createBuildConfig("mac", "dmg", version, signed, false, undefined);
           const mac = config.mac as { extendInfo: Record<string, unknown> };
           for (const key of [
             "NSCalendarsUsageDescription",
@@ -1748,7 +1724,7 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
   it.effect("signs Windows builds with signtool on Windows and the jsign hook elsewhere", () =>
     Effect.gen(function* () {
       const signedWinConfig = (hostPlatform: string) =>
-        createBuildConfig("win", "nsis", "1.2.3", true, false, undefined, undefined).pipe(
+        createBuildConfig("win", "nsis", "1.2.3", true, false, undefined).pipe(
           Effect.map((config) => config.win as Record<string, unknown>),
           Effect.provideService(HostProcess.Platform, hostPlatform),
         );

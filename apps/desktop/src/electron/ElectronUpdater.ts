@@ -1,34 +1,26 @@
+// @effect-diagnostics nodeBuiltinImport:off -- Starts the detached install helper, which must outlive this process.
+import * as NodeChildProcess from "node:child_process";
+
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 import * as Scope from "effect/Scope";
+import * as Electron from "electron";
+import * as HostProcess from "@t3tools/shared/HostProcess";
 
-import { AppImageUpdater, autoUpdater } from "electron-updater";
+import { GustafUpdater, type UpdateFeed } from "../updates/GustafUpdater.ts";
 
-type AutoUpdater = typeof autoUpdater;
-type SpawnLog = (cmd: string, args?: Array<string>, ...rest: Array<unknown>) => Promise<boolean>;
+export type ElectronUpdaterFeed = UpdateFeed;
 
-// Electron holds the AppImage runtime's keepalive pipe and some files without O_CLOEXEC; a
-// relaunched AppImage inherits them, so old runtimes and FUSE mounts never exit. bash (AppRun
-// already needs it; dash cannot close multi-digit fds) closes them before exec'ing the AppImage.
-// -p skips BASH_ENV and exported functions in the helper only; the AppImage still receives both.
-const CLOSE_INHERITED_FDS_THEN_EXEC =
-  'for fd in /proc/self/fd/*; do fd=${fd##*/}; case $fd in *[!0-9]*|[012]) ;; *) eval "exec $fd>&-" ;; esac; done; exec "$@"';
-
-const relaunchWithoutInheritedDescriptors = (updater: AppImageUpdater) => {
-  const spawnLog = (AppImageUpdater.prototype as unknown as { spawnLog: SpawnLog }).spawnLog;
-  (updater as unknown as { spawnLog: SpawnLog }).spawnLog = function (cmd, args = [], ...rest) {
-    return spawnLog.call(
-      this,
-      "bash",
-      ["-p", "-c", CLOSE_INHERITED_FDS_THEN_EXEC, cmd, cmd, ...args],
-      ...rest,
-    );
-  };
-};
-
-export type ElectronUpdaterFeedUrl = Parameters<AutoUpdater["setFeedURL"]>[0];
+export class ElectronUpdaterFeedError extends Schema.TaggedError<ElectronUpdaterFeedError>()(
+  "ElectronUpdaterFeedError",
+  { cause: Schema.Defect() },
+) {
+  override get message(): string {
+    return "The update feed or its signing key is not usable.";
+  }
+}
 
 export class ElectronUpdaterCheckForUpdatesError extends Schema.TaggedError<ElectronUpdaterCheckForUpdatesError>()(
   "ElectronUpdaterCheckForUpdatesError",
@@ -64,7 +56,8 @@ export class ElectronUpdaterQuitAndInstallError extends Schema.TaggedError<Elect
   },
 ) {
   override get message(): string {
-    return `Electron updater failed to quit and install the update on channel ${this.channel ?? "default"} (silent: ${this.isSilent}, force run after: ${this.isForceRunAfter}).`;
+    const detail = this.cause instanceof Error ? ` ${this.cause.message}` : "";
+    return `Electron updater failed to quit and install the update on channel ${this.channel ?? "default"} (silent: ${this.isSilent}, force run after: ${this.isForceRunAfter}).${detail}`;
   }
 }
 
@@ -78,7 +71,11 @@ export type ElectronUpdaterError = typeof ElectronUpdaterError.Type;
 export class ElectronUpdater extends Context.Service<
   ElectronUpdater,
   {
-    readonly setFeedURL: (options: ElectronUpdaterFeedUrl) => Effect.Effect<void>;
+    readonly setFeedURL: (
+      feed: ElectronUpdaterFeed,
+    ) => Effect.Effect<void, ElectronUpdaterFeedError>;
+    // The setters below are the contract DesktopUpdates was written against; Gustaf's feed has one
+    // stable track and downloads whole files, so they accept and ignore their values.
     readonly setAutoDownload: (value: boolean) => Effect.Effect<void>;
     readonly setAutoInstallOnAppQuit: (value: boolean) => Effect.Effect<void>;
     readonly setChannel: (channel: string) => Effect.Effect<void>;
@@ -100,108 +97,109 @@ export class ElectronUpdater extends Context.Service<
   }
 >()("@t3tools/desktop/electron/ElectronUpdater") {}
 
+const runToCompletion = (command: string, args: ReadonlyArray<string>) =>
+  new Promise<void>((resolve, reject) => {
+    NodeChildProcess.execFile(command, [...args], (error) => (error ? reject(error) : resolve()));
+  });
+
+const spawnDetached = (command: string, args: ReadonlyArray<string>) => {
+  const child = NodeChildProcess.spawn(command, [...args], { detached: true, stdio: "ignore" });
+  // A start failure arrives as an event; unhandled, it would crash the quitting app.
+  child.once("error", () => undefined);
+  child.unref();
+};
+
+const makeUpdater = (platform: NodeJS.Platform, arch: string) =>
+  new GustafUpdater({
+    platform,
+    arch,
+    pid: process.pid,
+    execPath: process.execPath,
+    // net.fetch follows the system proxy settings, which Node's fetch ignores.
+    fetch: ((input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) =>
+      Electron.net.fetch(input as string, init as RequestInit)) as typeof fetch,
+    spawnDetached,
+    run: runToCompletion,
+    quit: () => Electron.app.quit(),
+  });
+
 /** @public */
-export const make = ElectronUpdater.of({
-  setFeedURL: Effect.fn("ElectronUpdater.setFeedURL")(function (options) {
-    return Effect.suspend(() => {
-      autoUpdater.setFeedURL(options);
-      return Effect.void;
-    });
-  }),
-  setAutoDownload: Effect.fn("ElectronUpdater.setAutoDownload")(function (value) {
-    return Effect.suspend(() => {
-      autoUpdater.autoDownload = value;
-      return Effect.void;
-    });
-  }),
-  setAutoInstallOnAppQuit: Effect.fn("ElectronUpdater.setAutoInstallOnAppQuit")(function (value) {
-    return Effect.suspend(() => {
-      autoUpdater.autoInstallOnAppQuit = value;
-      return Effect.void;
-    });
-  }),
-  setChannel: Effect.fn("ElectronUpdater.setChannel")(function (channel) {
-    return Effect.suspend(() => {
-      autoUpdater.channel = channel;
-      return Effect.void;
-    });
-  }),
-  setAllowPrerelease: Effect.fn("ElectronUpdater.setAllowPrerelease")(function (value) {
-    return Effect.suspend(() => {
-      autoUpdater.allowPrerelease = value;
-      return Effect.void;
-    });
-  }),
-  allowDowngrade: Effect.sync(() => autoUpdater.allowDowngrade),
-  setAllowDowngrade: Effect.fn("ElectronUpdater.setAllowDowngrade")(function (value) {
-    return Effect.suspend(() => {
-      autoUpdater.allowDowngrade = value;
-      return Effect.void;
-    });
-  }),
-  setFullChangelog: Effect.fn("ElectronUpdater.setFullChangelog")(function (value) {
-    return Effect.suspend(() => {
-      autoUpdater.fullChangelog = value;
-      return Effect.void;
-    });
-  }),
-  setDisableDifferentialDownload: Effect.fn("ElectronUpdater.setDisableDifferentialDownload")(
-    function (value) {
-      return Effect.suspend(() => {
-        autoUpdater.disableDifferentialDownload = value;
-        return Effect.void;
-      });
-    },
-  ),
-  checkForUpdates: Effect.suspend(() => {
-    const channel = autoUpdater.channel;
-    return Effect.tryPromise({
-      try: () => autoUpdater.checkForUpdates(),
-      catch: (cause) => new ElectronUpdaterCheckForUpdatesError({ channel, cause }),
-    }).pipe(Effect.asVoid);
-  }),
-  downloadUpdate: Effect.suspend(() => {
-    const channel = autoUpdater.channel;
-    return Effect.tryPromise({
-      try: () => autoUpdater.downloadUpdate(),
-      catch: (cause) => new ElectronUpdaterDownloadUpdateError({ channel, cause }),
-    }).pipe(Effect.asVoid);
-  }),
-  quitAndInstall: Effect.fn("ElectronUpdater.quitAndInstall")(function ({
-    isSilent,
-    isForceRunAfter,
-  }) {
-    return Effect.suspend(() => {
-      const channel = autoUpdater.channel;
-      if (autoUpdater instanceof AppImageUpdater) relaunchWithoutInheritedDescriptors(autoUpdater);
+export const makeWith = (updater: GustafUpdater) =>
+  ElectronUpdater.of({
+    setFeedURL: Effect.fn("ElectronUpdater.setFeedURL")(function (feed) {
       return Effect.try({
-        try: () => autoUpdater.quitAndInstall(isSilent, isForceRunAfter),
+        try: () => updater.configure(feed),
+        catch: (cause) => new ElectronUpdaterFeedError({ cause }),
+      });
+    }),
+    setAutoDownload: Effect.fn("ElectronUpdater.setAutoDownload")(function () {
+      return Effect.void;
+    }),
+    setAutoInstallOnAppQuit: Effect.fn("ElectronUpdater.setAutoInstallOnAppQuit")(function () {
+      return Effect.void;
+    }),
+    setChannel: Effect.fn("ElectronUpdater.setChannel")(function () {
+      return Effect.void;
+    }),
+    setAllowPrerelease: Effect.fn("ElectronUpdater.setAllowPrerelease")(function () {
+      return Effect.void;
+    }),
+    allowDowngrade: Effect.sync(() => updater.allowDowngrade),
+    setAllowDowngrade: Effect.fn("ElectronUpdater.setAllowDowngrade")(function (value) {
+      return Effect.sync(() => {
+        updater.allowDowngrade = value;
+      });
+    }),
+    setFullChangelog: Effect.fn("ElectronUpdater.setFullChangelog")(function () {
+      return Effect.void;
+    }),
+    setDisableDifferentialDownload: Effect.fn("ElectronUpdater.setDisableDifferentialDownload")(
+      function () {
+        return Effect.void;
+      },
+    ),
+    checkForUpdates: Effect.tryPromise({
+      try: () => updater.checkForUpdates(),
+      catch: (cause) => new ElectronUpdaterCheckForUpdatesError({ channel: null, cause }),
+    }).pipe(Effect.asVoid),
+    downloadUpdate: Effect.tryPromise({
+      try: () => updater.downloadUpdate(),
+      catch: (cause) => new ElectronUpdaterDownloadUpdateError({ channel: null, cause }),
+    }),
+    quitAndInstall: Effect.fn("ElectronUpdater.quitAndInstall")(function ({
+      isSilent,
+      isForceRunAfter,
+    }) {
+      return Effect.try({
+        try: () => updater.quitAndInstall(isSilent, isForceRunAfter),
         catch: (cause) =>
           new ElectronUpdaterQuitAndInstallError({
-            channel,
+            channel: null,
             isSilent,
             isForceRunAfter,
             cause,
           }),
       });
-    });
-  }),
-  on: Effect.fn("ElectronUpdater.on")(function (eventName, listener) {
-    const eventTarget = autoUpdater as unknown as {
-      on: (eventName: string, listener: (...args: Array<unknown>) => void) => void;
-      removeListener: (eventName: string, listener: (...args: Array<unknown>) => void) => void;
-    };
-    const untypedListener = listener as unknown as (...args: Array<unknown>) => void;
-    return Effect.acquireRelease(
-      Effect.sync(() => {
-        eventTarget.on(eventName, untypedListener);
-      }),
-      () =>
+    }),
+    on: Effect.fn("ElectronUpdater.on")(function (eventName, listener) {
+      const untypedListener = listener as unknown as (...args: Array<unknown>) => void;
+      return Effect.acquireRelease(
         Effect.sync(() => {
-          eventTarget.removeListener(eventName, untypedListener);
+          updater.on(eventName, untypedListener);
         }),
-    ).pipe(Effect.asVoid);
-  }),
-});
+        () =>
+          Effect.sync(() => {
+            updater.removeListener(eventName, untypedListener);
+          }),
+      ).pipe(Effect.asVoid);
+    }),
+  });
 
-export const layer = Layer.succeed(ElectronUpdater, make);
+export const layer = Layer.effect(
+  ElectronUpdater,
+  Effect.gen(function* () {
+    const platform = yield* HostProcess.Platform;
+    const arch = yield* HostProcess.Architecture;
+    return makeWith(makeUpdater(platform, arch));
+  }),
+);

@@ -36,7 +36,12 @@ export interface UpdatesHarnessOptions {
   readonly backendInstances?: ReadonlyArray<DesktopBackendPool.DesktopBackendInstance>;
   readonly env?: Record<string, string | undefined>;
   readonly platform?: NodeJS.Platform;
-  readonly packageType?: string | undefined;
+  /** The contents of the baked `gustaf-updater.json`; builds made without a key have none. */
+  readonly updaterConfig?: string | undefined;
+  /** The updater rejects its feed, as it does for a key that is not minisign. */
+  readonly feedRejected?: boolean;
+  /** `APPIMAGE` of a Linux install; unset means a package install, which cannot update itself. */
+  readonly appImage?: string | undefined;
   readonly installRecord?: string | undefined;
   readonly policy?: DesktopUpdatePolicy.UpdatePolicy;
   readonly appVersion?: string;
@@ -53,7 +58,7 @@ export function makeHarness(options: UpdatesHarnessOptions = {}) {
   let allowDowngrade = false;
   const checkAllowedDowngrade: boolean[] = [];
   let fullChangelog = false;
-  const feedUrls: ElectronUpdater.ElectronUpdaterFeedUrl[] = [];
+  const feedUrls: ElectronUpdater.ElectronUpdaterFeed[] = [];
   const listeners = new Map<string, Set<(...args: readonly unknown[]) => void>>();
   const sentStates: DesktopUpdateState[] = [];
   const installSteps: string[] = [];
@@ -76,10 +81,12 @@ export function makeHarness(options: UpdatesHarnessOptions = {}) {
   };
 
   const layerUpdater = Layer.succeed(ElectronUpdater.ElectronUpdater, {
-    setFeedURL: (options) =>
-      Effect.sync(() => {
-        feedUrls.push(options);
-      }),
+    setFeedURL: (feed) =>
+      options.feedRejected
+        ? Effect.fail(new ElectronUpdater.ElectronUpdaterFeedError({ cause: new Error("bad key") }))
+        : Effect.sync(() => {
+            feedUrls.push(feed);
+          }),
     setAutoDownload: () => Effect.void,
     setAutoInstallOnAppQuit: () => Effect.void,
     setChannel: () => Effect.void,
@@ -197,6 +204,7 @@ export function makeHarness(options: UpdatesHarnessOptions = {}) {
           T3CODE_HOME: `/tmp/t3-desktop-updates-test-${process.pid}`,
           T3CODE_DESKTOP_MOCK_UPDATES: "true",
           T3CODE_DESKTOP_MOCK_UPDATE_SERVER_PORT: "4141",
+          APPIMAGE: options.appImage,
           ...options.env,
         }),
       ),
@@ -257,16 +265,17 @@ export function makeHarness(options: UpdatesHarnessOptions = {}) {
         ? (installRecords.get(path) ?? previousInstallRecord)
         : undefined;
       if (installRecord !== undefined) return Effect.succeed(installRecord);
-      return path === "/missing/resources/package-type" && options.packageType !== undefined
-        ? Effect.succeed(options.packageType)
-        : Effect.fail(
-            PlatformError.systemError({
-              module: "FileSystem",
-              method: "readFileString",
-              _tag: "NotFound",
-              pathOrDescriptor: path,
-            }),
-          );
+      if (path.endsWith("/gustaf-updater.json") && options.updaterConfig !== undefined) {
+        return Effect.succeed(options.updaterConfig);
+      }
+      return Effect.fail(
+        PlatformError.systemError({
+          module: "FileSystem",
+          method: "readFileString",
+          _tag: "NotFound",
+          pathOrDescriptor: path,
+        }),
+      );
     },
     exists: (path) => Effect.succeed(!deletedFiles.has(path)),
     makeDirectory: () => Effect.void,
@@ -307,6 +316,7 @@ export function makeHarness(options: UpdatesHarnessOptions = {}) {
         T3CODE_HOME: `/tmp/t3-desktop-updates-test-${process.pid}`,
         T3CODE_DESKTOP_MOCK_UPDATES: "true",
         T3CODE_DESKTOP_MOCK_UPDATE_SERVER_PORT: "4141",
+        APPIMAGE: options.appImage,
         ...options.env,
       }),
     ),
@@ -327,7 +337,7 @@ export function makeHarness(options: UpdatesHarnessOptions = {}) {
     deletedFiles,
     previousInstallRecord: () => previousInstallRecord,
     downloadCount: () => downloadCount,
-    feedUrls: (): ElectronUpdater.ElectronUpdaterFeedUrl[] => feedUrls,
+    feedUrls: (): ElectronUpdater.ElectronUpdaterFeed[] => feedUrls,
     fullChangelog: () => fullChangelog,
     /** Whether each feed check could offer an older release, and the flag now. */
     checkAllowedDowngrade,

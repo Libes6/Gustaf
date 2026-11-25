@@ -6,6 +6,8 @@ export const GUSTAF_REPOSITORY = "Libes6/Gustaf";
 export const GUSTAF_REPOSITORY_URL = `https://github.com/${GUSTAF_REPOSITORY}`;
 export const GUSTAF_RELEASES_URL = `${GUSTAF_REPOSITORY_URL}/releases`;
 export const GUSTAF_LATEST_RELEASE_URL = `${GUSTAF_RELEASES_URL}/latest`;
+/** The manifest the desktop updater reads: version, notes, and a signed file per platform. */
+export const GUSTAF_UPDATE_MANIFEST_URL = `${GUSTAF_LATEST_RELEASE_URL}/download/latest.json`;
 export const GUSTAF_ISSUES_URL = `${GUSTAF_REPOSITORY_URL}/issues`;
 export const GUSTAF_DOCS_URL = `${GUSTAF_REPOSITORY_URL}/blob/main/docs/user`;
 export const GUSTAF_INSTALL_SCRIPT_URL = `https://raw.githubusercontent.com/${GUSTAF_REPOSITORY}/main/scripts/install.sh`;

@@ -59,7 +59,7 @@ const LinuxDesktopEntryConfig = Config.all({
   xdgDataHome: trimmedString("XDG_DATA_HOME"),
   launcherPath: trimmedString("T3CODE_DESKTOP_LAUNCHER_PATH"),
   appImagePath: trimmedString("APPIMAGE"),
-  // electron-updater sets this on the AppImage it relaunches after installing an update.
+  // The updater's install helper sets this on the AppImage it relaunches after an update.
   relaunchedByUpdater: trimmedString("APPIMAGE_SILENT_INSTALL"),
 });
 

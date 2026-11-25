@@ -55,7 +55,7 @@ const HttpsUrl = TrimmedNonEmptyString.check(
 
 export const ManagedUpdatesPolicy = Schema.Struct({
   mode: ManagedUpdatesMode,
-  /** A generic electron-updater feed the desktop app updates from instead of GitHub. */
+  /** A mirror of the release files (`latest.json` and the files it lists) the desktop app updates from instead of GitHub. */
   feedUrl: Schema.optionalKey(HttpsUrl),
   /** `false` makes the nightly channel unavailable. */
   allowNightly: Schema.optionalKey(Schema.Boolean),

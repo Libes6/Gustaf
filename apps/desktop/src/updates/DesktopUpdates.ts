@@ -44,6 +44,7 @@ import {
   releaseNotesOfOfferedVersion,
 } from "./releaseNotes.ts";
 import { desktopUpdateChannelOf } from "@t3tools/shared/cliRelease";
+import { GUSTAF_RELEASES_URL, GUSTAF_UPDATE_MANIFEST_URL } from "@t3tools/shared/gustafService";
 import { compareSemverVersions } from "@t3tools/shared/semver";
 import {
   createInitialDesktopUpdateState,
@@ -72,8 +73,12 @@ interface DesktopPreparedUpdateInstallResult extends DesktopUpdateActionResult {
   readonly failed: boolean;
 }
 
-const AppUpdateYmlConfig = Schema.Record(Schema.String, Schema.String);
-type AppUpdateYmlConfig = typeof AppUpdateYmlConfig.Type;
+// Written into the app's resources at build time; absent from local builds, which cannot update.
+const UpdaterConfig = Schema.Struct({
+  manifestUrl: Schema.optional(Schema.String),
+  publicKey: Schema.String,
+});
+type UpdaterConfig = typeof UpdaterConfig.Type;
 
 const UpdateInfo = Schema.Struct({
   version: Schema.String,
@@ -94,7 +99,7 @@ const DesktopUpdateInstallRecord = Schema.fromJsonString(
 const decodeInstallRecord = Schema.decodeUnknownEffect(DesktopUpdateInstallRecord);
 const encodeInstallRecord = Schema.encodeEffect(DesktopUpdateInstallRecord);
 
-const decodeAppUpdateYmlConfig = Schema.decodeUnknownEffect(AppUpdateYmlConfig);
+const decodeUpdaterConfig = Schema.decodeUnknownEffect(Schema.fromJsonString(UpdaterConfig));
 const decodeUpdateInfo = Schema.decodeUnknownEffect(UpdateInfo);
 const decodeDownloadProgressInfo = Schema.decodeUnknownEffect(DownloadProgressInfo);
 
@@ -287,21 +292,6 @@ export function describeUpdateErrorCause(cause: unknown): string {
   }
 }
 
-function parseAppUpdateYml(raw: string): Effect.Effect<Option.Option<AppUpdateYmlConfig>> {
-  const entries: Record<string, string> = {};
-  for (const line of raw.split("\n")) {
-    const match = line.match(/^(\w+):\s*(.+)$/);
-    if (match?.[1] && match[2]) {
-      entries[match[1]] = match[2].trim();
-    }
-  }
-
-  return decodeAppUpdateYmlConfig(entries).pipe(
-    Effect.map((config) => (config.provider ? Option.some(config) : Option.none())),
-    Effect.orElseSucceed(() => Option.none<AppUpdateYmlConfig>()),
-  );
-}
-
 function createBaseUpdateState(
   channel: DesktopUpdateChannel,
   disabledReason: Option.Option<string>,
@@ -348,7 +338,6 @@ function getAutoUpdateDisabledReason(args: {
   isPackaged: boolean;
   platform: NodeJS.Platform;
   appImage?: string | undefined;
-  isDebPackage: boolean;
   disabledByEnv: boolean;
   hasUpdateFeedConfig: boolean;
 }): string | null {
@@ -364,8 +353,8 @@ function getAutoUpdateDisabledReason(args: {
   if (args.disabledByEnv) {
     return "Automatic updates are disabled by the T3CODE_DISABLE_AUTO_UPDATE setting.";
   }
-  if (args.platform === "linux" && !args.appImage && !args.isDebPackage) {
-    return "Automatic updates on Linux require the AppImage or the .deb package.";
+  if (args.platform === "linux" && !args.appImage) {
+    return `Automatic updates on Linux need the AppImage. Download new versions from ${GUSTAF_RELEASES_URL}.`;
   }
   return null;
 }
@@ -396,7 +385,8 @@ export const make = Effect.gen(function* () {
   // Any user can set the mock flag, so it never replaces an administrator's update source.
   const mockUpdates = config.mockUpdates && policy.message === null;
 
-  const appUpdateYmlConfigRef = yield* Ref.make<Option.Option<AppUpdateYmlConfig>>(Option.none());
+  const updaterConfigRef = yield* Ref.make<Option.Option<UpdaterConfig>>(Option.none());
+  const feedFailureRef = yield* Ref.make(Option.none<string>());
   const activeUpdateActionRef = yield* Ref.make<Option.Option<UpdateAction>>(Option.none());
   const installRunningBackendsRef = yield* Ref.make<
     ReadonlyArray<DesktopBackendPool.DesktopBackendInstance>
@@ -453,35 +443,22 @@ export const make = Effect.gen(function* () {
       }),
     );
 
-  const readAppUpdateYml = fileSystem.readFileString(environment.appUpdateYmlPath, "utf-8").pipe(
-    Effect.option,
-    Effect.flatMap(
-      Option.match({
-        onNone: () => Effect.succeed(Option.none<AppUpdateYmlConfig>()),
-        onSome: parseAppUpdateYml,
-      }),
-    ),
+  const readUpdaterConfig = fileSystem.readFileString(environment.updaterConfigPath, "utf-8").pipe(
+    Effect.flatMap(decodeUpdaterConfig),
+    Effect.asSome,
+    Effect.orElseSucceed(() => Option.none<UpdaterConfig>()),
   );
 
-  // electron-updater uses this marker to install .deb updates with dpkg.
-  const isDebPackage =
-    environment.platform === "linux" && environment.isPackaged
-      ? yield* fileSystem
-          .readFileString(environment.path.join(environment.resourcesPath, "package-type"))
-          .pipe(
-            Effect.map((packageType) => packageType.trim() === "deb"),
-            Effect.orElseSucceed(() => false),
-          )
-      : false;
-
-  const hasUpdateFeedConfig = Ref.get(appUpdateYmlConfigRef).pipe(
+  const hasUpdateFeedConfig = Ref.get(updaterConfigRef).pipe(
     Effect.map(
-      (appUpdateYmlConfig) =>
-        Option.isSome(appUpdateYmlConfig) || mockUpdates || policy.feedUrl !== undefined,
+      (updaterConfig) =>
+        Option.isSome(updaterConfig) || mockUpdates || policy.feedUrl !== undefined,
     ),
   );
 
   const resolveDisabledReason = Effect.gen(function* () {
+    const feedFailure = yield* Ref.get(feedFailureRef);
+    if (Option.isSome(feedFailure)) return feedFailure;
     const hasFeedConfig = yield* hasUpdateFeedConfig;
     return Option.fromNullishOr(
       getAutoUpdateDisabledReason({
@@ -490,7 +467,6 @@ export const make = Effect.gen(function* () {
         isPackaged: environment.isPackaged,
         platform: environment.platform,
         appImage: Option.getOrUndefined(config.appImagePath),
-        isDebPackage,
         disabledByEnv: config.disableAutoUpdate,
         hasUpdateFeedConfig: hasFeedConfig,
       }),
@@ -687,12 +663,12 @@ export const make = Effect.gen(function* () {
     let state = offered;
     return yield* Effect.gen(function* () {
       if (refresh) {
-        // electron-updater downloads what its last check found, which can be hours old.
+        // The updater downloads what its last check found, which can be hours old.
         yield* logUpdaterInfo("checking for updates", { reason: "download" });
         yield* runUpdaterCheck(
           offered.channel !== desktopUpdateChannelOf(environment.appVersion),
         ).pipe(
-          // A failed check keeps electron-updater's earlier result, so the known offer still downloads.
+          // A failed check keeps the updater's earlier result, so the known offer still downloads.
           Effect.catchTags({
             ElectronUpdaterCheckForUpdatesError: (error) =>
               logUpdaterWarning(error.message, {
@@ -1057,7 +1033,7 @@ export const make = Effect.gen(function* () {
       (yield* Ref.get(updateStateRef)).status === "available"
     ) {
       const refreshed = yield* Ref.get(updateStateRef);
-      // electron-updater compares a stale feed with the running build, not the retained download.
+      // The updater compares a stale feed with the running build, not the retained download.
       if (
         refreshed.availableVersion === null ||
         compareSemverVersions(refreshed.availableVersion, retainedVersion) <= 0
@@ -1325,8 +1301,8 @@ export const make = Effect.gen(function* () {
         void Effect.runPromiseWith(context)(effect);
       };
 
-      const appUpdateYmlConfig = yield* readAppUpdateYml;
-      yield* Ref.set(appUpdateYmlConfigRef, appUpdateYmlConfig);
+      const updaterConfig = yield* readUpdaterConfig;
+      yield* Ref.set(updaterConfigRef, updaterConfig);
 
       const notAppliedVersion = yield* readNotAppliedInstallVersion;
       yield* Ref.set(notAppliedVersionRef, notAppliedVersion);
@@ -1337,20 +1313,38 @@ export const make = Effect.gen(function* () {
         });
       }
 
-      if (mockUpdates) {
-        yield* electronUpdater.setFeedURL({
-          provider: "generic",
-          url: `http://localhost:${config.mockUpdateServerPort}`,
-        } as ElectronUpdater.ElectronUpdaterFeedUrl);
-      } else if (policy.feedUrl !== undefined) {
-        // The administrator's mirror replaces the GitHub feed baked into app-update.yml.
-        yield* electronUpdater.setFeedURL({
-          provider: "generic",
-          url: policy.feedUrl,
-        } as ElectronUpdater.ElectronUpdaterFeedUrl);
-      }
+      // A mirror or mock replaces where the manifest is read; the signing key is always the baked one.
+      const manifestUrl = mockUpdates
+        ? `http://localhost:${config.mockUpdateServerPort}/latest.json`
+        : policy.feedUrl !== undefined
+          ? `${policy.feedUrl.replace(/\/+$/, "")}/latest.json`
+          : (Option.getOrUndefined(updaterConfig)?.manifestUrl ?? GUSTAF_UPDATE_MANIFEST_URL);
+      const feedFailure = yield* (
+        mockUpdates || policy.feedUrl !== undefined || Option.isSome(updaterConfig)
+          ? electronUpdater.setFeedURL({
+              manifestUrl,
+              publicKey: Option.getOrUndefined(updaterConfig)?.publicKey ?? "",
+              currentVersion: environment.appVersion,
+              stagingDir: environment.path.join(environment.baseDir, "runtime", "updates"),
+              appImagePath: Option.getOrUndefined(environment.appImagePath),
+            })
+          : Effect.void
+      ).pipe(
+        Effect.as(Option.none<string>()),
+        Effect.catchTags({
+          ElectronUpdaterFeedError: (error) =>
+            logUpdaterError(error.message, { cause: describeUpdateErrorCause(error.cause) }).pipe(
+              Effect.as(
+                Option.some(
+                  "Automatic updates are not available because this build has no usable update key.",
+                ),
+              ),
+            ),
+        }),
+      );
 
       const settings = yield* desktopSettings.get;
+      yield* Ref.set(feedFailureRef, feedFailure);
       const disabledReason = yield* resolveDisabledReason;
       // A blocked nightly channel still lets the user switch back to stable, so it stays updatable.
       yield* Ref.set(desktopState.canInstallUpdates, Option.isNone(disabledReason));

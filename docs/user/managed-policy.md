@@ -283,11 +283,12 @@ starts the binary you set.
   machines that get Gustaf through device management.
 - `feedUrl`: Gustaf updates from your own mirror instead of GitHub: the desktop app, `t3 update`,
   and updates started from another device. Publish only the versions you have approved, laid out
-  as on a GitHub release. The release's update files (`latest.yml`, `latest-mac.yml`,
-  `latest-linux.yml`, `latest-linux-arm64.yml`, and their `nightly` versions if you allow nightly)
-  and the desktop installers they list go at the URL's root. The release's `t3-*` archives and
-  `SHA256SUMS` go under `v<version>/`. A `t3` run through `npx` comes from npm, so pin it with your
-  package tooling.
+  as on a GitHub release. The release's `latest.json` goes at the URL's root, with each `url` in it
+  pointing at the copy of that installer on your mirror, and each `signature` unchanged: the
+  desktop app installs a file only when its signature, made with Gustaf's release key, verifies,
+  so a mirror cannot offer anything Gustaf did not sign. The release's
+  `t3-*` archives and `SHA256SUMS` go under `v<version>/`. A `t3` run through `npx` comes from npm,
+  so pin it with your package tooling.
 - `allowNightly: false`: the nightly channel is unavailable.
 
 ## What a policy does not cover

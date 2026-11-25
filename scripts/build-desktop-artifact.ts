@@ -16,6 +16,7 @@ import {
 } from "@electron/asar";
 
 import { GUSTAF_REPOSITORY_URL } from "@t3tools/shared/gustafService";
+import { fromJsonStringPretty } from "@t3tools/shared/schemaJson";
 import { fromYaml } from "@t3tools/shared/schemaYaml";
 import * as HostProcess from "@t3tools/shared/HostProcess";
 import { clerkFrontendApiHostnameFromPublishableKey } from "@t3tools/shared/relayAuth";
@@ -1006,6 +1007,7 @@ export const DESKTOP_FILE_EXCLUSIONS = [
   "!apps/desktop/prod-resources/windows-server/**/*",
   "!apps/desktop/prod-resources/wsl-runtime.tar.gz",
   "!apps/desktop/prod-resources/wsl-runtime.tar.gz.sha256",
+  "!apps/desktop/prod-resources/gustaf-updater.json",
   "!apps/desktop/gnome-extension",
   "!apps/desktop/gnome-extension/**/*",
 ] as const;
@@ -1086,6 +1088,43 @@ export const WSL_RUNTIME_ARCHIVE_HASH_EXTRA_RESOURCE = {
   from: `apps/desktop/prod-resources/${WSL_RUNTIME_ARCHIVE_HASH_NAME}`,
   to: WSL_RUNTIME_ARCHIVE_HASH_NAME,
 } as const;
+
+/** Read by DesktopUpdates: the public half of the key that signs releases, and where to look. */
+export const UPDATER_CONFIG_NAME = "gustaf-updater.json";
+export const UPDATER_CONFIG_EXTRA_RESOURCE = {
+  from: `apps/desktop/prod-resources/${UPDATER_CONFIG_NAME}`,
+  to: UPDATER_CONFIG_NAME,
+} as const;
+
+const encodeUpdaterConfig = Schema.encodeEffect(
+  fromJsonStringPretty(
+    Schema.Struct({ publicKey: Schema.String, manifestUrl: Schema.optionalKey(Schema.String) }),
+  ),
+);
+
+const MINISIGN_PUBLIC_KEY_LINE = /^RW[A-Za-z0-9+/]{54}$/u;
+
+/**
+ * The updater config for a build, or undefined when the build has no update key (local builds).
+ * `publicKey` is the minisign key as `tauri signer generate` prints it, or a bare `RW...` line.
+ */
+export function resolveUpdaterConfig(input: {
+  readonly publicKey: string | undefined;
+  readonly manifestUrl: string | undefined;
+}): { readonly publicKey: string; readonly manifestUrl?: string } | undefined {
+  const publicKey = input.publicKey?.trim();
+  if (!publicKey) return undefined;
+  const text = publicKey.startsWith("untrusted comment:")
+    ? publicKey
+    : Buffer.from(publicKey, "base64").toString("utf8");
+  const keyLine = MINISIGN_PUBLIC_KEY_LINE.test(publicKey)
+    ? publicKey
+    : text.split(/\r?\n/u).find((line) => MINISIGN_PUBLIC_KEY_LINE.test(line.trim()));
+  if (keyLine === undefined) {
+    throw new Error("GUSTAF_UPDATER_PUBLIC_KEY is not a minisign public key.");
+  }
+  return { publicKey, ...(input.manifestUrl ? { manifestUrl: input.manifestUrl } : {}) };
+}
 
 export const bundlesWslRuntime = (input: {
   readonly platform: typeof BuildPlatform.Type;
@@ -2759,32 +2798,6 @@ export function resolveDesktopRuntimeDependencies(
   );
 }
 
-export const resolveGitHubPublishConfig = Effect.fn("resolveGitHubPublishConfig")(function* (
-  updateChannel: "latest" | "nightly",
-) {
-  const env = yield* Config.all({
-    updateRepository: Config.String("T3CODE_DESKTOP_UPDATE_REPOSITORY").pipe(Config.option),
-    githubRepository: Config.String("GITHUB_REPOSITORY").pipe(Config.option),
-  });
-  const rawRepo = (
-    Option.getOrUndefined(env.updateRepository)?.trim() ||
-    Option.getOrUndefined(env.githubRepository)?.trim() ||
-    ""
-  ).trim();
-  if (!rawRepo) return undefined;
-
-  const [owner, repo, ...rest] = rawRepo.split("/");
-  if (!owner || !repo || rest.length > 0) return undefined;
-
-  return {
-    provider: "github",
-    owner,
-    repo,
-    releaseType: updateChannel === "nightly" ? "prerelease" : "release",
-    ...(updateChannel === "nightly" ? { channel: "nightly" as const } : {}),
-  };
-});
-
 export function resolveDesktopUpdateChannel(version: string): "latest" | "nightly" {
   return /-nightly\.\d{8}\.\d+$/.test(version) ? "nightly" : "latest";
 }
@@ -2839,8 +2852,7 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
   target: string,
   version: string,
   signed: boolean,
-  mockUpdates: boolean,
-  mockUpdateServerPort: number | undefined,
+  updaterConfigBundled: boolean,
   macPasskeySigning:
     | {
         readonly entitlementsPath: string;
@@ -2879,24 +2891,14 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
       ...(platform === "mac" ? MAC_COMPUTER_USE_EXTRA_RESOURCES : []),
       ...(platform === "win" ? WINDOWS_SERVER_EXTRA_RESOURCES : []),
       ...(platform === "win" && wslRuntimeBundled ? WSL_RUNTIME_EXTRA_RESOURCES : []),
+      ...(updaterConfigBundled ? [UPDATER_CONFIG_EXTRA_RESOURCE] : []),
     ],
   };
   const updateChannel = resolveDesktopUpdateChannel(version);
-  // Missing publish config infers a GitHub feed from tokens; staging has no repository, so manifest generation would crash.
+  // Gustaf updates itself from latest.json (see apps/desktop/src/updates/GustafUpdater.ts), so
+  // electron-builder writes no update feed or app-update.yml. Without this it would infer a GitHub
+  // feed from the environment's tokens.
   buildConfig.publish = null;
-  if (!isDesktopPreviewVersion(version)) {
-    const publishConfig = yield* resolveGitHubPublishConfig(updateChannel);
-    if (publishConfig) {
-      buildConfig.publish = [publishConfig];
-    } else if (mockUpdates) {
-      buildConfig.publish = [
-        {
-          provider: "generic",
-          url: resolveMockUpdateServerUrl(mockUpdateServerPort),
-        },
-      ];
-    }
-  }
 
   if (platform === "mac") {
     const path = yield* Path.Path;
@@ -3003,13 +3005,6 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
         },
       },
     };
-    // electron-updater replaces an installed AppImage in place only when its name has no x.y.z version.
-    if (buildConfig.publish) {
-      buildConfig.appImage = {
-        artifactName:
-          updateChannel === "nightly" ? "Gustaf-Nightly-${arch}.${ext}" : "Gustaf-${arch}.${ext}",
-      };
-    }
     buildConfig.deb = {
       // FPM runs outside the staged app directory, so source paths must be absolute.
       fpm: [
@@ -3939,6 +3934,21 @@ const buildDesktopArtifactUnlocked = Effect.fn("buildDesktopArtifactUnlocked")(f
   const stageProdResourcesDir = path.join(stageAppDir, "apps/desktop/prod-resources");
   yield* fs.copy(stageResourcesDir, stageProdResourcesDir);
 
+  const updaterConfig = resolveUpdaterConfig({
+    publicKey: Option.getOrUndefined(
+      yield* Config.String("GUSTAF_UPDATER_PUBLIC_KEY").pipe(Config.option),
+    ),
+    manifestUrl: options.mockUpdates
+      ? `${resolveMockUpdateServerUrl(options.mockUpdateServerPort)}/latest.json`
+      : undefined,
+  });
+  if (updaterConfig !== undefined) {
+    yield* fs.writeFileString(
+      path.join(stageProdResourcesDir, UPDATER_CONFIG_NAME),
+      `${yield* encodeUpdaterConfig(updaterConfig)}\n`,
+    );
+  }
+
   const configuredMacPasskeySigning =
     options.platform === "mac" && options.signed
       ? yield* Effect.try({
@@ -4016,8 +4026,7 @@ const buildDesktopArtifactUnlocked = Effect.fn("buildDesktopArtifactUnlocked")(f
       options.target,
       appVersion,
       options.signed,
-      options.mockUpdates,
-      options.mockUpdateServerPort,
+      updaterConfig !== undefined,
       macPasskeySigning && macEntitlementsPath
         ? {
             entitlementsPath: macEntitlementsPath,
