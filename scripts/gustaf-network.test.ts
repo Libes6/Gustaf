@@ -55,14 +55,8 @@ describe("Gustaf service addresses", () => {
 const T3_SERVICE = /(?<![\w-])(?:[\w-]+\.)*t3\.(?:codes|chat|sh)\b|pingdotgg|t3tools\.com/u;
 
 const ALLOWED: Readonly<Record<string, string>> = {
-  "apps/mobile/app.config.ts":
-    "Native association entitlements, an EAS account name, and the hosted-app link host: identifiers, never requested.",
   "apps/mobile/src/features/showcase/showcaseEnvironmentRows.ts":
     "Sample rows for store screenshots.",
-  "apps/server/src/auth/McpOAuth.ts":
-    "Log text for the hosted-app default behind outside-agent thread links.",
-  "apps/server/src/cloud/publicConfig.ts":
-    "Hosted-app origin defaults; used to build links and the T3 Connect CLI sign-in, which needs a relay that Gustaf builds do not configure.",
   "apps/web/src/components/clerk/T3ChatUserProfilePage.tsx":
     "T3 Connect account page; rendered only when hasCloudPublicConfig() is true, which no Gustaf build is.",
   "apps/web/src/components/clerk/T3ConnectUserProfilePage.tsx":
@@ -71,10 +65,6 @@ const ALLOWED: Readonly<Record<string, string>> = {
     "T3 Connect plan link; rendered only when hasCloudPublicConfig() is true.",
   "packages/contracts/src/environmentHttp.ts":
     "Troubleshooting doc link attached to T3 Connect errors.",
-  "packages/shared/src/connectAuth.ts":
-    "Default hosted-app origin for generated links and the T3 Connect CLI sign-in.",
-  "packages/shared/src/providerAuthReturnUrl.ts":
-    "Accepted return origin when a provider sign-in started on the hosted app; compared, never requested.",
 };
 
 const SCANNED_ROOTS = [
