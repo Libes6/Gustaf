@@ -290,6 +290,8 @@ const make = Effect.gen(function* () {
           : { name: id, transport: "stdio", command: transport.command, args: transport.args },
         nativeServers,
       );
+      // Native copies share this server's name, so a copy with tools switched off takes the native
+      // one's place in the provider's config rather than running beside it.
       if (result.disabledTools === undefined) {
         if (
           result.type === "http" &&

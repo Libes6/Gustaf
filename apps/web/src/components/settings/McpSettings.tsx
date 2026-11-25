@@ -48,6 +48,7 @@ import { McpConnectorsSection } from "./McpConnectorsSection";
 import { McpMarketplaceDialog } from "./McpMarketplaceDialog";
 import {
   currentMcpStatus,
+  codexLoadsOwnServers,
   groupMcpTools,
   isHeavyMcpServer,
   mcpStatusKey,
@@ -461,6 +462,13 @@ function McpEnvironmentSettings({
         <p className="px-4 py-3 text-sm text-muted-foreground">
           {gt("Servers belong to this environment. Changes apply to new provider sessions.")}
         </p>
+        {codexLoadsOwnServers(installedDrivers) && (
+          <p className="px-4 pb-3 text-sm text-muted-foreground">
+            {gt(
+              "Codex also starts the servers in its own config.toml, whatever the switches here say. Turn those off in Codex.",
+            )}
+          </p>
+        )}
         {!canEdit && <p role="status">{gt("Requires settings:write and providers:manage.")}</p>}
         {!localAllowed && (
           <p role="status">

@@ -346,6 +346,9 @@ on. While the server is not connected, **Tools** lists only the tools you switch
 switch them back on. Only Claude and Codex hide switched-off tools; other agents still get every
 tool, and the window names them. Running threads may keep the old list until their next session.
 
+Codex also starts the servers in its own `config.toml`, whatever the switches in **Settings → MCP** say;
+turn those off in Codex.
+
 Enable servers for the whole environment or override their enabled state for a project. Mobile
 Settings lists each environment's servers and lets you switch them on or off for that environment;
 use web or desktop to add or edit them.

@@ -352,6 +352,44 @@ it.effect("leaves out a server the provider already loads from its own config", 
   }),
 );
 
+// The provider's native copy has the same name, so the injected one takes its place in the
+// provider's config: one server, with the filter, instead of the native copy with every tool.
+it.effect(
+  "hands an agent that filters tools its own copy of a native server with tools switched off",
+  () =>
+    Effect.gen(function* () {
+      const settings = {
+        mcpServers: {
+          playwright: {
+            ...stdio(true, { args: ["-y", "@playwright/mcp@latest"] }),
+            disabledTools: ["browser_close"],
+          },
+        },
+      };
+      const sources: NativeMcpSources = { provider: "codex", homeDir: "/home/u" };
+      const servers: ReadonlyArray<NativeMcpServer> = [
+        {
+          source: "codex",
+          sourcePath: "/home/u/.codex/config.toml",
+          name: "playwright",
+          enabled: true,
+          transport: "stdio",
+          command: "npx",
+          args: ["-y", "@playwright/mcp@latest"],
+          env: {},
+        },
+      ];
+      const filtering = yield* resolve(settings, {
+        filtersTools: true,
+        native: { sources, servers },
+      });
+      assert.deepStrictEqual(ids(filtering), ["playwright"]);
+      assert.deepStrictEqual(filtering.servers[0]?.disabledTools, ["browser_close"]);
+      // An agent that cannot filter keeps only the native copy, as for any other duplicate.
+      assert.deepStrictEqual(ids(yield* resolve(settings, { native: { sources, servers } })), []);
+    }),
+);
+
 it.effect("leaves out, for every provider, a stdio server whose command does not exist", () =>
   Effect.gen(function* () {
     const resolved = yield* resolve(

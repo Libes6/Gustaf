@@ -96,3 +96,7 @@ export function mcpToolFilterUnsupported(
     (driver) => !MCP_TOOL_FILTER_DRIVERS.includes(driver),
   );
 }
+
+/** Codex starts the servers of its own config.toml itself, so Gustaf's switches do not reach them. */
+export const codexLoadsOwnServers = (installed: ReadonlyArray<ProviderDriverKind>): boolean =>
+  installed.some((driver) => driver === "codex");
