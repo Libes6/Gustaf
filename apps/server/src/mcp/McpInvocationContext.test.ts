@@ -105,3 +105,21 @@ it("acts at an administrator's ceiling for a client approved above it", () => {
     ).runtimeModeCeiling,
   ).toBe("auto");
 });
+
+it("links an outside client to the app, through a hosted origin only when one is configured", () => {
+  const link = (client: McpInvocationContext.McpInvocationScope["client"]) =>
+    McpInvocationContext.threadLinkFor(
+      { environmentId: EnvironmentId.make("environment-1"), client },
+      ThreadId.make("thread-1"),
+      "Fix",
+    );
+  const outside = { sessionId: "session-1", label: "Claude Code", access: "auto" } as const;
+
+  expect(link(outside)).toBe("gustaf://threads/environment-1/thread-1");
+  expect(link({ ...outside, hostedAppUrl: "https://hosted.example.test" })).toBe(
+    "https://hosted.example.test/threads/environment-1/thread-1",
+  );
+  // A peer link and a thread inside the app read t3-thread:// links as chips.
+  expect(link({ ...outside, linked: true })).toBe("[Fix](t3-thread://v2/environment-1/thread-1)");
+  expect(link(undefined)).toBe("[Fix](t3-thread://v2/environment-1/thread-1)");
+});

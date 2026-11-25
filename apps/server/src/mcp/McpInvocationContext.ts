@@ -15,7 +15,7 @@ import * as Context from "effect/Context";
 import type * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
-import { formatThreadLink, hostedThreadLink } from "@t3tools/shared/threadLinks";
+import { formatThreadLink, shareThreadLink } from "@t3tools/shared/threadLinks";
 
 const ALL_MCP_CAPABILITIES = [
   "preview",
@@ -54,7 +54,7 @@ export interface McpClientCaller {
   readonly narrowedTo?: ClientModes | undefined;
   /** A linked environment's thread this request is made for (`T3-Sender-Thread`). */
   readonly senderThread?: OrchestrationV2LinkedSender | undefined;
-  /** An outside client's thread links go through this hosted app, as Copy thread's do. */
+  /** An outside client's thread links open through this hosted app, when one is configured. */
   readonly hostedAppUrl?: string | undefined;
 }
 
@@ -173,8 +173,8 @@ export interface McpInvocationScope {
 }
 
 /**
- * T3 Code renders `t3-thread://` links as thread chips. Other MCP clients cannot open them, so
- * they get the hosted link Copy thread copies, which opens the thread in either app or a browser.
+ * Gustaf renders `t3-thread://` links as thread chips. Other MCP clients cannot open them, so
+ * they get the app link Copy thread copies, which opens the thread in the desktop or mobile app.
  * A known `title` labels the chip for clients that cannot load this environment's threads.
  */
 export const threadLinkFor = (
@@ -182,11 +182,11 @@ export const threadLinkFor = (
   threadId: ThreadId,
   title?: string,
 ): string => {
-  const hostedAppUrl = scope.client?.hostedAppUrl;
+  const client = scope.client;
   const ref = { environmentId: scope.environmentId, threadId };
-  return hostedAppUrl === undefined
+  return client === undefined || client.linked === true
     ? formatThreadLink(ref, title)
-    : hostedThreadLink(ref, hostedAppUrl);
+    : shareThreadLink(ref, client.hostedAppUrl);
 };
 
 export class McpInvocationContext extends Context.Service<

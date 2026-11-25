@@ -3,7 +3,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { useGT, useMessages } from "gt-react";
 import { MessagesSquareIcon } from "lucide-react";
 import {
-  formatHostedThreadLink,
+  formatShareThreadLink,
   guessThreadLinkRef,
   threadLinkCandidates,
   type ThreadLink,
@@ -138,7 +138,7 @@ export function MarkdownThreadLink(props: {
     <ThreadContextChip
       record={{ ...ref, title }}
       projectId={resolved?.metadata.projectId ?? null}
-      copyMarkdown={formatHostedThreadLink(ref, title, configuredHostedAppUrl())}
+      copyMarkdown={formatShareThreadLink(ref, title, configuredHostedAppUrl())}
     />
   );
 }

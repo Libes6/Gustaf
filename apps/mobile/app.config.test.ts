@@ -1,4 +1,3 @@
-import { DEFAULT_HOSTED_APP_URL } from "@t3tools/shared/connectAuth";
 import { afterEach, expect, it, vi } from "vite-plus/test";
 
 // Keep config parsing independent of local env files and build credentials.
@@ -34,11 +33,9 @@ it.each([
     expect(config.ios?.bundleIdentifier).toBe(identifier);
     expect(config.android?.package).toBe(identifier);
     expect(config.scheme).toBe(scheme);
-    const host = new URL(DEFAULT_HOSTED_APP_URL).host;
-    expect(config.ios?.associatedDomains).toContain(`applinks:${host}`);
-    expect(config.android?.intentFilters?.[0]?.data).toEqual([
-      { scheme: "https", host, pathPrefix: "/threads/" },
-    ]);
+    // Gustaf has no hosted site: links open the app through its scheme alone.
+    expect(config.ios?.associatedDomains).toBeUndefined();
+    expect(config.android?.intentFilters).toBeUndefined();
   },
 );
 
