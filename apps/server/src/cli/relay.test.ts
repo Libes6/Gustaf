@@ -129,4 +129,109 @@ describe("gustaf relay", () => {
       ({ server }) => Effect.sync(() => server.close()),
     ).pipe(Effect.provide(Layer.mergeAll(layerCliRuntime, TestConsole.layer))),
   );
+
+  it.effect("lists what waits for an answer and answers it by the start of its id", () =>
+    Effect.acquireUseRelease(
+      Effect.callback<{
+        server: NodeHttp.Server;
+        received: Array<{ method: string; url: string; authorization: string; body: string }>;
+      }>((resume) => {
+        const received: Array<{
+          method: string;
+          url: string;
+          authorization: string;
+          body: string;
+        }> = [];
+        const status = {
+          connection: "online",
+          devices: [],
+          pending: [
+            {
+              id: "5f0c1d2e-aaaa-4bbb-8ccc-0123456789ab",
+              name: "Mac",
+              requestedAt: "2026-11-25T12:00:00.000Z",
+              safetyCode: "ABCD-EFGH",
+              peerLink: { access: "auto" },
+            },
+          ],
+        };
+        const server = NodeHttp.createServer((request, response) => {
+          if (request.url === "/.well-known/t3/environment") {
+            response.writeHead(200, { "content-type": "application/json" });
+            response.end(
+              JSON.stringify({
+                environmentId: "relay-test",
+                label: "relay-test",
+                platform: { os: "linux", arch: "x64" },
+                serverVersion: "0.0.1",
+                orchestrationProtocolVersion: ORCHESTRATION_PROTOCOL_VERSION,
+                capabilities: { repositoryIdentity: true },
+              }),
+            );
+            return;
+          }
+          let body = "";
+          request.on("data", (chunk) => (body += chunk));
+          request.on("end", () => {
+            received.push({
+              method: request.method ?? "",
+              url: request.url ?? "",
+              authorization: request.headers.authorization ?? "",
+              body,
+            });
+            const known =
+              request.url === "/api/relay-host" || request.url === "/api/relay-host/decision";
+            response.writeHead(known ? 200 : 404, { "content-type": "application/json" });
+            response.end(JSON.stringify(known ? status : {}));
+          });
+        });
+        server.listen(0, "127.0.0.1", () => resume(Effect.succeed({ server, received })));
+      }),
+      ({ server, received }) =>
+        Effect.gen(function* () {
+          const address = server.address();
+          if (address === null || typeof address === "string") return yield* Effect.die("no port");
+          const baseDir = NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "t3-relay-cli-ask-"));
+          yield* persistServerRuntimeState({
+            path: NodePath.join(baseDir, "userdata", "server-runtime.json"),
+            state: yield* makePersistedServerRuntimeState({
+              config: { host: "127.0.0.1", devUrl: undefined },
+              port: address.port,
+            }),
+          });
+
+          yield* runCli(["relay", "requests", "--base-dir", baseDir]);
+          const listed = (yield* TestConsole.logLines).findLast(
+            (line): line is string => typeof line === "string",
+          );
+          assert.include(listed ?? "", "5f0c1d2e-aaaa-4bbb-8ccc-0123456789ab");
+          assert.include(listed ?? "", "wants to link its agents here (auto)");
+          assert.include(listed ?? "", "safety code ABCD-EFGH");
+
+          // The first characters of the id are enough, and a stranger's id answers nothing.
+          yield* runCli(["relay", "allow", "5f0c", "--base-dir", baseDir]);
+          yield* runCli([
+            "relay",
+            "deny",
+            "5f0c1d2e-aaaa-4bbb-8ccc-0123456789ab",
+            "--base-dir",
+            baseDir,
+          ]);
+          const refused = yield* runCli(["relay", "allow", "9999", "--base-dir", baseDir]).pipe(
+            Effect.flip,
+          );
+          assert.include(String(refused), "No single request has that id");
+          const decisions = received.filter((request) => request.method === "POST");
+          assert.deepEqual(
+            decisions.map((request) => JSON.parse(request.body)),
+            [
+              { id: "5f0c1d2e-aaaa-4bbb-8ccc-0123456789ab", approve: true },
+              { id: "5f0c1d2e-aaaa-4bbb-8ccc-0123456789ab", approve: false },
+            ],
+          );
+          assert.match(decisions[0]!.authorization, /^Bearer \S+$/);
+        }),
+      ({ server }) => Effect.sync(() => server.close()),
+    ).pipe(Effect.provide(Layer.mergeAll(layerCliRuntime, TestConsole.layer))),
+  );
 });

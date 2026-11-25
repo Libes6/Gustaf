@@ -2,12 +2,14 @@ import { NodeHttpServer } from "@effect/platform-node";
 import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import {
+  type AuthMcpClientAccess,
   CommandId,
   EventId,
   MessageId,
   NodeId,
   OrchestratorMcpFailure,
   type PeerLinkCreateInput,
+  PeerLinkError,
   ProjectId,
   ProviderDriverKind,
   ProviderInstanceId,
@@ -904,6 +906,86 @@ it.live("settling the thread closes its open card, so it no longer reads as aski
       expect((yield* a.orchestrator.getThreadShell(threadId))?.pendingRuntimeRequest).toBeNull();
     }),
   ),
+);
+
+/** What a link to Box made through the relay looks like to the card that asked for it. */
+const relayLinked = (access: AuthMcpClientAccess) =>
+  Effect.gen(function* () {
+    const now = yield* DateTime.now;
+    return {
+      environmentId: box.environmentId,
+      label: "Box",
+      urls: ["https://d-box.relay.gustaf.invalid"],
+      access,
+      linkedAt: now,
+      expiresAt: DateTime.add(now, { days: 30 }),
+      lastReachedAt: now,
+      lastError: null,
+    };
+  });
+
+it.live("a card is answered with a computer of the account through the relay, with no code", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const asked: Array<unknown> = [];
+      const a = yield* makeLaptopWith((links) => ({
+        ...links,
+        linkRelay: (input) =>
+          Effect.sync(() => void asked.push(input)).pipe(Effect.andThen(relayLinked(input.access))),
+      }));
+      yield* seedThread(a);
+      yield* recordPendingCard(a, "relay");
+      const card = yield* pendingCard(a);
+      yield* a.requests.answer({
+        threadId,
+        turnItemId: card.id,
+        answer: { type: "link-relay", deviceId: "d-box", access: "auto" },
+      });
+      // No address and no pairing code went anywhere: the computer and the access did.
+      expect(asked).toEqual([{ deviceId: "d-box", access: "auto" }]);
+      expect(yield* cardOf(a)).toMatchObject({
+        linkStatus: "linked",
+        linkedLabel: "Box",
+        linkedAccess: "auto",
+      });
+      expect((yield* outcomeMessages(a)).messages[0]).toMatchObject({
+        notification: { outcome: "completed" },
+      });
+    }),
+  ).pipe(Effect.provide(NodeHttpServer.layerTest)),
+);
+
+it.live("a relay link the other computer's user declines fails the card with the reason", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const a = yield* makeLaptopWith((links) => ({
+        ...links,
+        linkRelay: () =>
+          Effect.fail(
+            new PeerLinkError({
+              reason: "relay_denied",
+              message:
+                "Box did not allow the link: it was declined there, or nobody answered in time.",
+            }),
+          ),
+      }));
+      yield* seedThread(a);
+      yield* recordPendingCard(a, "relay");
+      const card = yield* pendingCard(a);
+      yield* a.requests.answer({
+        threadId,
+        turnItemId: card.id,
+        answer: { type: "link-relay", deviceId: "d-box", access: "full-access" },
+      });
+      expect(yield* cardOf(a)).toMatchObject({
+        linkStatus: "failed",
+        failure: "Box did not allow the link: it was declined there, or nobody answered in time.",
+      });
+      expect((yield* outcomeMessages(a)).messages[0]).toMatchObject({
+        notification: { outcome: "failed" },
+      });
+    }),
+  ).pipe(Effect.provide(NodeHttpServer.layerTest)),
 );
 
 it.live("a code the box refuses fails the request with its reason, and links nothing", () =>

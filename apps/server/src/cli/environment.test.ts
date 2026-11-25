@@ -11,12 +11,15 @@ import { expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
 import * as TestConsole from "effect/testing/TestConsole";
 import { Command } from "effect/cli";
 
 import { cli } from "../binCli.ts";
 import * as ServerConfig from "../config.ts";
 import { descriptorOf, servePeer } from "../peer/PeerLinks.testkit.ts";
+import { PHONE_TOKEN, startRelay } from "../relay/RelayHost.testkit.ts";
+import { storeRelayCredential } from "./relay.ts";
 
 const layerCliRuntime = Layer.mergeAll(NodeServices.layer, NodeCrypto.layer, NetService.layer);
 
@@ -138,6 +141,59 @@ it.effect("links a file of environments, reports each line, and fails when one d
       expect(redacted).toContain("http://192.168.1.20:3773: unreachable: ");
       expect(redacted).toContain("line 3: unreachable: ");
       expect(redacted).not.toMatch(/alice|hunter2|s3cret/);
+    }),
+  ).pipe(Effect.provide(Layer.mergeAll(layerCliRuntime, TestConsole.layer))),
+);
+
+it.live("links a computer of the account through the relay by name, and says why it cannot", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const relay = yield* Effect.acquireDisposable(Effect.promise(startRelay));
+      const baseDir = yield* fs.makeTempDirectoryScoped({ prefix: "t3-environment-relay-cli-" });
+      const { settingsPath } = yield* ServerConfig.deriveServerPaths(baseDir, undefined);
+      yield* fs.makeDirectory(NodePath.dirname(settingsPath), { recursive: true });
+      yield* fs.writeFileString(settingsPath, JSON.stringify({ linkedEnvironmentsEnabled: true }));
+      const run = (...args: ReadonlyArray<string>) =>
+        runCli(["environment", ...args, "--base-dir", baseDir]);
+      const last = TestConsole.logLines.pipe(
+        Effect.map((lines) => lines.findLast((line): line is string => typeof line === "string")),
+      );
+
+      // Signed out of the relay, there is nothing to list and nothing to link.
+      yield* run("machines");
+      expect(yield* last).toContain("not signed in to the Gustaf relay");
+      expect(yield* run("link", "--relay", "Box").pipe(Effect.flip)).toMatchObject({
+        _tag: "EnvironmentLinkUsageError",
+      });
+
+      yield* storeRelayCredential(Option.some(baseDir), {
+        relayUrl: relay.url,
+        deviceId: "pixel",
+        token: PHONE_TOKEN,
+      });
+      // The account's other computers, never this one, with who is online (here, nobody).
+      yield* run("machines", "--json");
+      expect(JSON.parse((yield* last) ?? "{}")).toEqual({
+        machines: [{ deviceId: "laptop", name: "Box", online: false }],
+      });
+
+      const unknown = yield* run("link", "--relay", "toaster").pipe(Effect.flip);
+      expect(unknown).toMatchObject({ _tag: "EnvironmentLinkUsageError" });
+      expect(unknown.message).toContain('No computer on this Gustaf account matches "toaster"');
+      expect(unknown.message).toContain("Box (laptop) offline");
+
+      // A name in any case reaches the machine; it is offline, and the answer says so.
+      const offline = yield* run("link", "--relay", "bOx").pipe(Effect.flip);
+      expect(String(offline)).toContain("Box is not connected to the Gustaf relay");
+
+      const mixed = yield* run("link", "--relay", "Box", "--url", "https://x.example").pipe(
+        Effect.flip,
+      );
+      expect(mixed).toMatchObject({
+        _tag: "EnvironmentLinkUsageError",
+        detail: "--relay takes no address, --url, --pairing-code or --from.",
+      });
     }),
   ).pipe(Effect.provide(Layer.mergeAll(layerCliRuntime, TestConsole.layer))),
 );

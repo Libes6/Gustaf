@@ -90,6 +90,8 @@ const jsonFlag = Flag.Boolean("json").pipe(
   Flag.withDefault(false),
 );
 
+const encodeJson = Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown));
+
 const encodeLinks = Schema.encodeEffect(
   Schema.fromJsonString(Schema.Array(Schema.toEncoded(Schema.Unknown))),
 );
@@ -211,6 +213,52 @@ const readLinkBatch = Effect.fn("environment.readLinkBatch")(function* (from: st
   return yield* fs.readFileString(yield* expandHomePath(from));
 });
 
+interface RelayMachineChoice {
+  readonly deviceId: string;
+  readonly name: string;
+  readonly online: boolean;
+  readonly linkedEnvironmentId?: string;
+}
+
+const describeRelayMachines = (machines: ReadonlyArray<RelayMachineChoice>) =>
+  machines
+    .map(
+      (machine) =>
+        `${machine.name} (${machine.deviceId}) ${machine.online ? "online" : "offline"}${
+          machine.linkedEnvironmentId === undefined
+            ? ""
+            : `, linked as ${machine.linkedEnvironmentId}`
+        }`,
+    )
+    .join("\n");
+
+/**
+ * The computer a `--relay` value names: its device id, else its name as the account shows it
+ * (any capitalisation), else the only name that contains it. Anything unclear lists the choices.
+ */
+const pickRelayMachine = Effect.fn("environment.pickRelayMachine")(function* (
+  machines: ReadonlyArray<RelayMachineChoice>,
+  wanted: string,
+) {
+  const query = wanted.trim().toLowerCase();
+  const byId = machines.filter((machine) => machine.deviceId.toLowerCase() === query);
+  const byName = machines.filter((machine) => machine.name.toLowerCase() === query);
+  const matches =
+    byId.length > 0
+      ? byId
+      : byName.length > 0
+        ? byName
+        : machines.filter((machine) => machine.name.toLowerCase().includes(query));
+  const [only, ...others] = matches;
+  if (only !== undefined && others.length === 0) return only;
+  return yield* new EnvironmentLinkUsageError({
+    detail:
+      machines.length === 0
+        ? "No other computers are on this Gustaf account."
+        : `${matches.length === 0 ? `No computer on this Gustaf account matches "${wanted}".` : `More than one computer matches "${wanted}"; use its device id.`} Choose one of:\n${describeRelayMachines(matches.length === 0 ? machines : matches)}`,
+  });
+});
+
 const environmentLinkCommand = Command.make("link", {
   ...authLocationFlags,
   url: Argument.String("url").pipe(
@@ -233,6 +281,12 @@ const environmentLinkCommand = Command.make("link", {
     ),
     Flag.optional,
   ),
+  relay: Flag.String("relay").pipe(
+    Flag.withDescription(
+      "Link another computer on this Gustaf account through the Gustaf relay, by its name or device id (`t3 environment machines` lists them). No address and no pairing code: someone at that computer has to allow it in Gustaf, and the safety code printed here must match the one shown there.",
+    ),
+    Flag.optional,
+  ),
   access: Flag.Literals("access", AuthMcpClientAccess.literals).pipe(
     Flag.withDescription(
       "What this environment's agents may do there: read-only, or the broadest runtime mode.",
@@ -245,6 +299,51 @@ const environmentLinkCommand = Command.make("link", {
   ),
   Command.withHandler((flags) =>
     Effect.gen(function* () {
+      if (Option.isSome(flags.relay)) {
+        if (
+          Option.isSome(flags.url) ||
+          Option.isSome(flags.pairingCode) ||
+          Option.isSome(flags.from) ||
+          flags.alternateUrl.length > 0
+        ) {
+          return yield* new EnvironmentLinkUsageError({
+            detail: "--relay takes no address, --url, --pairing-code or --from.",
+          });
+        }
+        const wanted = flags.relay.value;
+        const runFork = Effect.runForkWith(yield* Effect.context<never>());
+        return yield* runWithPeerLinks(flags, (links) =>
+          Effect.gen(function* () {
+            const listed = yield* links.relayMachines;
+            if (listed.problem === "signed_out") {
+              return yield* new EnvironmentLinkUsageError({
+                detail:
+                  "This computer is not signed in to the Gustaf relay. Run `gustaf relay login` first.",
+              });
+            }
+            if (listed.problem === "unavailable") {
+              return yield* new EnvironmentLinkUsageError({
+                detail: "The Gustaf relay did not answer. Try again in a moment.",
+              });
+            }
+            const machine = yield* pickRelayMachine(listed.machines, wanted);
+            const linked = yield* links.linkRelay(
+              { deviceId: machine.deviceId, access: flags.access },
+              {
+                onSafetyCode: (code) =>
+                  void runFork(
+                    Console.log(
+                      `Waiting for ${machine.name} to allow this. Open Gustaf there and check that it shows this code before allowing it:\n  ${code}\n(On a computer with no screen: gustaf relay requests, then gustaf relay allow <id>.)\n`,
+                    ),
+                  ),
+              },
+            );
+            yield* Console.log(
+              `Linked ${linked.label} (${linked.environmentId}) with ${linked.access} access, until ${DateTime.formatIso(linked.expiresAt)}.\n`,
+            );
+          }),
+        );
+      }
       if (Option.isSome(flags.from)) {
         if (
           Option.isSome(flags.url) ||
@@ -260,7 +359,7 @@ const environmentLinkCommand = Command.make("link", {
       }
       if (Option.isNone(flags.url) || Option.isNone(flags.pairingCode)) {
         return yield* new EnvironmentLinkUsageError({
-          detail: "Give an address and --pairing-code, or --from <file>.",
+          detail: "Give an address and --pairing-code, --from <file>, or --relay <computer>.",
         });
       }
       const url = flags.url.value;
@@ -291,6 +390,40 @@ const environmentListCommand = Command.make("list", { ...authLocationFlags, json
         Effect.gen(function* () {
           const listed = yield* links.list;
           yield* Console.log(flags.json ? `${yield* encodeLinks(listed)}\n` : formatLinks(listed));
+        }),
+      { quietLogs: flags.json },
+    ),
+  ),
+);
+
+const environmentMachinesCommand = Command.make("machines", {
+  ...authLocationFlags,
+  json: jsonFlag,
+}).pipe(
+  Command.withDescription(
+    "List the other computers on this Gustaf account that `t3 environment link --relay` can reach, and which are online.",
+  ),
+  Command.withHandler((flags) =>
+    runWithPeerLinks(
+      flags,
+      (links) =>
+        Effect.gen(function* () {
+          const listed = yield* links.relayMachines;
+          if (flags.json) {
+            yield* Console.log(`${yield* encodeJson(listed)}\n`);
+          } else if (listed.problem === "signed_out") {
+            yield* Console.log(
+              "This computer is not signed in to the Gustaf relay. Run `gustaf relay login`.\n",
+            );
+          } else if (listed.problem === "unavailable") {
+            yield* Console.log("The Gustaf relay did not answer.\n");
+          } else {
+            yield* Console.log(
+              listed.machines.length === 0
+                ? "No other computers on this Gustaf account.\n"
+                : `${describeRelayMachines(listed.machines)}\n`,
+            );
+          }
         }),
       { quietLogs: flags.json },
     ),
@@ -328,6 +461,7 @@ export const environmentCommand = Command.make("environment").pipe(
   Command.withDescription("Link other Gustaf environments, so agents here can work there."),
   Command.withSubcommands([
     environmentLinkCommand,
+    environmentMachinesCommand,
     environmentListCommand,
     environmentUnlinkCommand,
   ]),
