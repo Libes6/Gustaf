@@ -11,6 +11,8 @@ import {
   pickableRelayComputers,
   relayComputersOfEnvironments,
   relayPairingFailureMessage,
+  startRelayComputerPairing,
+  type RelayPairingProgress,
 } from "./relayComputers.ts";
 
 const answer = (status: number, body: unknown = {}) =>
@@ -106,7 +108,7 @@ describe("account computers", () => {
 });
 
 describe("pairing from the account's computers", () => {
-  const computer = { deviceId: "laptop", name: "Laptop" };
+  const computer = { deviceId: "laptop", name: "Laptop", online: true };
   const failure = (reason: RelayTunnelClientError["reason"]) =>
     new RelayTunnelClientError(reason, "raw");
 
@@ -186,5 +188,43 @@ describe("pairing from the account's computers", () => {
       signal: controller.signal,
     });
     expect(cancelled).toEqual({ status: "cancelled" });
+  });
+
+  it("reports connecting, the safety code, then settles; cancel ends a waiting attempt", async () => {
+    const steps: Array<RelayPairingProgress> = [];
+    const waiting = Promise.withResolvers<void>();
+    const attempt = startRelayComputerPairing({
+      relay: {
+        pairWithComputer: (_computer, onPending, signal) =>
+          new Promise<string>((_resolve, reject) => {
+            onPending("1234-5678");
+            waiting.resolve();
+            signal?.addEventListener("abort", () => reject(failure("closed")));
+          }),
+      },
+      computer,
+      routeFor: undefined,
+      connect: vi.fn(),
+      onProgress: (progress) => steps.push(progress),
+    });
+    await waiting.promise;
+    expect(steps).toEqual([
+      { phase: "connecting", computer },
+      { phase: "waiting", computer, safetyCode: "1234-5678" },
+    ]);
+    attempt.cancel();
+    expect(await attempt.done).toEqual({ status: "cancelled" });
+    expect(steps.at(-1)).toEqual({ phase: "idle" });
+
+    const refused: Array<RelayPairingProgress> = [];
+    const failed = startRelayComputerPairing({
+      relay: { pairWithComputer: async () => Promise.reject(failure("rejected")) },
+      computer,
+      routeFor: undefined,
+      connect: vi.fn(),
+      onProgress: (progress) => refused.push(progress),
+    });
+    await failed.done;
+    expect(refused.at(-1)).toMatchObject({ phase: "failed", computer });
   });
 });

@@ -201,3 +201,47 @@ export async function pairWithRelayComputer<
         message: outcome.error ?? resolve(msg("Pairing over the relay failed.")),
       };
 }
+
+/** What a pairing from the account's computers shows while it runs; `idle` once it ended. */
+export type RelayPairingProgress =
+  | { readonly phase: "idle" }
+  | { readonly phase: "connecting"; readonly computer: RelayComputer }
+  | {
+      readonly phase: "waiting";
+      readonly computer: RelayComputer;
+      /** Shown on the computer too: matching codes rule out a relay in the middle. */
+      readonly safetyCode: string;
+    }
+  | { readonly phase: "failed"; readonly computer: RelayComputer; readonly message: string };
+
+export const RELAY_PAIRING_IDLE: RelayPairingProgress = { phase: "idle" };
+
+/**
+ * Starts a pairing with `computer` and reports each step to `onProgress`. `cancel` ends the
+ * attempt while the computer waits for its user; the computer then drops the request.
+ */
+export function startRelayComputerPairing<
+  Outcome extends RelayPairingOutcome & { readonly error: string | null },
+>(
+  input: Omit<Parameters<typeof pairWithRelayComputer<Outcome>>[0], "signal" | "onPending"> & {
+    readonly computer: RelayComputer;
+    readonly onProgress: (progress: RelayPairingProgress) => void;
+  },
+): { readonly cancel: () => void; readonly done: Promise<RelayComputerPairingResult> } {
+  const controller = new AbortController();
+  const { onProgress, computer } = input;
+  onProgress({ phase: "connecting", computer });
+  const done = pairWithRelayComputer({
+    ...input,
+    signal: controller.signal,
+    onPending: (safetyCode) => onProgress({ phase: "waiting", computer, safetyCode }),
+  }).then((result) => {
+    onProgress(
+      result.status === "failed"
+        ? { phase: "failed", computer, message: result.message }
+        : RELAY_PAIRING_IDLE,
+    );
+    return result;
+  });
+  return { cancel: () => controller.abort(), done };
+}

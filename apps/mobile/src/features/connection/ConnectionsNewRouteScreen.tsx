@@ -30,6 +30,7 @@ import { isRelayPairingLink, pairOverRelay } from "../relay/relayTunnels";
 import { useRemoteConnections } from "../../state/use-remote-environment-registry";
 import { SymbolView } from "../../components/ui/AppSymbol";
 import { hasCloudPublicConfig } from "../cloud/publicConfig";
+import { AccountComputersSection } from "./AccountComputersSection";
 import { CloudEnvironmentRows } from "./CloudEnvironmentRows";
 import {
   autoConnectReport,
@@ -252,14 +253,16 @@ function PairingForm({
         ? Haptics.NotificationFeedbackType.Success
         : Haptics.NotificationFeedbackType.Error,
     );
-    if (outcome.ok) {
-      // Replacing with Home would nest it inside any sheet below; return to the opener.
-      if (!navigation.canGoBack()) {
-        navigation.dispatch(StackActions.replace("Home"));
-      } else {
-        // Added from the Settings list, the new environment shows on Environments.
-        leaveSettingsPage(navigation, workspaceHasColumns(), "SettingsEnvironments");
-      }
+    if (outcome.ok) leaveAfterPairing();
+  };
+
+  const leaveAfterPairing = () => {
+    // Replacing with Home would nest it inside any sheet below; return to the opener.
+    if (!navigation.canGoBack()) {
+      navigation.dispatch(StackActions.replace("Home"));
+    } else {
+      // Added from the Settings list, the new environment shows on Environments.
+      leaveSettingsPage(navigation, workspaceHasColumns(), "SettingsEnvironments");
     }
   };
 
@@ -304,6 +307,12 @@ function PairingForm({
             onScanPress={() => {
               void handleScanPress();
             }}
+          />
+
+          <AccountComputersSection
+            routeFor={routeFor}
+            connect={onConnectPress}
+            onPaired={leaveAfterPairing}
           />
 
           <View collapsable={false} className="gap-2">
