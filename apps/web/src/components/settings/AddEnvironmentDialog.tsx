@@ -739,7 +739,7 @@ export function AddEnvironmentDialog({
                 ? renderConnectionModeCard({
                     mode: "relay",
                     title: gt("Gustaf relay"),
-                    description: gt("Reach a computer on any network with its relay link."),
+                    description: gt("Reach a computer of your account on any network."),
                     icon: <GlobeIcon aria-hidden className="size-4" />,
                   })
                 : null}
@@ -748,6 +748,7 @@ export function AddEnvironmentDialog({
               {savedBackendMode === "relay" ? (
                 <RelayPairingPanel
                   routeTarget={routeTarget}
+                  savedEnvironments={savedEnvironments}
                   onPaired={() => {
                     handleOpenChange(false);
                     toastManager.add({

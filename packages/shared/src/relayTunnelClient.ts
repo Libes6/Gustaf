@@ -36,8 +36,9 @@ export interface RelayTunnelClientOptions {
   readonly hostDeviceId: string;
   /**
    * The computer's static key from the QR code or an earlier link, base64url. The handshake fails
-   * on any other. `null` trusts the key the computer presents: only for asking to link a computer
-   * this device has no key for, where the user compares the safety codes on both screens.
+   * on any other. `null` trusts the key the computer presents: only for asking to link or to pair
+   * with a computer this device has no key for, where the user compares the safety codes on both
+   * screens.
    */
   readonly hostKey: string | null;
   readonly clientKeyPair: NoiseKeyPair;
@@ -46,6 +47,11 @@ export interface RelayTunnelClientOptions {
   readonly pairingSecret?: string;
   /** Asks the computer's user to let this machine link its agents there at this access. */
   readonly peerLink?: { readonly access: string };
+  /**
+   * Asks the computer's user to let this device pair as a client, picked from the account's
+   * computers instead of scanned. Like `peerLink`, the computer always waits for its own user.
+   */
+  readonly accountPairing?: boolean;
   readonly randomBytes: RandomBytes;
   /** Called with the computer's key when it asks its user to allow this device. */
   readonly onPending?: (hostKey: Uint8Array) => void;
@@ -250,6 +256,7 @@ export class RelayTunnelClient {
               name: options.name,
               ...(options.pairingSecret ? { pairingSecret: options.pairingSecret } : {}),
               ...(options.peerLink ? { peerLink: options.peerLink } : {}),
+              ...(options.accountPairing ? { accountPairing: true } : {}),
             };
             sendFrame(handshake.writeMessage(new TextEncoder().encode(JSON.stringify(hello))));
             session = handshake.session();

@@ -25,6 +25,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
+import * as Semaphore from "effect/Semaphore";
 
 import * as EnvironmentAuth from "../auth/EnvironmentAuth.ts";
 import * as ServerSecretStore from "../auth/ServerSecretStore.ts";
@@ -72,16 +73,25 @@ export class RelayHost extends Context.Service<
     readonly revokeDevice: (input: {
       readonly key: string;
     }) => Effect.Effect<RelayHostStatus, RelayHostError>;
+    readonly setTrust: (input: {
+      readonly enabled: boolean;
+    }) => Effect.Effect<RelayHostStatus, RelayHostError>;
   }
 >()("t3/relay/RelayHost") {}
 
 const HOST_KEY_SECRET = "relay-host-key";
 const CREDENTIAL_SECRET = "relay-host-credential";
 const DEVICES_SECRET = "relay-host-devices";
+const TRUST_SECRET = "relay-host-trust";
 const OFFER_TTL = Duration.minutes(5);
 const APPROVAL_TTL_MS = 5 * 60_000;
-// Requests to link come from any device of the account, so only a few may wait at once.
+// Requests to link or to pair come from any device of the account, so only a few may wait at once.
 const MAX_PENDING_PEER_LINKS = 3;
+const MAX_PENDING_ACCOUNT_PAIRINGS = 3;
+// A phone that reconnects often does not rewrite the device list each time.
+const LAST_SEEN_WRITE_INTERVAL_MS = 10 * 60_000;
+// How many characters of a device's key its sessions' labels carry, to tell them apart by name.
+const LABEL_KEY_LENGTH = 12;
 const isLinkAccess = Schema.is(AuthMcpClientAccess);
 // The approved phone redeems it through the tunnel within seconds.
 const PAIRING_TOKEN_TTL = Duration.minutes(5);
@@ -95,10 +105,26 @@ type StoredCredential = typeof StoredCredential.Type;
 const StoredDevice = Schema.Struct({
   key: Schema.String,
   name: Schema.String,
+  /** The first time this computer's user allowed the key. */
   approvedAt: Schema.String,
+  lastSeenAt: Schema.optional(Schema.String),
+  /**
+   * The user allowed this key as a client (a phone or another desktop app) once, by hand: the
+   * only kind of approval "Trust my other devices" repeats. Devices stored before this stay
+   * unmarked until the user allows them again.
+   */
+  client: Schema.optional(Schema.Boolean),
 });
 type StoredDevice = typeof StoredDevice.Type;
 const StoredDevices = Schema.Array(StoredDevice);
+
+const StoredTrust = Schema.Struct({ enabled: Schema.Boolean });
+const decodeStoredTrust = Schema.decodeUnknownOption(StoredTrust);
+
+/** What a pending request asks for beyond a QR scan. */
+type RequestKind =
+  | { readonly peerLink: NonNullable<RelayHostPendingDevice["peerLink"]> }
+  | { readonly viaAccount: true };
 
 interface PendingApproval {
   readonly view: RelayHostPendingDevice;
@@ -154,6 +180,23 @@ function readRelayUrl(value: string): string | null {
   }
 }
 
+const TRUSTED_SESSION_SUFFIX = " · trusted)";
+
+/**
+ * Names a session this computer issues to a relay device. It ends with the key's first characters
+ * (and a marker when no one was asked), and a device's name cannot forge that ending, so revoking
+ * finds exactly the sessions of one key.
+ */
+const sessionLabel = (name: string, key: string, byTrust: boolean) =>
+  `${name} (relay ${key.slice(0, LABEL_KEY_LENGTH)}${byTrust ? TRUSTED_SESSION_SUFFIX : ")"}`;
+
+const ownsSession = (label: string, key: string) =>
+  label.endsWith(` (relay ${key.slice(0, LABEL_KEY_LENGTH)})`) ||
+  label.endsWith(` (relay ${key.slice(0, LABEL_KEY_LENGTH)}${TRUSTED_SESSION_SUFFIX}`);
+
+const isTrustedSession = (label: string) =>
+  label.endsWith(TRUSTED_SESSION_SUFFIX) && label.includes(" (relay ");
+
 /** The host may be bound to every interface; tunneled requests always come from this machine. */
 function localOrigin(host: string | undefined, port: number) {
   const address =
@@ -162,7 +205,7 @@ function localOrigin(host: string | undefined, port: number) {
 }
 
 const make = Effect.fn("RelayHost.make")(function* (
-  options: { readonly localOrigin?: string } = {},
+  options: { readonly localOrigin?: string; readonly approvalTtlMs?: number | undefined } = {},
 ) {
   const secrets = yield* ServerSecretStore.ServerSecretStore;
   const auth = yield* EnvironmentAuth.EnvironmentAuth;
@@ -190,20 +233,34 @@ const make = Effect.fn("RelayHost.make")(function* (
     Effect.map(Option.getOrElse((): ReadonlyArray<StoredDevice> => [])),
     Effect.orElseSucceed((): ReadonlyArray<StoredDevice> => []),
   );
+  let trusting = yield* readText(TRUST_SECRET).pipe(
+    Effect.map(Option.flatMap((text) => decodeStoredTrust(parseJson(text)))),
+    Effect.map(Option.exists((stored) => stored.enabled)),
+    Effect.orElseSucceed(() => false),
+  );
   let connection: RelayHostConnectionState | null = null;
   let engine: RelayHostEngine | null = null;
   let offer: { secret: string; view: RelayHostPairingOffer } | null = null;
   const pending = new Map<string, PendingApproval>();
 
   const storageError = (cause: unknown) => new RelayHostError({ reason: "storage", cause });
-  const saveDevices = (next: ReadonlyArray<StoredDevice>) =>
-    secrets.set(DEVICES_SECRET, encodeJson(next)).pipe(
-      Effect.mapError(storageError),
-      Effect.tap(() =>
-        Effect.sync(() => {
-          devices = next;
-        }),
-      ),
+  const devicesLock = yield* Semaphore.make(1);
+  /** Changes the device list from its latest state: approvals, revocations and last-seen writes never undo each other. */
+  const updateDevices = (
+    change: (current: ReadonlyArray<StoredDevice>) => ReadonlyArray<StoredDevice>,
+  ) =>
+    devicesLock.withPermits(1)(
+      Effect.suspend(() => {
+        const next = change(devices);
+        return secrets.set(DEVICES_SECRET, encodeJson(next)).pipe(
+          Effect.mapError(storageError),
+          Effect.tap(() =>
+            Effect.sync(() => {
+              devices = next;
+            }),
+          ),
+        );
+      }),
     );
 
   const safetyCode = (key: string) => relaySafetyCode(hostKeyPair.publicKey, fromBase64Url(key));
@@ -223,15 +280,19 @@ const make = Effect.fn("RelayHost.make")(function* (
           name: device.name,
           approvedAt: device.approvedAt,
           safetyCode: safetyCode(device.key),
+          ...(device.lastSeenAt === undefined ? {} : { lastSeenAt: device.lastSeenAt }),
+          trusted: device.client === true,
         })),
         pending: [...pending.values()].map((approval) => approval.view),
         ...(offer ? { offer: offer.view } : {}),
+        trustOtherDevices: trusting,
       };
     });
 
-  // The phone pairs through the tunnel like over any other route and gets an ordinary session.
-  const issuePairingToken = (name: string) =>
-    auth.createPairingLink({ ttl: PAIRING_TOKEN_TTL, label: `${name} (relay)` });
+  // The phone pairs through the tunnel like over any other route and gets an ordinary session. Its
+  // label ends with a piece of the device's key, which is how revoking finds the sessions again.
+  const issuePairingToken = (name: string, key: string, byTrust: boolean) =>
+    auth.createPairingLink({ ttl: PAIRING_TOKEN_TTL, label: sessionLabel(name, key, byTrust) });
 
   const ready = (pairingToken?: string): RelayAdmission =>
     pairingToken === undefined ? { kind: "ready" } : { kind: "ready", pairingToken };
@@ -241,14 +302,14 @@ const make = Effect.fn("RelayHost.make")(function* (
     key: string,
     name: string,
     closed: Promise<void>,
-    peerLink?: RelayHostPendingDevice["peerLink"],
+    kind?: RequestKind,
   ): RelayAdmission => {
     const id = NodeCrypto.randomUUID();
     const decision = new Promise<RelayAdmission>((resolve) => {
       const timer = setTimeout(() => {
         pending.delete(id);
         resolve(reject("rejected"));
-      }, APPROVAL_TTL_MS);
+      }, options.approvalTtlMs ?? APPROVAL_TTL_MS);
       pending.set(id, {
         key,
         view: {
@@ -256,7 +317,7 @@ const make = Effect.fn("RelayHost.make")(function* (
           name,
           requestedAt: new Date().toISOString(),
           safetyCode: safetyCode(key),
-          ...(peerLink === undefined ? {} : { peerLink }),
+          ...kind,
         },
         settle: (admission) => {
           clearTimeout(timer);
@@ -271,9 +332,32 @@ const make = Effect.fn("RelayHost.make")(function* (
   };
 
   /**
-   * A machine of the same account asks to link its agents here. The account proves nothing about
-   * who is asking, so this always waits for this computer's user, known device or not: every
-   * link session is one the user allowed.
+   * A device of the same account asks to link or to pair without a QR code. The account proves
+   * nothing about who is asking, so only a few requests wait at once, one per key, and each one
+   * waits for this computer's user. Anything else is turned away with `busy`.
+   */
+  const requestApproval = (
+    client: {
+      readonly clientKey: string;
+      readonly hello: { readonly name: string };
+      readonly closed: Promise<void>;
+    },
+    kind: RequestKind,
+  ): RelayAdmission => {
+    const sameKind = (approval: PendingApproval) =>
+      "peerLink" in kind ? approval.view.peerLink !== undefined : approval.view.viaAccount === true;
+    const waiting = [...pending.values()].filter(sameKind);
+    const cap = "peerLink" in kind ? MAX_PENDING_PEER_LINKS : MAX_PENDING_ACCOUNT_PAIRINGS;
+    if (waiting.length >= cap || waiting.some((approval) => approval.key === client.clientKey)) {
+      return reject("busy");
+    }
+    return waitForUser(client.clientKey, client.hello.name, client.closed, kind);
+  };
+
+  /**
+   * A machine of the same account asks to link its agents here. This always waits for the user,
+   * and "Trust my other devices" does not change that: a link hands an agent standing access, and
+   * the requester takes this key on trust and relies on the user comparing safety codes.
    */
   const admitPeerLink = Effect.fn("RelayHost.admitPeerLink")(function* (
     client: {
@@ -285,17 +369,48 @@ const make = Effect.fn("RelayHost.make")(function* (
   ) {
     if (!isLinkAccess(access)) return reject("rejected");
     if (!(yield* linkedEnvironmentsEnabled)) return reject("linking_off");
-    const waiting = [...pending.values()].filter(
-      (approval) => approval.view.peerLink !== undefined,
-    );
-    if (
-      waiting.length >= MAX_PENDING_PEER_LINKS ||
-      waiting.some((approval) => approval.key === client.clientKey)
-    ) {
-      return reject("busy");
-    }
-    return waitForUser(client.clientKey, client.hello.name, client.closed, { access });
+    return requestApproval(client, { peerLink: { access } });
   });
+
+  /**
+   * A device of the account asks to pair as a client from its computer list. The user answers
+   * with the safety code in front of them, unless they turned on "Trust my other devices" and this
+   * key is one they already allowed as a client: then it gets the same pairing, with nothing more
+   * and no prompt. A new key always waits, so an account's token alone never adds a device.
+   */
+  const admitAccountPairing = Effect.fn("RelayHost.admitAccountPairing")(function* (client: {
+    readonly clientKey: string;
+    readonly hello: { readonly name: string };
+    readonly closed: Promise<void>;
+  }) {
+    const device = devices.find((candidate) => candidate.key === client.clientKey);
+    if (trusting && device?.client === true) {
+      const issued = yield* issuePairingToken(client.hello.name, client.clientKey, true).pipe(
+        Effect.map((link) => ready(link.credential)),
+        Effect.catch((error) =>
+          Effect.succeed(
+            error._tag === "ManagedPolicyRefusedError" ? reject("policy") : reject("rejected"),
+          ),
+        ),
+      );
+      return issued;
+    }
+    return requestApproval(client, { viaAccount: true });
+  });
+
+  const noteSeen = (key: string, nowMs: number) =>
+    Effect.suspend(() => {
+      const device = devices.find((candidate) => candidate.key === key);
+      if (device === undefined) return Effect.void;
+      const last = device.lastSeenAt === undefined ? 0 : Date.parse(device.lastSeenAt);
+      if (nowMs - last < LAST_SEEN_WRITE_INTERVAL_MS) return Effect.void;
+      const seen = new Date(nowMs).toISOString();
+      return updateDevices((current) =>
+        current.map((candidate) =>
+          candidate.key === key ? { ...candidate, lastSeenAt: seen } : candidate,
+        ),
+      ).pipe(Effect.ignore);
+    });
 
   /** Runs inside the engine's callback: decides about a client whose handshake completed. */
   const admit = Effect.fn("RelayHost.admit")(function* (client: {
@@ -305,6 +420,7 @@ const make = Effect.fn("RelayHost.make")(function* (
   }) {
     const now = yield* Clock.currentTimeMillis;
     const known = devices.some((device) => device.key === client.clientKey);
+    yield* noteSeen(client.clientKey, now);
     const secret = client.hello.pairingSecret;
     const current = offer;
     const scanned =
@@ -315,12 +431,17 @@ const make = Effect.fn("RelayHost.make")(function* (
     if (!scanned) {
       const requested = client.hello.peerLink;
       if (requested !== undefined) return yield* admitPeerLink(client, requested.access);
+      if (client.hello.accountPairing === true) return yield* admitAccountPairing(client);
       return known ? ready() : reject("unknown_device");
     }
     // One scan, one device: a second phone needs a fresh code.
     offer = null;
     // An allowed phone that scans again (say, after removing the computer) needs no new approval.
-    if (known) return ready((yield* issuePairingToken(client.hello.name)).credential);
+    if (known) {
+      return ready(
+        (yield* issuePairingToken(client.hello.name, client.clientKey, false)).credential,
+      );
+    }
     return waitForUser(client.clientKey, client.hello.name, client.closed);
   });
 
@@ -407,54 +528,105 @@ const make = Effect.fn("RelayHost.make")(function* (
     },
   );
 
+  /** A refused or failed issue ends the request with the reason the device can act on. */
+  const failIssue = <A, E extends { readonly _tag: string }, R>(
+    approval: PendingApproval,
+    issuing: Effect.Effect<A, E, R>,
+  ) =>
+    issuing.pipe(
+      Effect.mapError((error) =>
+        error._tag === "ManagedPolicyRefusedError"
+          ? new RelayHostError({ reason: "policy" })
+          : storageError(error),
+      ),
+      Effect.tapError((error) =>
+        Effect.sync(() => {
+          if (error.reason === "policy") approval.settle(reject("policy"));
+        }),
+      ),
+    );
+
   const decide: RelayHost["Service"]["decide"] = Effect.fn("RelayHost.decide")(function* (input) {
     const approval = pending.get(input.id);
     if (!approval) return yield* new RelayHostError({ reason: "not_found" });
     if (!input.approve) {
-      approval.settle({ kind: "reject", reason: "rejected" });
+      approval.settle(reject("rejected"));
       return yield* status();
     }
     const linkAccess = approval.view.peerLink?.access;
     // A link's code carries the access the user is allowing, and this computer's policy may cap it.
-    const issued = yield* linkAccess === undefined
-      ? issuePairingToken(approval.view.name).pipe(Effect.mapError(storageError))
-      : auth
-          .issuePairingCredential({
+    const issued = yield* failIssue(
+      approval,
+      linkAccess === undefined
+        ? issuePairingToken(approval.view.name, approval.key, false)
+        : auth.issuePairingCredential({
             access: linkAccess,
             purpose: "peer-link",
             label: `Link · ${approval.view.name} (relay)`,
-          })
-          .pipe(
-            Effect.mapError((error) =>
-              error._tag === "ManagedPolicyRefusedError"
-                ? new RelayHostError({ reason: "policy" })
-                : storageError(error),
-            ),
-            Effect.tapError((error) =>
-              Effect.sync(() => {
-                if (error.reason === "policy") approval.settle(reject("policy"));
-              }),
-            ),
-          );
-    yield* saveDevices([
-      ...devices.filter((device) => device.key !== approval.key),
-      {
-        key: approval.key,
-        name: approval.view.name,
-        approvedAt: DateTime.formatIso(yield* DateTime.now),
-      },
-    ]);
+          }),
+    );
+    const allowedAt = DateTime.formatIso(yield* DateTime.now);
+    yield* updateDevices((current) => {
+      const before = current.find((device) => device.key === approval.key);
+      return [
+        ...current.filter((device) => device.key !== approval.key),
+        {
+          key: approval.key,
+          name: approval.view.name,
+          approvedAt: before?.approvedAt ?? allowedAt,
+          lastSeenAt: allowedAt,
+          // Only a hand-allowed client can later skip the prompt; a link never does.
+          ...(before?.client === true || linkAccess === undefined ? { client: true } : {}),
+        },
+      ];
+    });
     approval.settle(ready(issued.credential));
     return yield* status();
   });
+
+  /** Ends the sessions whose label `matches`, so a device cannot keep using them on another route. */
+  const endSessions = (matches: (label: string) => boolean) =>
+    auth.listSessions().pipe(
+      Effect.flatMap((sessions) =>
+        Effect.forEach(
+          sessions.filter(
+            (session) => session.client.label !== undefined && matches(session.client.label),
+          ),
+          (session) => auth.revokeSession(session.sessionId),
+          { discard: true },
+        ),
+      ),
+      Effect.mapError(storageError),
+    );
 
   const revokeDevice: RelayHost["Service"]["revokeDevice"] = Effect.fn("RelayHost.revokeDevice")(
     function* (input) {
       const device = devices.find((candidate) => candidate.key === input.key);
       if (!device) return yield* new RelayHostError({ reason: "not_found" });
-      // Without an approved key the phone's session is unreachable: its only route is this tunnel.
-      yield* saveDevices(devices.filter((candidate) => candidate.key !== input.key));
+      // The key goes first: nothing new gets in while the old sessions end.
+      yield* updateDevices((current) => current.filter((candidate) => candidate.key !== input.key));
+      for (const approval of pending.values()) {
+        if (approval.key === device.key) approval.settle(reject("rejected"));
+      }
       engine?.disconnectClient(device.key);
+      // Sessions from before labels carried the key are `<name> (relay)`: ended too, at the risk
+      // of another device that shares the name, which only has to pair again.
+      yield* endSessions(
+        (label) => ownsSession(label, device.key) || label === `${device.name} (relay)`,
+      );
+      return yield* status();
+    },
+  );
+
+  const setTrust: RelayHost["Service"]["setTrust"] = Effect.fn("RelayHost.setTrust")(
+    function* (input) {
+      if (trusting === input.enabled) return yield* status();
+      yield* secrets
+        .set(TRUST_SECRET, encodeJson({ enabled: input.enabled }))
+        .pipe(Effect.mapError(storageError));
+      trusting = input.enabled;
+      // Sessions nobody was asked about end now; the ones the user allowed by hand stay.
+      if (!input.enabled) yield* endSessions(isTrustedSession);
       return yield* status();
     },
   );
@@ -466,11 +638,17 @@ const make = Effect.fn("RelayHost.make")(function* (
     createOffer,
     decide,
     revokeDevice,
+    setTrust,
   });
 });
 
 export const layer = Layer.effect(RelayHost, make());
 
-/** `localOrigin` is where tunneled requests go; tests point it at a server on a random port. */
-export const layerWith = (options: { readonly localOrigin?: string }) =>
-  Layer.effect(RelayHost, make(options));
+/**
+ * `localOrigin` is where tunneled requests go; tests point it at a server on a random port, and
+ * shorten how long a request waits for the user.
+ */
+export const layerWith = (options: {
+  readonly localOrigin?: string;
+  readonly approvalTtlMs?: number | undefined;
+}) => Layer.effect(RelayHost, make(options));

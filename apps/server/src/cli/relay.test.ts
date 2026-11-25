@@ -153,6 +153,13 @@ describe("gustaf relay", () => {
               safetyCode: "ABCD-EFGH",
               peerLink: { access: "auto" },
             },
+            {
+              id: "7a1b2c3d-aaaa-4bbb-8ccc-0123456789ab",
+              name: "Pixel",
+              requestedAt: "2026-11-25T12:01:00.000Z",
+              safetyCode: "WXYZ-1234",
+              viaAccount: true,
+            },
           ],
         };
         const server = NodeHttp.createServer((request, response) => {
@@ -207,6 +214,10 @@ describe("gustaf relay", () => {
           assert.include(listed ?? "", "5f0c1d2e-aaaa-4bbb-8ccc-0123456789ab");
           assert.include(listed ?? "", "wants to link its agents here (auto)");
           assert.include(listed ?? "", "safety code ABCD-EFGH");
+          assert.include(
+            listed ?? "",
+            "Pixel  asks to connect from your account  safety code WXYZ-1234",
+          );
 
           // The first characters of the id are enough, and a stranger's id answers nothing.
           yield* runCli(["relay", "allow", "5f0c", "--base-dir", baseDir]);

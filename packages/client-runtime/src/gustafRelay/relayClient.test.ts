@@ -1,5 +1,6 @@
 import { generateNoiseKeyPair, relaySafetyCode } from "@t3tools/shared/relayNoise";
 import { fromBase64Url, toBase64Url } from "@t3tools/shared/relayTunnel";
+import { RelayTunnelClient } from "@t3tools/shared/relayTunnelClient";
 import { describe, expect, it, vi } from "vite-plus/test";
 
 import {
@@ -16,6 +17,7 @@ function platform(storage: Map<string, string>) {
     getItem: vi.fn(async (key: string) => storage.get(key) ?? null),
     setItem: vi.fn(async (key: string, value: string) => void storage.set(key, value)),
     deviceToken: vi.fn(async () => "gdt_device"),
+    relayUrl: vi.fn(async () => "https://cloud.test"),
     native: vi.fn(async () => ({ name: "Laptop", randomBytes: seeded(3) })),
   };
 }
@@ -48,5 +50,65 @@ describe("Gustaf relay client", () => {
     );
     expect(deps.deviceToken).not.toHaveBeenCalled();
     await expect(client.tunnels.client("host1")).rejects.toThrow("not paired over the relay");
+  });
+
+  it("pairs with a computer picked from the account's list, keeping the key it presented", async () => {
+    const storage = new Map<string, string>();
+    const hostKey = generateNoiseKeyPair(seeded(9)).publicKey;
+    const close = vi.fn();
+    const connect = vi.spyOn(RelayTunnelClient, "connect").mockImplementation(async (options) => {
+      options.onPending?.(hostKey);
+      return {
+        pairingToken: "ABC 123",
+        remoteStaticKey: hostKey,
+        close,
+      } as unknown as RelayTunnelClient;
+    });
+    const client = makeGustafRelayClient(platform(storage));
+    const codes: Array<string> = [];
+
+    const link = await client.pairWithComputer({ deviceId: "Mac1", name: "Mac" }, (code) =>
+      codes.push(code),
+    );
+
+    // First contact has no key to check, and it asks for the account pairing, never a link's.
+    expect(connect.mock.calls[0]?.[0]).toMatchObject({
+      hostDeviceId: "Mac1",
+      hostKey: null,
+      accountPairing: true,
+      relayUrl: "https://cloud.test",
+    });
+    expect(connect.mock.calls[0]?.[0].pairingSecret).toBeUndefined();
+    expect(connect.mock.calls[0]?.[0].peerLink).toBeUndefined();
+    expect(link).toBe("https://mac1.relay.gustaf.invalid/pair#token=ABC%20123");
+    expect(codes).toEqual([relaySafetyCode(generateNoiseKeyPair(seeded(3)).publicKey, hostKey)]);
+    expect(JSON.parse(storage.get(RELAY_HOSTS_STORAGE)!)).toEqual({
+      mac1: { relayUrl: "https://cloud.test", hostKey: toBase64Url(hostKey), hostName: "Mac" },
+    });
+    expect(close).toHaveBeenCalled();
+
+    // A computer that answers without a code predates this pairing: nothing is saved for it.
+    connect.mockImplementation(
+      async () =>
+        ({
+          pairingToken: undefined,
+          remoteStaticKey: hostKey,
+          close,
+        }) as unknown as RelayTunnelClient,
+    );
+    await expect(
+      client.pairWithComputer({ deviceId: "old", name: "Old" }, () => {}),
+    ).rejects.toMatchObject({ reason: "unknown_device" });
+    expect(Object.keys(JSON.parse(storage.get(RELAY_HOSTS_STORAGE)!))).toEqual(["mac1"]);
+    connect.mockRestore();
+  });
+
+  it("lists the account's computers as signed out when this device has no credential", async () => {
+    const deps = platform(new Map());
+    deps.deviceToken.mockRejectedValue(new Error("not registered"));
+    expect(await makeGustafRelayClient(deps).computers()).toEqual({
+      computers: [],
+      problem: "signed_out",
+    });
   });
 });

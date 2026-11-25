@@ -12,6 +12,7 @@ import { accessConfig } from "../auth/ConnectAgentSurface";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { QRCodeSvg } from "../ui/qr-code";
+import { Switch } from "../ui/switch";
 import { SettingsRow, SettingsSection } from "./settingsLayout";
 
 const POLL_MS = 3_000;
@@ -39,6 +40,7 @@ function RelayHostSettings({ environmentId }: { environmentId: EnvironmentId }) 
   const createOffer = useAtomCommand(relayHostEnvironment.createOffer);
   const decide = useAtomCommand(relayHostEnvironment.decide);
   const revokeDevice = useAtomCommand(relayHostEnvironment.revokeDevice);
+  const setTrust = useAtomCommand(relayHostEnvironment.setTrust);
   const [status, setStatus] = useState<RelayHostStatus | null>(null);
   const [busy, setBusy] = useState(false);
   const [showCodes, setShowCodes] = useState(false);
@@ -132,6 +134,24 @@ function RelayHostSettings({ environmentId }: { environmentId: EnvironmentId }) 
           ) : null
         }
       />
+      {status.trustOtherDevices !== undefined && status.connection !== "disabled" ? (
+        <SettingsRow
+          title={gt("Trust my other devices")}
+          description={gt(
+            "A device you already allowed here can pair again from your account's computer list without asking. A new device always needs your approval. Turning this off ends the sessions it let in.",
+          )}
+          control={
+            <Switch
+              checked={status.trustOtherDevices}
+              disabled={busy}
+              aria-label={gt("Trust my other devices")}
+              onCheckedChange={(enabled) =>
+                runStatusMutation(() => setTrust({ environmentId, input: { enabled } }))
+              }
+            />
+          }
+        />
+      ) : null}
       {status.offer ? (
         <SettingsRow
           title={gt("Scan with the Gustaf app")}
@@ -176,19 +196,26 @@ function RelayHostSettings({ environmentId }: { environmentId: EnvironmentId }) 
           title={
             pending.peerLink
               ? gt("Allow “{name}” to link its agents here?", { name: pending.name })
-              : gt("Allow “{name}”?", { name: pending.name })
+              : pending.viaAccount
+                ? gt("Allow “{name}” to connect from your account?", { name: pending.name })
+                : gt("Allow “{name}”?", { name: pending.name })
           }
           description={
-            pending.peerLink
+            pending.viaAccount
               ? gt(
-                  "{access}. Safety code {code}: it must match the code shown on {name}. Only allow it if you just started this link.",
-                  {
-                    access: m(accessConfig[pending.peerLink.access].label),
-                    code: pending.safetyCode,
-                    name: pending.name,
-                  },
+                  "Safety code {code}: it must match the code shown on {name}. Only allow it if you just started this on that device.",
+                  { code: pending.safetyCode, name: pending.name },
                 )
-              : gt("Safety code {code}", { code: pending.safetyCode })
+              : pending.peerLink
+                ? gt(
+                    "{access}. Safety code {code}: it must match the code shown on {name}. Only allow it if you just started this link.",
+                    {
+                      access: m(accessConfig[pending.peerLink.access].label),
+                      code: pending.safetyCode,
+                      name: pending.name,
+                    },
+                  )
+                : gt("Safety code {code}", { code: pending.safetyCode })
           }
           control={
             <span className="flex gap-2">
@@ -222,13 +249,30 @@ function RelayHostSettings({ environmentId }: { environmentId: EnvironmentId }) 
       {status.devices.map((device) => (
         <SettingsRow
           key={device.key}
-          title={device.name}
+          title={
+            <span className="flex items-center gap-2">
+              {device.name}
+              {status.trustOtherDevices === true && device.trusted === true ? (
+                <Badge variant="outline" size="sm">
+                  <T>Trusted</T>
+                </Badge>
+              ) : null}
+            </span>
+          }
           description={
             showCodes
               ? gt("Safety code {code}", { code: device.safetyCode })
-              : gt("Allowed on {date}", {
-                  date: new Date(device.approvedAt).toLocaleDateString(formattingLocale),
-                })
+              : device.lastSeenAt === undefined
+                ? gt("Allowed on {date}", {
+                    date: new Date(device.approvedAt).toLocaleDateString(formattingLocale),
+                  })
+                : gt("Allowed on {date}. Last seen {lastSeen}.", {
+                    date: new Date(device.approvedAt).toLocaleDateString(formattingLocale),
+                    lastSeen: new Date(device.lastSeenAt).toLocaleString(formattingLocale, {
+                      dateStyle: "medium",
+                      timeStyle: "short",
+                    }),
+                  })
           }
           control={
             <Button

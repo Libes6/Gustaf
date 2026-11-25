@@ -402,6 +402,53 @@ For a systemd service, add `Environment=T3CODE_SERVER_BROWSER_SANDBOX=0` under
 your Gustaf service. Setting the variable in an agent's terminal does not change the
 environment of an already running Gustaf server.
 
+## Reach a computer through the Gustaf relay
+
+When your phone or another computer is signed in to the same Gustaf account as the
+computer you want to reach, the Gustaf relay connects them on any network, with no
+address or Tailscale. Sign in first: the desktop app under **Account** (register the
+computer there), the phone under **Settings → Account** (**Register this phone**), or
+`gustaf relay login` in a terminal on a computer with no screen.
+
+**Pick the computer from your account.** On the phone, **Add environment** lists the
+computers on your account under **My computers**, with an online dot, leaving out
+the ones already connected. In the desktop app, **Settings → Environments → Add
+environment → Gustaf relay** lists them the same way. Tap or click one that is
+online. Your phone shows a safety code and waits. On that computer, **Settings →
+Sharing & access → Any network (Gustaf relay)** shows **Allow “…” to connect from your
+account?** with the same code. Allow it only when the codes match and you just
+started this yourself. The request waits up to five minutes, goes away if you cancel,
+and only a few can wait at once. On a computer with no screen, `gustaf relay requests`
+lists what waits, with the safety code, and `gustaf relay allow <id>` answers.
+
+Being signed in to the same account is never enough by itself: a device the computer
+has not seen is always allowed by a person at that computer. If the phone says the
+computer is offline, check that Gustaf is running there and signed in to the same
+account. If it says the computer's Gustaf cannot pair from your account's list, update
+Gustaf there, or use **Connect a device** in the same section: it shows a code to scan
+on the phone, or a link to paste in the desktop app (**Paste a relay link instead**).
+
+### Trust my other devices
+
+Off by default. Turn it on in **Settings → Sharing & access → Any network (Gustaf
+relay)** on the computer you want to reach. A device you already allowed there by hand
+can then pair again from your account's computer list without asking, which saves
+the walk to that computer when a phone has to pair again. It never reaches further than
+the first approval:
+
+- A new device is always asked about, so someone with only your account's sign-in can
+  never add one.
+- Devices allowed before this option existed, and computers that were only ever allowed
+  to link their agents (a link is always asked about), are asked once more as a device;
+  they count from the moment you allow them.
+- Each device is listed with when it was allowed and last seen. **Revoke** removes it
+  at once and ends its tunnel and its sessions. Turning the option off ends the
+  sessions it let in without asking and leaves the ones you allowed by hand.
+
+With the option on, a phone's own key is what skips the question, so a lost phone
+that is still signed in could pair again. Remove it under **Account** (it can no
+longer open a tunnel) and **Revoke** it here.
+
 ## Connect an outside agent
 
 Claude Code, Codex, ChatGPT and other agents Gustaf did not start can drive

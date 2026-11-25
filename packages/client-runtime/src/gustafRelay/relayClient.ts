@@ -3,12 +3,7 @@ import {
   noiseKeyPairFromSecret,
   relaySafetyCode,
 } from "@t3tools/shared/relayNoise";
-import {
-  type RelayPairingOffer,
-  fromBase64Url,
-  parseRelayPairingLink,
-  toBase64Url,
-} from "@t3tools/shared/relayTunnel";
+import { fromBase64Url, parseRelayPairingLink, toBase64Url } from "@t3tools/shared/relayTunnel";
 import {
   type RelayTunnelClientOptions,
   RelayTunnelClient,
@@ -16,6 +11,8 @@ import {
   RelayTunnelPool,
   relayVirtualBaseUrl,
 } from "@t3tools/shared/relayTunnelClient";
+
+import { type RelayComputersResult, fetchRelayComputers } from "./relayComputers.ts";
 
 /**
  * The client side of the Gustaf relay (not T3 Connect): this device's Noise key, the computers it
@@ -27,6 +24,10 @@ export interface GustafRelayPlatform {
   readonly setItem: (key: string, value: string) => Promise<void>;
   /** This device's own cloud credential; rejects with a `RelayTunnelClientError` when unregistered. */
   readonly deviceToken: () => Promise<string>;
+  /** The cloud API's origin this device signs in to, which also hosts the relay. */
+  readonly relayUrl: () => Promise<string>;
+  /** This device's own id among the account's computers, so the list never offers it to itself. */
+  readonly selfDeviceId?: () => Promise<string | null>;
   /** The name computers show for this device and a secure random source. */
   readonly native: () => Promise<{
     readonly name: string;
@@ -66,12 +67,12 @@ export function makeGustafRelayClient(platform: GustafRelayPlatform) {
     }
   };
 
-  const saveHost = async (offer: RelayPairingOffer) => {
+  const saveHost = async (host: RelayHostRecord & { readonly hostDeviceId: string }) => {
     const hosts = await loadHosts();
-    hosts[offer.hostDeviceId.toLowerCase()] = {
-      relayUrl: offer.relayUrl,
-      hostKey: offer.hostKey,
-      hostName: offer.hostName,
+    hosts[host.hostDeviceId.toLowerCase()] = {
+      relayUrl: host.relayUrl,
+      hostKey: host.hostKey,
+      hostName: host.hostName,
     };
     await platform.setItem(RELAY_HOSTS_STORAGE, JSON.stringify(hosts));
   };
@@ -141,6 +142,74 @@ export function makeGustafRelayClient(platform: GustafRelayPlatform) {
       await saveHost(offer);
       tunnels.forget(offer.hostDeviceId.toLowerCase());
       return `${relayVirtualBaseUrl(offer.hostDeviceId)}/pair#token=${encodeURIComponent(token)}`;
+    },
+
+    /** The account's other computers, as the relay lists them for this device. */
+    async computers(signal?: AbortSignal): Promise<RelayComputersResult> {
+      let credentials: { readonly deviceToken: string; readonly relayUrl: string };
+      try {
+        const [deviceToken, relayUrl] = await Promise.all([
+          platform.deviceToken(),
+          platform.relayUrl(),
+        ]);
+        credentials = { deviceToken, relayUrl };
+      } catch {
+        return { computers: [], problem: "signed_out" };
+      }
+      return fetchRelayComputers({
+        ...credentials,
+        selfDeviceId: (await platform.selfDeviceId?.()) ?? null,
+        ...(signal ? { signal } : {}),
+      });
+    },
+
+    /**
+     * Picks a computer from the account's list instead of scanning its QR code: its user is
+     * asked, and sees the same safety code `onPending` gets. The computer's key is taken on first
+     * use, so that code is the only check against a relay in the middle. Resolves with the
+     * ordinary pairing link at the computer's virtual relay origin, as `pair` does.
+     */
+    async pairWithComputer(
+      computer: { readonly deviceId: string; readonly name: string },
+      onPending: (safetyCode: string) => void,
+      signal?: AbortSignal,
+    ): Promise<string> {
+      const [deviceToken, relayUrl, clientKeyPair, native] = await Promise.all([
+        platform.deviceToken(),
+        platform.relayUrl(),
+        keyPair(),
+        platform.native(),
+      ]);
+      const client = await RelayTunnelClient.connect({
+        relayUrl,
+        deviceToken,
+        hostDeviceId: computer.deviceId,
+        hostKey: null,
+        clientKeyPair,
+        ...native,
+        ...(platform.createSocket ? { createSocket: platform.createSocket } : {}),
+        accountPairing: true,
+        ...(signal ? { signal } : {}),
+        onPending: (hostKey) => onPending(relaySafetyCode(clientKeyPair.publicKey, hostKey)),
+      });
+      const token = client.pairingToken;
+      const hostKey = toBase64Url(client.remoteStaticKey);
+      client.close();
+      // A computer from before this pairing answers a known device with no code at all.
+      if (!token) {
+        throw new RelayTunnelClientError(
+          "unknown_device",
+          "The computer did not send a pairing code.",
+        );
+      }
+      await saveHost({
+        relayUrl,
+        hostDeviceId: computer.deviceId,
+        hostKey,
+        hostName: computer.name,
+      });
+      tunnels.forget(computer.deviceId.toLowerCase());
+      return `${relayVirtualBaseUrl(computer.deviceId)}/pair#token=${encodeURIComponent(token)}`;
     },
 
     /** The code this device and a relay-paired computer both show; null when not paired here. */

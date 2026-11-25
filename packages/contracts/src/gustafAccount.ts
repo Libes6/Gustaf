@@ -30,6 +30,8 @@ export const GustafRelayClientCredentialSchema = Schema.Struct({
   deviceId: Schema.String,
   deviceToken: Schema.String,
   deviceName: Schema.String,
+  /** The cloud API's origin, which also hosts the relay. */
+  relayUrl: Schema.String,
 });
 export type GustafRelayClientCredential = typeof GustafRelayClientCredentialSchema.Type;
 

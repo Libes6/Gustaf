@@ -756,6 +756,7 @@ export const makeWithOptions = Effect.fn("gustaf.account.make")(function* (
           deviceId: account.device.id,
           deviceToken: account.device.token,
           deviceName: readComputerName(environment.platform),
+          relayUrl: apiBase,
         } satisfies GustafRelayClientCredential),
   ).pipe(
     Effect.filterOrFail(

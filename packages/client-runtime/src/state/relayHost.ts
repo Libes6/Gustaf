@@ -1,4 +1,8 @@
-import type { RelayHostDecisionInput, RelayHostRevokeInput } from "@t3tools/contracts";
+import type {
+  RelayHostDecisionInput,
+  RelayHostRevokeInput,
+  RelayHostTrustInput,
+} from "@t3tools/contracts";
 import type { HttpClient } from "effect/http";
 import type { Atom } from "effect/reactivity";
 
@@ -8,7 +12,7 @@ import { createEnvironmentCommand } from "./runtime.ts";
 
 const RELAY_HOST_REQUEST_TIMEOUT_MS = 8_000;
 
-/** This computer's end of the Gustaf relay: status, the pairing QR code, approvals, revocation. */
+/** This computer's end of the Gustaf relay: status, the pairing QR code, approvals, trust, revocation. */
 export function createRelayHostAtoms<R, E>(
   runtime: Atom.AtomRuntime<EnvironmentRegistry | HttpClient.HttpClient | R, E>,
 ) {
@@ -44,6 +48,17 @@ export function createRelayHostAtoms<R, E>(
           url: (urls) => urls.decide(),
           timeoutMs: RELAY_HOST_REQUEST_TIMEOUT_MS,
           request: ({ client, headers }) => client.decide({ headers, payload: input }),
+        }),
+    }),
+    setTrust: createEnvironmentCommand(runtime, {
+      label: "environment-data:server:relay-host-set-trust",
+      execute: (input: RelayHostTrustInput) =>
+        executeConnectedEnvironmentHttpRequest({
+          group: "relayHost",
+          method: "PUT",
+          url: (urls) => urls.setTrust(),
+          timeoutMs: RELAY_HOST_REQUEST_TIMEOUT_MS,
+          request: ({ client, headers }) => client.setTrust({ headers, payload: input }),
         }),
     }),
     revokeDevice: createEnvironmentCommand(runtime, {

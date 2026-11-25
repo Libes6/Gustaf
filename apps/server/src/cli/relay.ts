@@ -271,9 +271,11 @@ const requestsCommand = Command.make("requests", { baseDir: baseDirFlag }).pipe(
               .map(
                 (request) =>
                   `${request.id}  ${request.name}  ${
-                    request.peerLink === undefined
-                      ? "wants to connect"
-                      : `wants to link its agents here (${request.peerLink.access})`
+                    request.peerLink !== undefined
+                      ? `wants to link its agents here (${request.peerLink.access})`
+                      : request.viaAccount === true
+                        ? "asks to connect from your account"
+                        : "wants to connect"
                   }  safety code ${request.safetyCode}`,
               )
               .join(

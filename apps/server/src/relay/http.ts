@@ -107,6 +107,16 @@ export const layer = HttpApiBuilder.group(
           yield* requireOutsideRelay;
           return yield* relayHost.revokeDevice(args.payload).pipe(Effect.catch(mapRelayHostError));
         }),
+      )
+      .handle(
+        "setTrust",
+        Effect.fn("environment.relayHost.setTrust")(function* (args) {
+          yield* annotateEnvironmentRequest(args.endpoint.name);
+          yield* requireEnvironmentScope(AuthRelayWriteScope);
+          // A trusted phone must not be able to widen its own trust.
+          yield* requireOutsideRelay;
+          return yield* relayHost.setTrust(args.payload).pipe(Effect.catch(mapRelayHostError));
+        }),
       );
   }),
 );

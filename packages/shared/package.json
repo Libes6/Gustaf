@@ -211,6 +211,10 @@
       "types": "./src/relaySigning.ts",
       "import": "./src/relaySigning.ts"
     },
+    "./relayComputers": {
+      "types": "./src/relayComputers.ts",
+      "import": "./src/relayComputers.ts"
+    },
     "./relayNoise": {
       "types": "./src/relayNoise.ts",
       "import": "./src/relayNoise.ts"
