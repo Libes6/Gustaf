@@ -2058,7 +2058,9 @@ it.effect("lists browser and device tools only to threads that hold those capabi
             Layer.mock(ProjectService.ProjectService)({}),
             Layer.mock(PreviewManager.PreviewManager)({}),
             PreviewAutomationBroker.layer.pipe(Layer.provide(NodeCrypto.layer)),
-            ServerConfig.layerTest(process.cwd(), { prefix: "t3-mcp-capability-list-" }),
+            ServerConfig.layerTest(process.cwd(), { prefix: "t3-mcp-capability-list-" }).pipe(
+              Layer.provide(NodeServices.layer),
+            ),
             NodeServices.layer,
             NodeCrypto.layer,
           ),
