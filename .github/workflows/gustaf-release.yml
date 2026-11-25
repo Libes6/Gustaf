@@ -1,0 +1,23 @@
+name: Gustaf release
+
+# Placeholder so the real workflow on feat/gustaf-electron can be started by hand:
+# GitHub only dispatches a workflow whose file name already exists on the default branch.
+# Run it with `gh workflow run gustaf-release.yml --ref feat/gustaf-electron`.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to build, such as 0.2.0. Empty uses the version in apps/desktop/package.json."
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  placeholder:
+    name: Placeholder
+    runs-on: ubuntu-24.04
+    steps:
+      - run: echo "Start this workflow from the feat/gustaf-electron branch (--ref), not from dev."
