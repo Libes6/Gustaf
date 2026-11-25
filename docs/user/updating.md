@@ -1,5 +1,13 @@
 # Updating Gustaf
 
+The desktop app checks [GitHub Releases](https://github.com/Libes6/Gustaf/releases) and installs
+the update itself: it offers a newer version, downloads it, confirms it was signed with Gustaf's
+release key, and restarts into it. A download that fails that check is deleted and never
+installed. On macOS the app replaces itself in place, so it must sit in a folder you can write to
+(such as `/Applications` on your own account). On Linux only the AppImage updates itself; a `.deb`
+install shows a link to the release instead. On Android, install a newer APK from the same
+releases over the one you already have; the app does not download it for you.
+
 The app you use and the server running your agents can be on different machines.
 When a server is behind your web or desktop app, the update button at the bottom
 of the sidebar and **Settings → Environments** offer to update it.
@@ -37,6 +45,8 @@ and how many can resume afterwards. See **Continue threads after restarts**
 below.
 
 ## Switch between Stable and Nightly
+
+Gustaf publishes stable releases only, so the Nightly track has nothing to offer today.
 
 In the desktop app, change **Settings → About → Update track**. Gustaf shows each
 connected machine it will move and each one it skips, then moves them in one
@@ -194,8 +204,6 @@ there before refreshing to find newer versions. The same setting controls whethe
 Gustaf downloads model catalog updates, so with it off new models may not appear
 until you enable it and refresh provider status.
 
-Install mobile releases as usual. The mobile app can also
-download updates in the background and apply them when you next leave the app.
-It saves drafts and queued messages before restarting. If you keep the app open
-for a long time, it may ask to install immediately; choosing **Later** leaves the
-update queued for the next suitable moment.
+Install Android releases by opening the newer `Gustaf-<version>-Android.apk` from
+[GitHub Releases](https://github.com/Libes6/Gustaf/releases) over the app you have. Your data and
+settings stay; Android refuses an APK signed with a different key or with an older version.

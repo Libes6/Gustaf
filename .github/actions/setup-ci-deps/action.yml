@@ -33,7 +33,6 @@ runs:
 
     # Restore only: "Save Vite+" below writes the toolchain before this job
     # installs or runs project code.
-    # Pinned because release-desktop.yml signs builds with this action in the job.
     - name: Restore Vite+
       id: vp_cache
       if: steps.vp.outputs.version != ''
