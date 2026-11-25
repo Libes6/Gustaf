@@ -14,6 +14,7 @@ import { ClientCapabilities } from "@t3tools/client-runtime/platform";
 import {
   ConnectionBlockedError,
   ConnectionTransientError,
+  sshTargetKey,
 } from "@t3tools/client-runtime/connection";
 
 import {
@@ -29,6 +30,7 @@ import {
   secondaryRegistrationsToRetainAfterTopologyRead,
 } from "./platform.ts";
 import { APP_VERSION } from "../branding.ts";
+import { getSshAddLog } from "./sshAddLog.ts";
 
 const TARGET: DesktopSshEnvironmentTarget = {
   alias: "devbox",
@@ -122,6 +124,62 @@ function makeBridge(
     },
   } as unknown as DesktopBridge;
 }
+
+describe("desktop SSH add progress", () => {
+  const summary = () =>
+    getSshAddLog(sshTargetKey(TARGET)).map((entry) => `${entry.step}:${entry.status}`);
+
+  it.effect("records its own request's events and the renderer's own requests", () =>
+    Effect.gen(function* () {
+      const bridge = makeBridge([]);
+      const listeners = new Map<string, (event: never) => void>();
+      const unsubscribed: string[] = [];
+      Object.assign(bridge, {
+        onSshEnsureProgress: (requestId: string, listener: (event: never) => void) => {
+          listeners.set(requestId, listener);
+          return () => unsubscribed.push(requestId);
+        },
+      });
+      const ensure = vi.spyOn(bridge, "ensureSshEnvironment").mockImplementation(async (target) => {
+        const [requestId] = [...listeners.keys()];
+        const send = (step: string, status: string) =>
+          listeners.get(requestId!)?.({ requestId, step, status, at: 1 } as never);
+        send("connect", "running");
+        send("connect", "done");
+        return { ...SSH_BOOTSTRAP, target };
+      });
+
+      yield* provisionDesktopSshEnvironment(bridge, TARGET);
+
+      const [, options] = ensure.mock.calls[0]!;
+      expect(options).toEqual({
+        issuePairingToken: true,
+        progressRequestId: [...listeners.keys()][0],
+      });
+      expect(summary()).toEqual(["connect:done", "descriptor:done", "session:done"]);
+      expect(unsubscribed).toEqual([...listeners.keys()]);
+    }),
+  );
+
+  it.effect("marks the renderer's own step failed and keeps the log", () =>
+    Effect.gen(function* () {
+      yield* provisionDesktopSshEnvironment(makeBridge([], { failDescriptor: true }), TARGET).pipe(
+        Effect.flip,
+      );
+      expect(summary()).toEqual(["descriptor:failed"]);
+      expect(getSshAddLog(sshTargetKey(TARGET))[0]?.detail).toContain("descriptor unavailable");
+    }),
+  );
+
+  it.effect("behaves as before on a shell without progress events", () =>
+    Effect.gen(function* () {
+      const bridge = makeBridge([]);
+      const ensure = vi.spyOn(bridge, "ensureSshEnvironment");
+      yield* provisionDesktopSshEnvironment(bridge, TARGET);
+      expect(ensure).toHaveBeenCalledExactlyOnceWith(TARGET, { issuePairingToken: true });
+    }),
+  );
+});
 
 describe("desktop SSH pairing", () => {
   it.effect("does not consume the credential when adding a route to a different machine", () =>

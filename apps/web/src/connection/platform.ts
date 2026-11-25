@@ -44,6 +44,7 @@ import * as Stream from "effect/Stream";
 import { FetchHttpClient } from "effect/http";
 
 import { APP_VERSION } from "../branding";
+import { recordSshAddLogEvent, resetSshAddLog, trackSshAddLogStep } from "./sshAddLog";
 import { readDesktopPrimaryBearerToken } from "../environments/primary/desktopAuth";
 import * as PrimaryEnvironmentHttpLayer from "../environments/primary/httpLayer";
 import {
@@ -214,12 +215,21 @@ const ensureDesktopSshEnvironment = (bridge: DesktopBridge, target: DesktopSshEn
         pending.signal = signal;
         return pending.promise;
       }
+      resetSshAddLog(key);
+      const progressRequestId = randomUUID();
+      const unsubscribe = bridge.onSshEnsureProgress?.(progressRequestId, (event) =>
+        recordSshAddLogEvent(key, event),
+      );
       const setup = {
-        promise: bridge.ensureSshEnvironment(target, { issuePairingToken: true }),
+        promise: bridge.ensureSshEnvironment(target, {
+          issuePairingToken: true,
+          ...(unsubscribe === undefined ? {} : { progressRequestId }),
+        }),
         signal,
       };
       pendingSshSetups.set(key, setup);
       const forget = () => {
+        unsubscribe?.();
         if (pendingSshSetups.get(key) === setup) pendingSshSetups.delete(key);
       };
       setup.promise.then(forget, forget);
@@ -243,8 +253,12 @@ export const provisionDesktopSshEnvironment = Effect.fn(
       detail: m(msg("The SSH environment did not issue a pairing credential.")),
     });
   }
+  const logKey = sshTargetKey(target);
   const descriptor = yield* Effect.tryPromise({
-    try: () => bridge.fetchSshEnvironmentDescriptor(bootstrap.httpBaseUrl),
+    try: () =>
+      trackSshAddLogStep(logKey, "descriptor", () =>
+        bridge.fetchSshEnvironmentDescriptor(bootstrap.httpBaseUrl),
+      ),
     catch: sshPreparationError,
   });
   if (expectedEnvironmentId !== undefined && descriptor.environmentId !== expectedEnvironmentId) {
@@ -259,7 +273,10 @@ export const provisionDesktopSshEnvironment = Effect.fn(
     });
   }
   const access = yield* Effect.tryPromise({
-    try: () => bridge.bootstrapSshBearerSession(bootstrap.httpBaseUrl, pairingToken),
+    try: () =>
+      trackSshAddLogStep(logKey, "session", () =>
+        bridge.bootstrapSshBearerSession(bootstrap.httpBaseUrl, pairingToken),
+      ),
     catch: (cause) => {
       const error = sshPreparationError(cause);
       // A reused remote server on another build can fail to decode the grant

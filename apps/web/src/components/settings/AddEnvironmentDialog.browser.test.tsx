@@ -5,7 +5,11 @@ import { useState } from "react";
 import { page, userEvent } from "vite-plus/test/browser";
 import { describe, expect, it, vi } from "vite-plus/test";
 
+import type { DesktopSshEnvironmentTarget } from "@t3tools/contracts";
+import { sshTargetKey } from "@t3tools/client-runtime/connection";
+
 import { render, stubGlobal } from "../../../test/render";
+import { recordSshAddLogEvent } from "~/connection/sshAddLog";
 import { AppAtomRegistryProvider } from "../../rpc/atomRegistry";
 
 const mocks = vi.hoisted(() => ({
@@ -95,6 +99,41 @@ describe("AddEnvironmentDialog", () => {
     expect(mocks.connectSshEnvironment).toHaveBeenCalledOnce();
 
     await expectDefaultModeAfterReopen();
+  });
+
+  it("keeps the SSH progress log, with its failed step, after a failed attempt", async () => {
+    using _bridge = setup();
+    await using _screen = await render(<Owner />);
+
+    mocks.connectSshEnvironment.mockImplementationOnce((async (input: {
+      readonly target: DesktopSshEnvironmentTarget;
+    }) => {
+      const key = sshTargetKey(input.target);
+      recordSshAddLogEvent(key, { step: "connect", status: "running", at: 0 });
+      recordSshAddLogEvent(key, { step: "connect", status: "done", at: 100 });
+      recordSshAddLogEvent(key, { step: "runtime-download", status: "running", at: 100 });
+      recordSshAddLogEvent(key, {
+        step: "runtime-download",
+        status: "failed",
+        detail: "Could not download t3 0.23.0",
+        at: 4_100,
+      });
+      return AsyncResult.failure(Cause.fail(new Error("SSH add failed")));
+    }) as never);
+    await openDialogOnSsh();
+    await expect.element(page.getByRole("button", { name: "Copy log" })).not.toBeInTheDocument();
+    await userEvent.type(page.getByPlaceholder("Search hosts or type devbox"), "devbox");
+    await userEvent.click(
+      page.getByRole("dialog").getByRole("button", { name: "Add environment" }),
+    );
+
+    await expect.element(page.getByText("Connecting over SSH")).toBeVisible();
+    await expect.element(page.getByText("Downloading Gustaf")).toBeVisible();
+    await expect.element(page.getByText("Could not download t3 0.23.0")).toBeVisible();
+    await expect.element(page.getByRole("button", { name: "Copy log" })).toBeVisible();
+    await expect
+      .element(page.getByRole("dialog").getByRole("button", { name: "Add environment" }))
+      .toBeEnabled();
   });
 
   it("drops an SSH error when switching to Remote link", async () => {

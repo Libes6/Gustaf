@@ -1204,8 +1204,11 @@ export interface DesktopBridge {
     target: DesktopSshEnvironmentTarget,
     options?: { issuePairingToken?: boolean; progressRequestId?: string },
   ) => Promise<DesktopSshEnvironmentBootstrap>;
-  /** Progress of the `ensureSshEnvironment` call started with the same `progressRequestId`. */
-  onSshEnsureProgress: (
+  /**
+   * Progress of the `ensureSshEnvironment` call started with the same `progressRequestId`.
+   * Missing on a shell older than the web app it loaded, which then shows no log.
+   */
+  onSshEnsureProgress?: (
     progressRequestId: string,
     listener: (event: DesktopSshEnsureProgressEvent) => void,
   ) => () => void;

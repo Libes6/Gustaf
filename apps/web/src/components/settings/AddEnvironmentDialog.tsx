@@ -12,6 +12,7 @@ import {
 import {
   RelayConnectionRegistration,
   RelayConnectionTarget,
+  sshTargetKey,
 } from "@t3tools/client-runtime/connection";
 import {
   isAtomCommandInterrupted,
@@ -70,6 +71,8 @@ import {
 } from "./ConnectionsSettings.logic";
 import { desktopRelay } from "../../relay/desktopRelay";
 import { RelayPairingPanel } from "./RelayPairingPanel";
+import { SshAddLog } from "./SshAddLog";
+import { useSshAddLog } from "~/connection/sshAddLog";
 
 const SSH_PROTOCOL_NAME = "SSH";
 const EMPTY_DISCOVERED_SSH_HOSTS: ReadonlyArray<DesktopDiscoveredSshHost> = [];
@@ -136,6 +139,8 @@ export function AddEnvironmentDialog({
   const [sshHostSuggestionsOpen, setSshHostSuggestionsOpen] = useState(false);
   const highlightedSshHostRef = useRef<DesktopDiscoveredSshHost | undefined>(undefined);
   const [isAddingSavedBackend, setIsAddingSavedBackend] = useState(false);
+  const [sshAddLogKey, setSshAddLogKey] = useState<string | null>(null);
+  const sshAddLog = useSshAddLog(sshAddLogKey);
   const savedBackendSessionRef = useRef(0);
   const isSshDiscoveryActive = desktopBridge !== undefined && open && savedBackendMode === "ssh";
   const desktopSshHosts = useEnvironmentQuery(
@@ -175,11 +180,13 @@ export function AddEnvironmentDialog({
       setSavedBackendSshHost("");
       setSavedBackendSshUsername("");
       setSavedBackendSshPort("");
+      setSshAddLogKey(null);
     }
     onOpenChange(nextOpen);
   };
   const connectSavedBackendSshTarget = async (target: DesktopSshEnvironmentTarget) => {
     const session = savedBackendSessionRef.current;
+    setSshAddLogKey(sshTargetKey(target));
     setIsAddingSavedBackend(true);
     onErrorChange(null);
     const result = await connectSshEnvironment({
@@ -663,6 +670,7 @@ export function AddEnvironmentDialog({
               ? gt("Add route")
               : gt("Add environment")}
         </Button>
+        <SshAddLog entries={sshAddLog} />
       </div>
     </div>
   );
