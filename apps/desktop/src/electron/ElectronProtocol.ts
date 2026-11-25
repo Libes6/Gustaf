@@ -82,7 +82,6 @@ function makeDesktopContentSecurityPolicy(input: DesktopProtocolRegistrationInpu
     "'unsafe-inline'",
     "'wasm-unsafe-eval'",
     ...(clerkOrigin ? [clerkOrigin] : []),
-    "https://challenges.cloudflare.com",
   ];
 
   // User-configured environment origins are unknown here, so allow supported network schemes.
