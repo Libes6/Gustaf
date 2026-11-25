@@ -41,3 +41,33 @@ it("applies theme CSS and drops every rule that would load a remote file", () =>
   applyThemeCss(undefined);
   expect(getComputedStyle(probe).color).not.toBe("rgb(1, 2, 3)");
 });
+
+it("lets the app pause a theme's animations without touching its other declarations", () => {
+  const probe = document.createElement("div");
+  probe.dataset.themeMotionProbe = "";
+  document.body.append(probe);
+  using _probe = { [Symbol.dispose]: () => probe.remove() };
+  using _css = { [Symbol.dispose]: () => applyThemeCss(undefined) };
+
+  applyThemeCss(`
+    @keyframes drift { to { opacity: 0.5; } }
+    [data-theme-motion-probe] {
+      color: rgb(1, 2, 3);
+      animation: drift 1s linear infinite alternate;
+    }
+  `);
+
+  // The test page is unfocused, so the motion guard has already paused the theme.
+  document.documentElement.style.removeProperty("--theme-motion-state");
+  const style = getComputedStyle(probe);
+  expect(style.animationPlayState).toBe("running");
+  expect(style.animationName).toBe("drift");
+  expect(style.color).toBe("rgb(1, 2, 3)");
+
+  document.documentElement.style.setProperty("--theme-motion-state", "paused");
+  using _state = {
+    [Symbol.dispose]: () => document.documentElement.style.removeProperty("--theme-motion-state"),
+  };
+  expect(style.animationPlayState).toBe("paused");
+  expect(style.animationName).toBe("drift");
+});

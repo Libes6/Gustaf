@@ -82,6 +82,10 @@ Custom CSS cannot load files. `@import`, `image-set()`, and `url()` are ignored,
 with a `data:` address or an `#id`. This keeps an imported theme from sending what is on your screen
 to another site. For a full-size image, use a [background image](#background-image).
 
+Animations in custom CSS pause while the window is hidden or unfocused, and after 30 seconds
+without input, then resume on the next mouse move or key press. Animating `transform` and `opacity`
+is cheap; animating gradients or `@property` values repaints the whole window every frame.
+
 Class names in the app change between releases. For rules that keep working, target `data-slot`
 and other `data-` attributes, such as `[data-chat-header]` or `[data-slot="button"]`.
 

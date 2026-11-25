@@ -1,5 +1,7 @@
 import { themeCssValueFetches } from "@t3tools/shared/themeCss";
 
+import { makeThemeAnimationsPausable, watchThemeMotion } from "./themeMotion";
+
 // Theme CSS comes from imported files and from agents, so it must not fetch: a
 // url() on an attribute selector can send what is on screen to another host.
 // The browser parses the text first, so the checks see normalized values and
@@ -7,6 +9,7 @@ import { themeCssValueFetches } from "@t3tools/shared/themeCss";
 
 let themeSheet: CSSStyleSheet | null = null;
 let appliedCss = "";
+let stopMotionWatch: (() => void) | null = null;
 
 type RuleParent = Pick<CSSStyleSheet, "cssRules" | "deleteRule">;
 
@@ -61,4 +64,11 @@ export function applyThemeCss(css: string | undefined): void {
   }
   themeSheet.replaceSync(next);
   stripFetches(themeSheet);
+  makeThemeAnimationsPausable(themeSheet);
+  if (next === "") {
+    stopMotionWatch?.();
+    stopMotionWatch = null;
+  } else {
+    stopMotionWatch ??= watchThemeMotion();
+  }
 }
