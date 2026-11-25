@@ -17,6 +17,7 @@ import { resolveLinuxDesktopEntryName } from "./DesktopEarlyElectronStartup.ts";
 import { resolveDesktopBaseDir, resolveDesktopStateDir } from "./DesktopStatePaths.ts";
 import { isNightlyDesktopVersion } from "../updates/updateChannels.ts";
 import type { OtlpProtocol } from "@t3tools/shared/observability";
+import desktopPackageJson from "../../package.json" with { type: "json" };
 
 export interface MakeDesktopEnvironmentInput {
   readonly dirname: string;
@@ -86,6 +87,14 @@ export class DesktopEnvironment extends Context.Service<
 >()("@t3tools/desktop/app/DesktopEnvironment") {}
 
 const APP_BASE_NAME = "Gustaf";
+
+/** An unpackaged dev run reports Electron's own version, which no release carries. */
+export function releaseVersionOf(environment: {
+  readonly isDevelopment: boolean;
+  readonly appVersion: string;
+}): string {
+  return environment.isDevelopment ? desktopPackageJson.version : environment.appVersion;
+}
 
 function resolveDesktopAppStageLabel(input: {
   readonly isDevelopment: boolean;

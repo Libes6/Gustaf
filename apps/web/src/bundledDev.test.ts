@@ -50,7 +50,14 @@ export const startup = Promise.resolve().then(() => globalThis.onStarted(Shared(
       publicDir: NodeURL.fileURLToPath(new URL("../public", import.meta.url)),
       logLevel: "silent",
       resolve: {
-        alias: { react: NodePath.dirname(NodeURL.fileURLToPath(import.meta.resolve("react"))) },
+        // The copied sources sit in a temp dir outside the workspace, where bare workspace
+        // imports cannot resolve at bundle or run time, so the bundle must inline them.
+        alias: {
+          react: NodePath.dirname(NodeURL.fileURLToPath(import.meta.resolve("react"))),
+          "@t3tools/shared/gustafService": NodeURL.fileURLToPath(
+            import.meta.resolve("@t3tools/shared/gustafService"),
+          ),
+        },
       },
       experimental: { bundledDev: true },
       plugins: [

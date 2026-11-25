@@ -6300,7 +6300,7 @@
   "bd2304f25f6f999e": "{selected, plural, one {{selected} of {total} selected} other {{selected} of {total} selected}}",
   "228cd9fd55a55070": "Could not check projects again. {error}",
   "1cc599c5f5874014": "Phone",
-  "0f7c08d8284fee68": "T3 Code app for iPhone and Android",
+  "ef7cbba6708dcd66": "Gustaf app for iPhone and Android",
   "431bee88ecc944e4": "Check T3 Connect",
   "c747696796f64468": "T3 Connect is on, but the app cannot reach this computer.",
   "96557a906f6167b9": "Signed in. Share this computer so the app can reach it.",
@@ -6383,7 +6383,7 @@
     },
     " history"
   ],
-  "0070a15f6b693068": "Use T3 Code on your phone",
+  "9342a2a15019e51a": "Use Gustaf on your phone",
   "37c66042ce1906da": "Scan with your phone to get the app.",
   "1b4364ef89b07f35": "Could not check T3 Connect.",
   "7b10d40dd15938e5": "Your phone can reach this computer. Sign in to the app with the same account.",
