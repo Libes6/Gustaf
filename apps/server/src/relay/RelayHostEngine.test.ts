@@ -80,7 +80,7 @@ describe("relay tunnel", () => {
     const pending = Promise.withResolvers<void>();
     const connecting = connect(relay.url, host.hostKey, {
       pairingSecret: "s".repeat(32),
-      onPending: pending.resolve,
+      onPending: () => pending.resolve(),
     });
     await pending.promise;
     expect(admitted).toMatchObject([
@@ -226,7 +226,7 @@ describe("relay tunnel", () => {
     const pending = Promise.withResolvers<void>();
     const connecting = connect(relay.url, host.hostKey, {
       peerLink: { access: "auto" },
-      onPending: pending.resolve,
+      onPending: () => pending.resolve(),
       signal: controller.signal,
     });
     await pending.promise;

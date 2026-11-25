@@ -718,10 +718,11 @@ const make = Effect.gen(function* () {
       const listed = yield* relayTransport.machines;
       if (listed.problem === "signed_out") {
         return yield* relayLinkError(
-          new RelayPeerTransport.RelayPeerLinkError(
-            "signed_out",
-            "This computer is not signed in to the Gustaf relay. Run gustaf relay login, or sign in under Account.",
-          ),
+          new RelayPeerTransport.RelayPeerLinkError({
+            reason: "signed_out",
+            message:
+              "This computer is not signed in to the Gustaf relay. Run gustaf relay login, or sign in under Account.",
+          }),
         );
       }
       const machine = listed.machines.find((candidate) => candidate.deviceId === deviceId);
@@ -755,10 +756,10 @@ const make = Effect.gen(function* () {
         .pipe(
           Effect.mapError((error) =>
             relayLinkError(
-              new RelayPeerTransport.RelayPeerLinkError(
-                error.reason,
-                error.message.replace("That computer", name),
-              ),
+              new RelayPeerTransport.RelayPeerLinkError({
+                reason: error.reason,
+                message: error.message.replace("That computer", name),
+              }),
             ),
           ),
           Effect.ensuring(Effect.sync(() => void relayAttempts.delete(deviceId))),

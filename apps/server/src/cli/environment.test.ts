@@ -13,6 +13,7 @@ import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as TestConsole from "effect/testing/TestConsole";
+import { FetchHttpClient } from "effect/http";
 import { Command } from "effect/cli";
 
 import { cli } from "../binCli.ts";
@@ -195,5 +196,5 @@ it.live("links a computer of the account through the relay by name, and says why
         detail: "--relay takes no address, --url, --pairing-code or --from.",
       });
     }),
-  ).pipe(Effect.provide(Layer.mergeAll(layerCliRuntime, TestConsole.layer))),
+  ).pipe(Effect.provide(Layer.mergeAll(layerCliRuntime, TestConsole.layer, FetchHttpClient.layer))),
 );

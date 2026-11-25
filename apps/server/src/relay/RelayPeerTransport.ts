@@ -1,4 +1,4 @@
-// @effect-diagnostics nodeBuiltinImport:off globalFetch:off globalTimers:off globalRandom:off -- The tunnel client is plain socket code, and the relay's machine list is one plain request; both sit outside the Effect runtime like the relay host.
+// @effect-diagnostics nodeBuiltinImport:off globalFetch:off globalTimers:off globalRandom:off -- The tunnel client is plain socket code outside the Effect runtime, like the relay host, and the relay's computer list is one plain request that cannot use the HttpClient this module wraps.
 import * as NodeCrypto from "node:crypto";
 
 import type { AuthMcpClientAccess } from "@t3tools/contracts";
@@ -20,6 +20,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Predicate from "effect/Predicate";
+import * as Schema from "effect/Schema";
 import * as FetchHttpClient from "effect/http/FetchHttpClient";
 import * as HttpClient from "effect/http/HttpClient";
 
@@ -48,14 +49,27 @@ export interface RelayMachinesResult {
 }
 
 /** Why a relay link could not be started or finished, in the tunnel's own terms. */
-export class RelayPeerLinkError extends Error {
-  override readonly name = "RelayPeerLinkError";
-  readonly reason: RelayTunnelClientError["reason"] | "signed_out" | "no_code";
-  constructor(reason: RelayPeerLinkError["reason"], message: string) {
-    super(message);
-    this.reason = reason;
-  }
-}
+export class RelayPeerLinkError extends Schema.TaggedError<RelayPeerLinkError>()(
+  "RelayPeerLinkError",
+  {
+    reason: Schema.Literals([
+      "relay_unreachable",
+      "unauthorized",
+      "host_offline",
+      "rejected",
+      "limit",
+      "unknown_device",
+      "linking_off",
+      "busy",
+      "policy",
+      "handshake_failed",
+      "closed",
+      "signed_out",
+      "no_code",
+    ]),
+    message: Schema.String,
+  },
+) {}
 
 export interface RelayLinkRequest {
   readonly deviceId: string;
@@ -128,6 +142,47 @@ export const relayFailureMessage = (error: RelayTunnelClientError, machine: stri
 
 const randomBytes = (length: number) => new Uint8Array(NodeCrypto.randomBytes(length));
 
+/** The account's other computers as the relay lists them for this computer's own credential. */
+async function listComputers(credential: {
+  readonly relayUrl: string;
+  readonly token: string;
+  readonly deviceId: string;
+}): Promise<RelayMachinesResult> {
+  const response = await fetch(new URL("/v1/relay/hosts", credential.relayUrl), {
+    headers: { accept: "application/json", authorization: `Bearer ${credential.token}` },
+    signal: AbortSignal.timeout(MACHINES_TIMEOUT_MS),
+  });
+  if (response.status === 401) return { machines: [], problem: "signed_out" };
+  if (!response.ok) return { machines: [], problem: "unavailable" };
+  const body = (await response.json()) as {
+    readonly online?: ReadonlyArray<unknown>;
+    readonly computers?: ReadonlyArray<{
+      readonly id?: unknown;
+      readonly name?: unknown;
+      readonly online?: unknown;
+    }>;
+  };
+  const online = new Set((body.online ?? []).filter((id): id is string => typeof id === "string"));
+  // An API from before names were listed only knows which computers are online.
+  const listed =
+    body.computers?.flatMap((computer) =>
+      typeof computer.id === "string"
+        ? [
+            {
+              deviceId: computer.id,
+              name:
+                typeof computer.name === "string" && computer.name.trim() !== ""
+                  ? computer.name.trim().slice(0, 100)
+                  : `Computer ${computer.id.slice(0, 8)}`,
+              online: computer.online === true || online.has(computer.id),
+            },
+          ]
+        : [],
+    ) ??
+    [...online].map((id) => ({ deviceId: id, name: `Computer ${id.slice(0, 8)}`, online: true }));
+  return { machines: listed.filter((machine) => machine.deviceId !== credential.deviceId) };
+}
+
 const make = Effect.gen(function* () {
   const secrets = yield* ServerSecretStore.ServerSecretStore;
   const run = Effect.runPromiseWith(yield* Effect.context<never>());
@@ -190,49 +245,8 @@ const make = Effect.gen(function* () {
   const machines: RelayPeerTransport["Service"]["machines"] = Effect.gen(function* () {
     const signedIn = yield* credential;
     if (Option.isNone(signedIn)) return { machines: [], problem: "signed_out" } as const;
-    const { relayUrl, token, deviceId } = signedIn.value;
     return yield* Effect.tryPromise({
-      try: async (): Promise<RelayMachinesResult> => {
-        const response = await fetch(new URL("/v1/relay/hosts", relayUrl), {
-          headers: { accept: "application/json", authorization: `Bearer ${token}` },
-          signal: AbortSignal.timeout(MACHINES_TIMEOUT_MS),
-        });
-        if (response.status === 401) return { machines: [], problem: "signed_out" };
-        if (!response.ok) return { machines: [], problem: "unavailable" };
-        const body = (await response.json()) as {
-          readonly online?: ReadonlyArray<unknown>;
-          readonly computers?: ReadonlyArray<{
-            readonly id?: unknown;
-            readonly name?: unknown;
-            readonly online?: unknown;
-          }>;
-        };
-        const online = new Set(
-          (body.online ?? []).filter((id): id is string => typeof id === "string"),
-        );
-        // An API from before names were listed only knows which computers are online.
-        const listed =
-          body.computers?.flatMap((computer) =>
-            typeof computer.id === "string"
-              ? [
-                  {
-                    deviceId: computer.id,
-                    name:
-                      typeof computer.name === "string" && computer.name.trim() !== ""
-                        ? computer.name.trim().slice(0, 100)
-                        : `Computer ${computer.id.slice(0, 8)}`,
-                    online: computer.online === true || online.has(computer.id),
-                  },
-                ]
-              : [],
-          ) ??
-          [...online].map((id) => ({
-            deviceId: id,
-            name: `Computer ${id.slice(0, 8)}`,
-            online: true,
-          }));
-        return { machines: listed.filter((machine) => machine.deviceId !== deviceId) };
-      },
+      try: () => listComputers(signedIn.value),
       catch: () => ({ machines: [], problem: "unavailable" }) as RelayMachinesResult,
     }).pipe(Effect.catch((result) => Effect.succeed(result)));
   });
@@ -242,12 +256,11 @@ const make = Effect.gen(function* () {
   )(function* (request) {
     const signedIn = yield* credential;
     if (Option.isNone(signedIn)) {
-      return yield* Effect.fail(
-        new RelayPeerLinkError(
-          "signed_out",
+      return yield* new RelayPeerLinkError({
+        reason: "signed_out",
+        message:
           "This computer is not signed in to the Gustaf relay. Run gustaf relay login, or sign in under Account.",
-        ),
-      );
+      });
     }
     const { relayUrl, token } = signedIn.value;
     const client = yield* Effect.tryPromise({
@@ -270,24 +283,32 @@ const make = Effect.gen(function* () {
         }),
       catch: (cause) =>
         cause instanceof RelayTunnelClientError
-          ? new RelayPeerLinkError(cause.reason, relayFailureMessage(cause, "That computer"))
-          : new RelayPeerLinkError("closed", "The connection through the Gustaf relay failed."),
+          ? new RelayPeerLinkError({
+              reason: cause.reason,
+              message: relayFailureMessage(cause, "That computer"),
+            })
+          : new RelayPeerLinkError({
+              reason: "closed",
+              message: "The connection through the Gustaf relay failed.",
+            }),
     });
     const pairingCode = client.pairingToken;
     const hostKey = toBase64Url(client.remoteStaticKey);
     client.close();
     if (pairingCode === undefined) {
-      return yield* Effect.fail(
-        new RelayPeerLinkError(
-          "no_code",
-          "That computer did not send a link code. Update Gustaf there, then try again.",
-        ),
-      );
+      return yield* new RelayPeerLinkError({
+        reason: "no_code",
+        message: "That computer did not send a link code. Update Gustaf there, then try again.",
+      });
     }
     yield* readHosts.pipe(
       Effect.flatMap((hosts) => writeHosts({ ...hosts, [request.deviceId]: { hostKey } })),
       Effect.mapError(
-        () => new RelayPeerLinkError("closed", "Could not keep the key of that computer."),
+        () =>
+          new RelayPeerLinkError({
+            reason: "closed",
+            message: "Could not keep the key of that computer.",
+          }),
       ),
     );
     // A tunnel opened earlier still holds the old key.
@@ -303,7 +324,7 @@ const make = Effect.gen(function* () {
       const { [deviceId]: _removed, ...rest } = hosts;
       yield* writeHosts(rest);
     },
-    Effect.ignore,
+    (effect) => Effect.ignore(effect),
   );
 
   return RelayPeerTransport.of({
