@@ -1,7 +1,7 @@
 {
   "claudeSystemAppendBytes": 6412,
   "codexAdditionalContextBytes": 7634,
-  "mcpToolListJsonBytes": 67345,
+  "mcpToolListJsonBytes": 67339,
   "mcpToolListJsonBytesNormalThread": 60461,
   "mcpToolListJsonBytesDelegatedChild": 36164,
   "mcpToolListJsonBytesNoBrowserOrDevices": 49659,

@@ -271,7 +271,11 @@ const AGENT_FEEDBACK_CHOICES: ReadonlyArray<{
   readonly label: string;
   readonly description: string;
 }> = [
-  { mode: "off", label: msg("Off"), description: msg("Agents send no feedback to the T3 team.") },
+  {
+    mode: "off",
+    label: msg("Off"),
+    description: msg("Agents write no feedback reports about Gustaf."),
+  },
   {
     mode: "on-request",
     label: msg("When I ask"),
@@ -339,9 +343,10 @@ function AgentFeedbackSection() {
       })}
       <Text className="px-2 text-sm text-foreground-muted">
         <T>
-          Reports go to the T3 team. A report you ask for is shown to you first in a card, with an
-          outline of recent turns. Turn on Include the conversation there to add the messages of the
-          turns the report is about.
+          Reports are saved on the machine that runs the agent, and sent only if sending is
+          configured there. A report you ask for is shown to you first in a card, with an outline of
+          recent turns. Turn on Include the conversation there to add the messages of the turns the
+          report is about.
         </T>
       </Text>
     </View>

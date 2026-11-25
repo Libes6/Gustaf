@@ -1884,7 +1884,7 @@ const OrchestrationV2LinkRequestFields = {
 } as const;
 
 /**
- * A report the user asked the agent to send to the T3 team, shown for approval. Send stores and
+ * A report the user asked the agent to send, shown for approval. Send stores and
  * sends exactly `preview`, with `conversationTrace` as its trace if the user included the
  * conversation. Once answered, the card keeps only what was sent.
  */

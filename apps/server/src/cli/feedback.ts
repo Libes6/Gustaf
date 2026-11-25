@@ -134,7 +134,7 @@ export const feedbackCommand = Command.make("feedback", {
   ),
 }).pipe(
   Command.withDescription(
-    "Send feedback to the Gustaf team. Needs Agent feedback set to Automatic in Settings > Labs; to approve a report first, ask your agent in a thread.",
+    "File feedback about Gustaf, saved on this machine and sent only if sending is configured. Needs Agent feedback set to Automatic in Settings > Labs; to approve a report first, ask your agent in a thread.",
   ),
   Command.withHandler(({ baseDir, kind, subject, expected, actual, workaround }) =>
     withThreadTools(

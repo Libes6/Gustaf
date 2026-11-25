@@ -334,12 +334,12 @@ const AGENT_FEEDBACK_MODE_LABELS: Record<AgentFeedbackMode, string> = {
   auto: msg("Automatic"),
 };
 const AGENT_FEEDBACK_MODE_DESCRIPTIONS: Record<AgentFeedbackMode, string> = {
-  off: msg("Agents send no feedback to the T3 team."),
+  off: msg("Agents write no feedback reports about Gustaf."),
   "on-request": msg(
-    "When you ask, agents show you a short report about Gustaf and send it to the T3 team if you approve.",
+    "When you ask, agents show you a short report about Gustaf. If you approve it, it is saved on the server's machine and sent only if sending is configured there.",
   ),
   auto: msg(
-    "Agents also report Gustaf problems they hit on their own, such as a T3 tool that failed.",
+    "Agents also report Gustaf problems they hit on their own, such as a Gustaf tool that failed. Reports are saved on the server's machine and sent only if sending is configured there.",
   ),
 };
 
