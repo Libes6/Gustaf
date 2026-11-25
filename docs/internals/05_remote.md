@@ -69,6 +69,31 @@ The server's own HTTP client routes that origin into a Noise tunnel
   device token with `online` ids and, since links, `computers` with names; a client older than that
   answers ids only.
 
+### Pairing from the account's computer list
+
+A phone or desktop app signed in to the account can ask one of its computers to pair, with no QR
+code. It opens a tunnel with `accountPairing` in its hello and no link secret; the host then
+behaves like a link request ([`RelayHost`](../../apps/server/src/relay/RelayHost.ts)).
+
+- **A new key always waits for a person.** The account token only proves which account is asking,
+  so a stolen one can start a request but never finish it: waiting requests are capped
+  separately from link requests, one per key, dropped when the requester leaves or after a few
+  minutes. The safety code is the only check on the key taken at first contact, and the prompt
+  says to allow it only if the user just started the request.
+- **"Trust my other devices" repeats one decision, never widens it.** Off by default and stored
+  beside the device list, not in server settings, so only a session with relay write scope on a
+  direct route changes it. When on, a key whose user allowed it by hand as a client skips the
+  prompt for an account pairing and gets the same pairing a hand-allowed phone gets. Keys allowed
+  only as linked machines, keys from before the mark existed, and new keys still ask. A relay
+  that swapped keys cannot use it: it holds no pinned key's secret.
+- **Links are left out on purpose.** A link hands another computer's agents standing access, the
+  requester takes this host's key on trust each time, and a used link renews itself, so a skipped
+  prompt would remove the only human check for little convenience.
+- **Revoking ends sessions the key opened.** Pairing credentials issued for a relay device carry
+  the end of its key in the session label (and a marker when trust let it in), because a session
+  works on any route and closing the tunnel alone would not end it. Turning trust off ends only the
+  marked sessions; revoking a device ends all of its sessions and its tunnel.
+
 ## Hosted web is a client
 
 Gustaf ships no hosted web app. A build that serves one sets `VITE_HOSTED_APP_URL` (web) or
