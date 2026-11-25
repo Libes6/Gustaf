@@ -39,13 +39,13 @@ const DOC_RULES = [
   },
   {
     files: "docs/internals/06_t3-connect.md",
-    applyTo: "{infra/relay/src,apps/server/src/cloud}/**/*.ts",
-    instructions: "Hold relay and T3 Connect changes to docs/internals/06_t3-connect.md.",
+    applyTo: "apps/server/src/cloud/**/*.ts",
+    instructions: "Hold T3 Connect changes to docs/internals/06_t3-connect.md.",
   },
   {
     files: "SECURITY.md",
     applyTo:
-      "{apps/server/src/auth,apps/server/src/mcp,apps/server/src/guest,apps/server/src/assets,apps/server/src/peer,apps/server/src/cloud,apps/server/src/policy,infra/relay/src}/**/*.ts",
+      "{apps/server/src/auth,apps/server/src/mcp,apps/server/src/guest,apps/server/src/assets,apps/server/src/peer,apps/server/src/cloud,apps/server/src/policy}/**/*.ts",
     instructions:
       "Check security boundary changes against the trust model and real-finding criteria in SECURITY.md.",
   },

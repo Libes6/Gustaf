@@ -5,10 +5,10 @@ credentials, and managed tunnel allocations. Regular HTTP and WebSocket traffic 
 clients to the environment's tunnel hostname—the relay Worker is not in the data path.
 
 The one forwarded exception is automation webhooks
-([`HookForwarder.ts`](../../infra/relay/src/hooks/HookForwarder.ts)), which give senders a stable
+(`HookForwarder.ts` in the upstream relay), which give senders a stable
 URL while leaving token/signature verification to the environment and keeping bodies/tokens out of
 traces. Opt-in offline holding stores raw webhook requests in a per-link Durable Object
-([`HookInboxObject.ts`](../../infra/relay/src/hooks/HookInboxObject.ts)) rather than Queues or
+(`HookInboxObject.ts` in the upstream relay) rather than Queues or
 Postgres because held requests need per-link ordering, retry timing, and larger payload limits.
 
 Deployment and Clerk configuration live in the [Connect setup runbook](../operations/02_connect-setup.md).
@@ -28,8 +28,8 @@ every Connect surface (gated by `hasCloudPublicConfig`) stays hidden. The Gustaf
 - **Mutual authentication.** The environment accepts only bounded, replay-guarded relay proofs for
   its own identity, linked user, and operation; the relay verifies signed environment responses
   bound to the request nonce and client proof key so nothing behind the tunnel can impersonate the
-  environment ([`CloudLink.ts`](../../apps/server/src/cloud/CloudLink.ts),
-  [`EnvironmentConnector.ts`](../../infra/relay/src/environments/EnvironmentConnector.ts)).
+  environment ([`CloudLink.ts`](../../apps/server/src/cloud/CloudLink.ts); the relay side is
+  `EnvironmentConnector.ts` upstream).
 - **Explicit trust assumption & device approval.** DPoP protects an honest exchange, not a
   compromised relay signing key. Enabling `requireConnectDeviceApproval` shifts trust from the relay
   to approved DPoP key thumbprints: untrusted keys mint credentials that cannot be spent until
@@ -54,7 +54,7 @@ every Connect surface (gated by `hasCloudPublicConfig`) stays hidden. The Gustaf
 - Every allocation mutation bumps its `generation`. Unlink commits authorization revocation before
   external teardown, and release/reclamation lock on the claimed generation so delayed cleanup never
   deletes a tunnel reused by a concurrent restart or relink
-  ([`ManagedEndpointProvider.ts`](../../infra/relay/src/environments/ManagedEndpointProvider.ts)).
+  (`ManagedEndpointProvider.ts` in the upstream relay).
 - Idle tunnel reclamation deletes only tunnels whose host has registered recovery (and never
   unallocated orphans) so hosts that cannot self-heal are left alone.
 

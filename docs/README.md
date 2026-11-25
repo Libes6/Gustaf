@@ -73,4 +73,3 @@ anything.
 - [02 · T3 Connect setup](./operations/02_connect-setup.md)
 - [03 · Release](./operations/03_release.md)
 - [04 · Observability](./operations/04_observability.md)
-- [05 · Relay observability](./operations/05_relay-observability.md)
