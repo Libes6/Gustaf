@@ -184,6 +184,10 @@ export const ExecutionEnvironmentCapabilities = Schema.Struct({
       in them. Absent on servers from before linking, which clients must not
       offer linking for. */
   peerLinks: Schema.optionalKey(Schema.Boolean),
+  /** Links to another machine of the same Gustaf account through the relay, with no address or
+      code (`PeerLinkRelayCreateInput`), and lets such a machine ask to link here. Absent on
+      servers from before it. */
+  relayPeerLinks: Schema.optionalKey(Schema.Boolean),
   /** Server's `/mcp` narrows an OAuth client's modes from `T3-Mode-Limit`, so
       a linked environment's calls keep its agent's limits. Another environment
       links to this one only when it is set. */

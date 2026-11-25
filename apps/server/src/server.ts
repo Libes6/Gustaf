@@ -52,6 +52,7 @@ import * as SpawnWorker from "./process/SpawnWorker.ts";
 import * as NodePtyAdapter from "./terminal/NodePtyAdapter.ts";
 import * as PullRequestHttp from "./pullRequest/http.ts";
 import * as RelayHost from "./relay/RelayHost.ts";
+import * as RelayPeerTransport from "./relay/RelayPeerTransport.ts";
 import * as RelayHostHttp from "./relay/http.ts";
 import * as SpeechModelStore from "./speech/SpeechModelStore.ts";
 import * as SpeechService from "./speech/SpeechService.ts";
@@ -1470,7 +1471,15 @@ const layerMakeServer = Layer.unwrap(
       ),
       Layer.provideMerge(layerHttpServer),
       Layer.provide(layerApplicationObservability),
-      Layer.provideMerge(FetchHttpClient.layer),
+      // Peers on the user's other computers answer through the Gustaf relay at a made-up origin
+      // this client routes into a tunnel; every other URL is fetched as before.
+      Layer.provideMerge(
+        RelayPeerTransport.layerHttpClient.pipe(
+          Layer.provideMerge(RelayPeerTransport.layer),
+          Layer.provide(FetchHttpClient.layer),
+          Layer.provide(ServerSecretStore.layer),
+        ),
+      ),
       Layer.provide(VcsProcess.layer),
       Layer.provideMerge(AgentScopeLive.layer),
       Layer.provideMerge(layerPlatformServices),

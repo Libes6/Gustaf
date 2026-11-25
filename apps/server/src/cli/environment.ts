@@ -26,6 +26,7 @@ import * as ServerSecretStore from "../auth/ServerSecretStore.ts";
 import * as ServerConfig from "../config.ts";
 import * as ServerEnvironment from "../environment/ServerEnvironment.ts";
 import * as PeerLinks from "../peer/PeerLinks.ts";
+import * as RelayPeerTransport from "../relay/RelayPeerTransport.ts";
 import * as ServerSettings from "../serverSettings.ts";
 import * as ManagedPolicy from "../policy/ManagedPolicy.ts";
 import * as SqlitePersistence from "../persistence/Sqlite.ts";
@@ -55,7 +56,12 @@ const runWithPeerLinks = Effect.fn("environment.runWithPeerLinks")(function* <A,
           Layer.mergeAll(
             ServerSecretStore.layer,
             SqlitePersistence.layerCliConfig,
-            FetchHttpClient.layer,
+            // A relay link goes through a tunnel to a computer on the same Gustaf account.
+            RelayPeerTransport.layerHttpClient.pipe(
+              Layer.provideMerge(RelayPeerTransport.layer),
+              Layer.provide(FetchHttpClient.layer),
+              Layer.provide(ServerSecretStore.layer),
+            ),
           ),
         ),
         Layer.provide(ServerEnvironment.layer.pipe(Layer.provide(ServerSecretStore.layer))),

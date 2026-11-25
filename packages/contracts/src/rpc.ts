@@ -24,6 +24,9 @@ import {
   PeerLinkCreateInput,
   PeerLinkError,
   PeerLinkName,
+  PeerLinkRelayAttempt,
+  PeerLinkRelayCreateInput,
+  PeerLinkRelayMachines,
   PeerLinkRemoveInput,
   PeerLinkRemoveResult,
   PeerLinkRequestAnswerInput,
@@ -645,6 +648,9 @@ export const WS_METHODS = {
   peerLinksList: "peerLinks.list",
   peerLinksNames: "peerLinks.names",
   peerLinksLink: "peerLinks.link",
+  peerLinksRelayMachines: "peerLinks.relayMachines",
+  peerLinksRelayLink: "peerLinks.relayLink",
+  peerLinksRelayAttempts: "peerLinks.relayAttempts",
   peerLinksUnlink: "peerLinks.unlink",
   peerLinksAnswerRequest: "peerLinks.answerRequest",
   peerLinksSubscribeThread: "peerLinks.subscribeThread",
@@ -1032,6 +1038,27 @@ const WsPeerLinksNamesRpc = Rpc.make(WS_METHODS.peerLinksNames, {
 const WsPeerLinksLinkRpc = Rpc.make(WS_METHODS.peerLinksLink, {
   payload: PeerLinkCreateInput,
   success: PeerLink,
+  error: Schema.Union([PeerLinkError, EnvironmentAuthorizationError]),
+});
+
+/** The account's other computers, for linking one through the relay. */
+const WsPeerLinksRelayMachinesRpc = Rpc.make(WS_METHODS.peerLinksRelayMachines, {
+  payload: Schema.Struct({}),
+  success: PeerLinkRelayMachines,
+  error: Schema.Union([PeerLinkError, EnvironmentAuthorizationError]),
+});
+
+/** Answers once the other computer's user has allowed the link, which can take minutes. */
+const WsPeerLinksRelayLinkRpc = Rpc.make(WS_METHODS.peerLinksRelayLink, {
+  payload: PeerLinkRelayCreateInput,
+  success: PeerLink,
+  error: Schema.Union([PeerLinkError, EnvironmentAuthorizationError]),
+});
+
+/** The relay links waiting for their computer's user, with the safety code each shows. */
+const WsPeerLinksRelayAttemptsRpc = Rpc.make(WS_METHODS.peerLinksRelayAttempts, {
+  payload: Schema.Struct({}),
+  success: Schema.Struct({ attempts: Schema.Array(PeerLinkRelayAttempt) }),
   error: Schema.Union([PeerLinkError, EnvironmentAuthorizationError]),
 });
 
@@ -2698,6 +2725,9 @@ export const WsRpcGroup = RpcGroup.make(
   WsPeerLinksListRpc,
   WsPeerLinksNamesRpc,
   WsPeerLinksLinkRpc,
+  WsPeerLinksRelayMachinesRpc,
+  WsPeerLinksRelayLinkRpc,
+  WsPeerLinksRelayAttemptsRpc,
   WsPeerLinksUnlinkRpc,
   WsPeerLinksAnswerRequestRpc,
   WsPeerLinksSubscribeThreadRpc,

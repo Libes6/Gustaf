@@ -100,6 +100,8 @@ export const CLIENT_GUARDED_RPC_SCOPES = {
   // A guest link hands thread access to someone outside, like a pairing link.
   [WS_METHODS.guestShareCreate]: AuthAccessWriteScope,
   [WS_METHODS.peerLinksLink]: AuthAccessWriteScope,
+  // The link RPC's bar: it signs this environment in to another and hands that environment's agents access.
+  [WS_METHODS.peerLinksRelayLink]: AuthAccessWriteScope,
   [WS_METHODS.peerLinksUnlink]: AuthAccessWriteScope,
   // A link lets every agent here reach the other environment: Settings' bar.
   [WS_METHODS.peerLinksAnswerRequest]: AuthAccessWriteScope,

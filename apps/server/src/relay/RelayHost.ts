@@ -2,15 +2,21 @@
 import * as NodeCrypto from "node:crypto";
 import * as NodeOS from "node:os";
 
-import type {
-  RelayHostCredentialInput,
-  RelayHostDevice,
-  RelayHostPairingOffer,
-  RelayHostPendingDevice,
-  RelayHostStatus,
+import {
+  AuthMcpClientAccess,
+  type RelayHostCredentialInput,
+  type RelayHostDevice,
+  type RelayHostPairingOffer,
+  type RelayHostPendingDevice,
+  type RelayHostStatus,
 } from "@t3tools/contracts";
 import { bytesEqual, noiseKeyPairFromSecret, relaySafetyCode } from "@t3tools/shared/relayNoise";
-import { formatRelayPairingLink, fromBase64Url, toBase64Url } from "@t3tools/shared/relayTunnel";
+import {
+  type RelayClientHello,
+  formatRelayPairingLink,
+  fromBase64Url,
+  toBase64Url,
+} from "@t3tools/shared/relayTunnel";
 import * as Clock from "effect/Clock";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
@@ -23,6 +29,7 @@ import * as Schema from "effect/Schema";
 import * as EnvironmentAuth from "../auth/EnvironmentAuth.ts";
 import * as ServerSecretStore from "../auth/ServerSecretStore.ts";
 import * as ServerConfig from "../config.ts";
+import * as ServerSettings from "../serverSettings.ts";
 import {
   type RelayAdmission,
   type RelayHostConnectionState,
@@ -30,7 +37,7 @@ import {
 } from "./RelayHostEngine.ts";
 
 export class RelayHostError extends Schema.TaggedError<RelayHostError>()("RelayHostError", {
-  reason: Schema.Literals(["not_online", "not_found", "invalid_relay_url", "storage"]),
+  reason: Schema.Literals(["not_online", "not_found", "invalid_relay_url", "storage", "policy"]),
   cause: Schema.optional(Schema.Defect()),
 }) {
   override get message(): string {
@@ -43,6 +50,8 @@ export class RelayHostError extends Schema.TaggedError<RelayHostError>()("RelayH
         return "The relay address must be an https origin.";
       case "storage":
         return "Could not read or write the relay settings.";
+      case "policy":
+        return "This computer's managed policy does not allow that access.";
     }
   }
 }
@@ -71,6 +80,9 @@ const CREDENTIAL_SECRET = "relay-host-credential";
 const DEVICES_SECRET = "relay-host-devices";
 const OFFER_TTL = Duration.minutes(5);
 const APPROVAL_TTL_MS = 5 * 60_000;
+// Requests to link come from any device of the account, so only a few may wait at once.
+const MAX_PENDING_PEER_LINKS = 3;
+const isLinkAccess = Schema.is(AuthMcpClientAccess);
 // The approved phone redeems it through the tunnel within seconds.
 const PAIRING_TOKEN_TTL = Duration.minutes(5);
 
@@ -149,10 +161,17 @@ function localOrigin(host: string | undefined, port: number) {
   return `http://${address.includes(":") && !address.startsWith("[") ? `[${address}]` : address}:${port}`;
 }
 
-const make = Effect.gen(function* () {
+const make = Effect.fn("RelayHost.make")(function* (
+  options: { readonly localOrigin?: string } = {},
+) {
   const secrets = yield* ServerSecretStore.ServerSecretStore;
   const auth = yield* EnvironmentAuth.EnvironmentAuth;
   const config = yield* ServerConfig.ServerConfig;
+  const serverSettings = yield* ServerSettings.ServerSettingsService;
+  const linkedEnvironmentsEnabled = serverSettings.getSettings.pipe(
+    Effect.map((settings) => settings.linkedEnvironmentsEnabled),
+    Effect.orElseSucceed(() => false),
+  );
   const runPromise = Effect.runPromiseWith(yield* Effect.context<never>());
 
   const hostKeyPair = noiseKeyPairFromSecret(
@@ -218,7 +237,12 @@ const make = Effect.gen(function* () {
     pairingToken === undefined ? { kind: "ready" } : { kind: "ready", pairingToken };
   const reject = (reason: string): RelayAdmission => ({ kind: "reject", reason });
 
-  const waitForUser = (key: string, name: string): RelayAdmission => {
+  const waitForUser = (
+    key: string,
+    name: string,
+    closed: Promise<void>,
+    peerLink?: RelayHostPendingDevice["peerLink"],
+  ): RelayAdmission => {
     const id = NodeCrypto.randomUUID();
     const decision = new Promise<RelayAdmission>((resolve) => {
       const timer = setTimeout(() => {
@@ -227,21 +251,57 @@ const make = Effect.gen(function* () {
       }, APPROVAL_TTL_MS);
       pending.set(id, {
         key,
-        view: { id, name, requestedAt: new Date().toISOString(), safetyCode: safetyCode(key) },
+        view: {
+          id,
+          name,
+          requestedAt: new Date().toISOString(),
+          safetyCode: safetyCode(key),
+          ...(peerLink === undefined ? {} : { peerLink }),
+        },
         settle: (admission) => {
           clearTimeout(timer);
           pending.delete(id);
           resolve(admission);
         },
       });
+      // The device gave up (closed its request, lost the relay): nobody is left to allow.
+      void closed.then(() => pending.get(id)?.settle(reject("rejected")));
     });
     return { kind: "pending", decision };
   };
 
+  /**
+   * A machine of the same account asks to link its agents here. The account proves nothing about
+   * who is asking, so this always waits for this computer's user, known device or not: every
+   * link session is one the user allowed.
+   */
+  const admitPeerLink = Effect.fn("RelayHost.admitPeerLink")(function* (
+    client: {
+      readonly clientKey: string;
+      readonly hello: { readonly name: string };
+      readonly closed: Promise<void>;
+    },
+    access: string,
+  ) {
+    if (!isLinkAccess(access)) return reject("rejected");
+    if (!(yield* linkedEnvironmentsEnabled)) return reject("linking_off");
+    const waiting = [...pending.values()].filter(
+      (approval) => approval.view.peerLink !== undefined,
+    );
+    if (
+      waiting.length >= MAX_PENDING_PEER_LINKS ||
+      waiting.some((approval) => approval.key === client.clientKey)
+    ) {
+      return reject("busy");
+    }
+    return waitForUser(client.clientKey, client.hello.name, client.closed, { access });
+  });
+
   /** Runs inside the engine's callback: decides about a client whose handshake completed. */
   const admit = Effect.fn("RelayHost.admit")(function* (client: {
     readonly clientKey: string;
-    readonly hello: { readonly name: string; readonly pairingSecret?: string };
+    readonly hello: RelayClientHello;
+    readonly closed: Promise<void>;
   }) {
     const now = yield* Clock.currentTimeMillis;
     const known = devices.some((device) => device.key === client.clientKey);
@@ -252,12 +312,16 @@ const make = Effect.gen(function* () {
       current !== null &&
       Date.parse(current.view.expiresAt) > now &&
       bytesEqual(new TextEncoder().encode(secret), new TextEncoder().encode(current.secret));
-    if (!scanned) return known ? ready() : reject("unknown_device");
+    if (!scanned) {
+      const requested = client.hello.peerLink;
+      if (requested !== undefined) return yield* admitPeerLink(client, requested.access);
+      return known ? ready() : reject("unknown_device");
+    }
     // One scan, one device: a second phone needs a fresh code.
     offer = null;
     // An allowed phone that scans again (say, after removing the computer) needs no new approval.
     if (known) return ready((yield* issuePairingToken(client.hello.name)).credential);
-    return waitForUser(client.clientKey, client.hello.name);
+    return waitForUser(client.clientKey, client.hello.name, client.closed);
   });
 
   const stopEngine = () => {
@@ -276,7 +340,7 @@ const make = Effect.gen(function* () {
       deviceToken: credential.token,
       hostKeyPair,
       randomBytes: (length) => new Uint8Array(NodeCrypto.randomBytes(length)),
-      localOrigin: localOrigin(config.host, config.port),
+      localOrigin: options.localOrigin ?? localOrigin(config.host, config.port),
       admit: (client) => runPromise(admit(client)),
       onState: (state) => {
         if (engine === started) connection = state;
@@ -350,7 +414,28 @@ const make = Effect.gen(function* () {
       approval.settle({ kind: "reject", reason: "rejected" });
       return yield* status();
     }
-    const issued = yield* issuePairingToken(approval.view.name).pipe(Effect.mapError(storageError));
+    const linkAccess = approval.view.peerLink?.access;
+    // A link's code carries the access the user is allowing, and this computer's policy may cap it.
+    const issued = yield* linkAccess === undefined
+      ? issuePairingToken(approval.view.name).pipe(Effect.mapError(storageError))
+      : auth
+          .issuePairingCredential({
+            access: linkAccess,
+            purpose: "peer-link",
+            label: `Link · ${approval.view.name} (relay)`,
+          })
+          .pipe(
+            Effect.mapError((error) =>
+              error._tag === "ManagedPolicyRefusedError"
+                ? new RelayHostError({ reason: "policy" })
+                : storageError(error),
+            ),
+            Effect.tapError((error) =>
+              Effect.sync(() => {
+                if (error.reason === "policy") approval.settle(reject("policy"));
+              }),
+            ),
+          );
     yield* saveDevices([
       ...devices.filter((device) => device.key !== approval.key),
       {
@@ -384,4 +469,8 @@ const make = Effect.gen(function* () {
   });
 });
 
-export const layer = Layer.effect(RelayHost, make);
+export const layer = Layer.effect(RelayHost, make());
+
+/** `localOrigin` is where tunneled requests go; tests point it at a server on a random port. */
+export const layerWith = (options: { readonly localOrigin?: string }) =>
+  Layer.effect(RelayHost, make(options));

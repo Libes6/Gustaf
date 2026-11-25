@@ -30,7 +30,11 @@ NodeTest.test(
       NodeAssert.deepEqual(client.first, { type: "ready", deviceId: phone.device.id });
 
       const presence = await api("/v1/relay/hosts", { auth: { bearer: phone.token } });
-      NodeAssert.deepEqual(presence.body, { online: [laptop.device.id] });
+      NodeAssert.deepEqual(presence.body, {
+        online: [laptop.device.id],
+        // Computers only: a phone is never a host, so it is not offered as one.
+        computers: [{ id: laptop.device.id, name: "Laptop", online: true }],
+      });
 
       client.socket.send(
         JSON.stringify({ type: "open", channel: 1, hostDeviceId: laptop.device.id }),

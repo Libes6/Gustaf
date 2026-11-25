@@ -29,6 +29,8 @@ const mapRelayHostError = (
       return failEnvironmentInvalidRequest("relay_item_not_found");
     case "invalid_relay_url":
       return failEnvironmentInvalidRequest("relay_invalid_url");
+    case "policy":
+      return failEnvironmentInvalidRequest("relay_policy_refused");
     case "storage":
       return failEnvironmentInternal("relay_host_failed", error);
   }

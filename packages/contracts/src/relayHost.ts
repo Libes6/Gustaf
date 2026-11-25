@@ -1,5 +1,6 @@
 import * as Schema from "effect/Schema";
 
+import { AuthMcpClientAccess } from "./auth.ts";
 import { TrimmedNonEmptyString } from "./baseSchemas.ts";
 
 /** A phone this computer allowed to connect through the Gustaf relay. */
@@ -13,12 +14,14 @@ export const RelayHostDevice = Schema.Struct({
 });
 export type RelayHostDevice = typeof RelayHostDevice.Type;
 
-/** A device that scanned this computer's QR code and waits for the user's answer. */
+/** A device that scanned this computer's QR code, or asks to link its agents here, and waits for the user's answer. */
 export const RelayHostPendingDevice = Schema.Struct({
   id: TrimmedNonEmptyString,
   name: Schema.String,
   requestedAt: Schema.String,
   safetyCode: Schema.String,
+  /** Set when the device asks to link its agents here instead of pairing as a client. */
+  peerLink: Schema.optional(Schema.Struct({ access: AuthMcpClientAccess })),
 });
 export type RelayHostPendingDevice = typeof RelayHostPendingDevice.Type;
 

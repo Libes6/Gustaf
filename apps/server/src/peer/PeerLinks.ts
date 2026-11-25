@@ -10,6 +10,9 @@ import {
   type PeerLinkCreateInput,
   PeerLinkError,
   type PeerLinkName,
+  type PeerLinkRelayAttempt,
+  type PeerLinkRelayCreateInput,
+  type PeerLinkRelayMachines,
   type PeerLinkSummary,
 } from "@t3tools/contracts";
 import * as NodeSqliteClient from "@t3tools/shared/nodeSqliteClient";
@@ -36,9 +39,11 @@ import * as HttpClientError from "effect/http/HttpClientError";
 import * as HttpApi from "effect/http-api/HttpApi";
 import * as HttpApiClient from "effect/http-api/HttpApiClient";
 import { isLocalLoopbackHost, isTailnetHost } from "@t3tools/shared/hostClassification";
+import { relayHostFromUrl, relayVirtualBaseUrl } from "@t3tools/shared/relayTunnelClient";
 
 import * as ServerSecretStore from "../auth/ServerSecretStore.ts";
 import * as ServerEnvironment from "../environment/ServerEnvironment.ts";
+import * as RelayPeerTransport from "../relay/RelayPeerTransport.ts";
 import * as ServerSettings from "../serverSettings.ts";
 
 const PeerHttpApi = HttpApi.make(EnvironmentHttpApi.identifier)
@@ -53,7 +58,12 @@ const LINK_REDIRECT_URI = "http://127.0.0.1/t3code-peer-link";
  * as unreachable. A tailnet or relayed route to a machine that is waking up takes longer.
  */
 export const probeTimeout = (origin: string) =>
-  isLocalLoopbackHost(new URL(origin).hostname) ? Duration.seconds(3) : Duration.seconds(10);
+  RelayPeerTransport.isRelayUrl(origin)
+    ? // The tunnel opens first, and a computer on the relay answers after a moment.
+      Duration.seconds(20)
+    : isLocalLoopbackHost(new URL(origin).hostname)
+      ? Duration.seconds(3)
+      : Duration.seconds(10);
 /** How long a listing waits on a link's addresses; a real call still gives a waking peer `probeTimeout`. */
 const LIST_PROBE_TIMEOUT = Duration.seconds(3);
 
@@ -110,6 +120,19 @@ export class PeerLinks extends Context.Service<
       input: PeerLinkCreateInput,
     ) => Effect.Effect<{ readonly link: PeerLink; readonly alreadyLinked: boolean }, PeerLinkError>;
     readonly list: Effect.Effect<ReadonlyArray<PeerLinkSummary>, PeerLinkError>;
+    /**
+     * Links a machine on the same Gustaf account through the relay, with no address and no pairing
+     * code. The machine's own user has to allow it there, so this waits for them (minutes at
+     * most); `onSafetyCode` hears the code both screens must show meanwhile.
+     */
+    readonly linkRelay: (
+      input: PeerLinkRelayCreateInput,
+      options?: { readonly onSafetyCode?: (code: string) => void },
+    ) => Effect.Effect<PeerLink, PeerLinkError>;
+    /** The account's other computers and which hold a relay connection now. */
+    readonly relayMachines: Effect.Effect<PeerLinkRelayMachines, PeerLinkError>;
+    /** Relay links waiting for their machine's user, with the code each shows. */
+    readonly relayAttempts: Effect.Effect<ReadonlyArray<PeerLinkRelayAttempt>>;
     /** The unexpired links' names, from what is stored, without asking any peer. */
     readonly names: Effect.Effect<ReadonlyArray<PeerLinkName>, PeerLinkError>;
     /** The stored link, without asking the peer whether it answers. */
@@ -211,8 +234,18 @@ const probeFailure = (
   origin: string,
   error: HttpClientError.HttpClientError | Schema.SchemaError | Cause.TimeoutError,
   timeout: Duration.Duration,
+  machine = "That machine",
 ) => {
   const unreachable = (message: string) => new PeerLinkError({ reason: "unreachable", message });
+  const tunnel = RelayPeerTransport.relayTunnelFailure(error);
+  if (tunnel !== undefined) {
+    return unreachable(RelayPeerTransport.relayFailureMessage(tunnel, machine));
+  }
+  if (RelayPeerTransport.isRelayUrl(origin) && Cause.isTimeoutError(error)) {
+    return unreachable(
+      `${machine} did not answer through the Gustaf relay within ${Duration.toSeconds(timeout)} seconds.`,
+    );
+  }
   const certificate = certificateErrorCode(error);
   if (certificate !== undefined) {
     return unreachable(`${origin} presented a certificate this machine rejected (${certificate}).`);
@@ -250,7 +283,10 @@ const make = Effect.gen(function* () {
   const httpClient = yield* HttpClient.HttpClient;
   const environment = yield* ServerEnvironment.ServerEnvironment;
   const serverSettings = yield* ServerSettings.ServerSettingsService;
+  const relayTransport = yield* RelayPeerTransport.RelayPeerTransport;
   const isOwnLoopback = yield* LoopbackHost;
+  /** Relay links being asked of their machine's user, by device id. */
+  const relayAttempts = new Map<string, PeerLinkRelayAttempt>();
   const enabled = serverSettings.getSettings.pipe(
     Effect.map((settings) => settings.linkedEnvironmentsEnabled),
     Effect.orElseSucceed(() => false),
@@ -274,7 +310,7 @@ const make = Effect.gen(function* () {
     );
 
   /** The environment answering at `origin`, or why nothing there answers as T3 Code. */
-  const probe = (origin: string) => {
+  const probe = (origin: string, machine?: string) => {
     const timeout = probeTimeout(origin);
     return clientFor(origin).pipe(
       Effect.flatMap((client) => client.metadata.descriptor()),
@@ -286,7 +322,7 @@ const make = Effect.gen(function* () {
       }),
       Effect.timeout(timeout),
       // No cause: a decode error can carry the response body to the client.
-      Effect.mapError((error) => probeFailure(origin, error, timeout)),
+      Effect.mapError((error) => probeFailure(origin, error, timeout, machine)),
     );
   };
 
@@ -329,7 +365,11 @@ const make = Effect.gen(function* () {
 
   /** Signs in to the peer's `/mcp` with a pairing code: register, decide, exchange. */
   const signIn = Effect.fn("PeerLinks.signIn")(
-    function* (origin: string, input: PeerLinkCreateInput, clientName: string) {
+    function* (
+      origin: string,
+      input: Pick<PeerLinkCreateInput, "access" | "pairingCode">,
+      clientName: string,
+    ) {
       const client = yield* clientFor(origin);
       // Only the peer's own refusals are rejections. A dropped connection or
       // an answer this version cannot read is classified below.
@@ -357,7 +397,9 @@ const make = Effect.gen(function* () {
         yield* digest.digest(Digest.sha256, new TextEncoder().encode(verifier)).pipe(Effect.orDie),
       );
       const state = Base64Url.encode(yield* random.randomBytes(16));
-      const resource = `${origin}/mcp`;
+      // A tunnel's made-up origin is not what the peer derives its own address from, and the
+      // resource indicator is optional: the peer binds the code to its own `/mcp` regardless.
+      const resource = RelayPeerTransport.isRelayUrl(origin) ? undefined : `${origin}/mcp`;
       const decided = yield* client.mcpOAuth
         .decision({
           headers: {},
@@ -369,7 +411,7 @@ const make = Effect.gen(function* () {
               code_challenge: challenge,
               code_challenge_method: "S256",
               state: Redacted.make(state),
-              resource,
+              ...(resource === undefined ? {} : { resource }),
             },
             decision: { _tag: "pairing-code", access: input.access, code: input.pairingCode },
           },
@@ -406,7 +448,7 @@ const make = Effect.gen(function* () {
             redirect_uri: LINK_REDIRECT_URI,
             client_id: registered.client_id,
             code_verifier: Redacted.make(verifier),
-            resource,
+            ...(resource === undefined ? {} : { resource }),
           },
         })
         .pipe(
@@ -507,38 +549,33 @@ const make = Effect.gen(function* () {
     return { primary, peer: yield* probe(primary), origins };
   });
 
-  const linkWith = Effect.fn("PeerLinks.link")(function* (
-    input: PeerLinkCreateInput,
-    keepLinked: boolean,
+  type Descriptor = Effect.Success<ReturnType<typeof probe>>;
+
+  /**
+   * Everything after the peer is found: checks, the sign-in with its pairing code, and keeping the
+   * link and its token. `byAddress` is a peer found only by the address typed, which can answer as
+   * anything.
+   */
+  const completeLink = Effect.fn("PeerLinks.completeLink")(function* (
+    found: {
+      readonly primary: string;
+      readonly peer: Descriptor;
+      readonly origins: ReadonlyArray<string>;
+    },
+    input: Pick<PeerLinkCreateInput, "access" | "pairingCode">,
+    options: { readonly keepLinked: boolean; readonly byAddress: boolean },
   ) {
-    if (!(yield* enabled)) {
-      return yield* new PeerLinkError({ reason: "disabled", message: LINKED_ENVIRONMENTS_OFF });
-    }
-    const urls = [input.url, ...(input.alternateUrls ?? [])];
-    // The user picked a machine: link through the addresses that answer as
-    // it, so one that now answers as another never receives the pairing code.
-    const { primary, peer, origins } =
-      input.expectedEnvironmentId === undefined
-        ? yield* answeringAt(urls)
-        : yield* answeringAs(
-            urls,
-            input.expectedEnvironmentId,
-            input.expectedLabel ?? input.expectedEnvironmentId,
-          );
+    const { primary, peer, origins } = found;
     const row = yield* readRow(peer.environmentId);
     const stored = Option.isSome(row) ? yield* toLink(row.value) : undefined;
     const current =
       stored !== undefined && DateTime.isGreaterThan(stored.expiresAt, yield* DateTime.now)
         ? stored
         : undefined;
-    if (keepLinked && current !== undefined) return { link: current, alreadyLinked: true };
+    if (options.keepLinked && current !== undefined) return { link: current, alreadyLinked: true };
     // Anything can answer as a linked machine, so an address alone renews its
     // link only where the link already reaches it, and never moves it.
-    if (
-      input.expectedEnvironmentId === undefined &&
-      current !== undefined &&
-      !current.urls.includes(primary)
-    ) {
+    if (options.byAddress && current !== undefined && !current.urls.includes(primary)) {
       return yield* new PeerLinkError({
         reason: "pairing_rejected",
         message: `${primary} answers as ${current.label}, which is already linked at another address. If ${current.label} moved, forget that link first.`,
@@ -609,10 +646,133 @@ const make = Effect.gen(function* () {
     return { link: linked, alreadyLinked: false };
   });
 
+  const linkWith = Effect.fn("PeerLinks.link")(function* (
+    input: PeerLinkCreateInput,
+    keepLinked: boolean,
+  ) {
+    if (!(yield* enabled)) {
+      return yield* new PeerLinkError({ reason: "disabled", message: LINKED_ENVIRONMENTS_OFF });
+    }
+    const urls = [input.url, ...(input.alternateUrls ?? [])];
+    // The user picked a machine: link through the addresses that answer as
+    // it, so one that now answers as another never receives the pairing code.
+    const found =
+      input.expectedEnvironmentId === undefined
+        ? yield* answeringAt(urls)
+        : yield* answeringAs(
+            urls,
+            input.expectedEnvironmentId,
+            input.expectedLabel ?? input.expectedEnvironmentId,
+          );
+    return yield* completeLink(found, input, {
+      keepLinked,
+      byAddress: input.expectedEnvironmentId === undefined,
+    });
+  });
+
   const link: PeerLinks["Service"]["link"] = (input) =>
     linkWith(input, false).pipe(Effect.map((result) => result.link));
   const linkUnlessLinked: PeerLinks["Service"]["linkUnlessLinked"] = (input) =>
     linkWith(input, true);
+
+  const relayLinkError = (error: RelayPeerTransport.RelayPeerLinkError) =>
+    new PeerLinkError({
+      reason:
+        error.reason === "signed_out"
+          ? "relay_signed_out"
+          : error.reason === "rejected" || error.reason === "policy" || error.reason === "busy"
+            ? "relay_denied"
+            : error.reason === "unknown_device" ||
+                error.reason === "linking_off" ||
+                error.reason === "no_code"
+              ? "incompatible"
+              : "unreachable",
+      message: error.message,
+    });
+
+  const relayMachines: PeerLinks["Service"]["relayMachines"] = Effect.gen(function* () {
+    const listed = yield* relayTransport.machines;
+    const links = yield* Effect.forEach(yield* readRows, toLink);
+    const linkedTo = new Map<string, EnvironmentId>();
+    for (const link of links) {
+      for (const url of link.urls) {
+        const device = relayHostFromUrl(url);
+        if (device !== null) linkedTo.set(device, link.environmentId);
+      }
+    }
+    return {
+      machines: listed.machines.map((machine) => {
+        const linkedEnvironmentId = linkedTo.get(machine.deviceId.toLowerCase());
+        return linkedEnvironmentId === undefined ? machine : { ...machine, linkedEnvironmentId };
+      }),
+      ...(listed.problem === undefined ? {} : { problem: listed.problem }),
+    };
+  });
+
+  const linkRelay: PeerLinks["Service"]["linkRelay"] = Effect.fn("PeerLinks.linkRelay")(
+    function* (input, options) {
+      if (!(yield* enabled)) {
+        return yield* new PeerLinkError({ reason: "disabled", message: LINKED_ENVIRONMENTS_OFF });
+      }
+      const deviceId = input.deviceId.toLowerCase();
+      const listed = yield* relayTransport.machines;
+      if (listed.problem === "signed_out") {
+        return yield* relayLinkError(
+          new RelayPeerTransport.RelayPeerLinkError(
+            "signed_out",
+            "This computer is not signed in to the Gustaf relay. Run gustaf relay login, or sign in under Account.",
+          ),
+        );
+      }
+      const machine = listed.machines.find((candidate) => candidate.deviceId === deviceId);
+      // A machine the account does not list is another account's, or gone: the relay answers
+      // for it exactly as for an offline one, so say what it can.
+      if (listed.problem === undefined && machine === undefined) {
+        return yield* new PeerLinkError({
+          reason: "unreachable",
+          message: "That machine is not on this Gustaf account's computers.",
+        });
+      }
+      const name = machine?.name ?? deviceId;
+      if (machine !== undefined && !machine.online) {
+        return yield* new PeerLinkError({
+          reason: "unreachable",
+          message: `${name} is not connected to the Gustaf relay. Check that Gustaf is running there and signed in (gustaf relay login).`,
+        });
+      }
+      const self = yield* environment.getDescriptor;
+      relayAttempts.set(deviceId, { deviceId, name, safetyCode: null });
+      const pairing = yield* relayTransport
+        .requestLink({
+          deviceId,
+          access: input.access,
+          name: self.label,
+          onSafetyCode: (code) => {
+            relayAttempts.set(deviceId, { deviceId, name, safetyCode: code });
+            options?.onSafetyCode?.(code);
+          },
+        })
+        .pipe(
+          Effect.mapError((error) =>
+            relayLinkError(
+              new RelayPeerTransport.RelayPeerLinkError(
+                error.reason,
+                error.message.replace("That computer", name),
+              ),
+            ),
+          ),
+          Effect.ensuring(Effect.sync(() => void relayAttempts.delete(deviceId))),
+        );
+      const origin = relayVirtualBaseUrl(deviceId);
+      const peer = yield* probe(origin, name);
+      const completed = yield* completeLink(
+        { primary: origin, peer, origins: [origin] },
+        { access: input.access, pairingCode: pairing.pairingCode },
+        { keepLinked: false, byAddress: false },
+      );
+      return completed.link;
+    },
+  );
 
   /** A peer's label follows its machine name, so the link takes the one its own address answers with. */
   const withLabel = (link: PeerLink, label: string) =>
@@ -722,6 +882,12 @@ const make = Effect.gen(function* () {
             new TextDecoder().decode(token.value),
           );
         }
+        // The tunnel to a machine that is linked no longer is the revocation's last use.
+        const urls = yield* decodeUrls(row.urls_json).pipe(Effect.orElseSucceed(() => []));
+        for (const url of urls) {
+          const device = relayHostFromUrl(url);
+          if (device !== null) yield* relayTransport.forget(device);
+        }
       }
       return { removed: deleted.length > 0, endedThere };
     },
@@ -766,9 +932,17 @@ const make = Effect.gen(function* () {
               ),
             ).pipe(Effect.option);
       if (Option.isNone(answered)) {
+        // A relay route fails for reasons only its tunnel knows: offline, signed out, over a limit.
+        const why =
+          link.urls.length > 0 && link.urls.every(RelayPeerTransport.isRelayUrl)
+            ? yield* probe(link.urls[0]!, link.label).pipe(
+                Effect.as(undefined),
+                Effect.catch((error) => Effect.succeed(error.message)),
+              )
+            : undefined;
         return yield* new PeerLinkError({
           reason: "unreachable",
-          message: `${link.label} did not answer at ${link.urls.join(", ")}.`,
+          message: why ?? `${link.label} did not answer at ${link.urls.join(", ")}.`,
         });
       }
       const { url, peer } = answered.value;
@@ -817,6 +991,9 @@ const make = Effect.gen(function* () {
     enabled,
     link,
     linkUnlessLinked,
+    linkRelay,
+    relayMachines,
+    relayAttempts: Effect.sync(() => [...relayAttempts.values()]),
     list,
     names,
     get,

@@ -60,6 +60,54 @@ export const PeerLinkCreateInput = Schema.Struct({
 });
 export type PeerLinkCreateInput = typeof PeerLinkCreateInput.Type;
 
+/**
+ * Links to another of the user's own machines through the Gustaf relay, with no address and no
+ * pairing code: both machines are signed in to one Gustaf account. The other machine's user still
+ * has to allow it there, so the account alone grants nothing.
+ */
+export const PeerLinkRelayCreateInput = Schema.Struct({
+  /** The other computer's relay device id, from `PeerLinkRelayMachines`. */
+  deviceId: TrimmedNonEmptyString,
+  access: AuthMcpClientAccess,
+});
+export type PeerLinkRelayCreateInput = typeof PeerLinkRelayCreateInput.Type;
+
+/** One of the account's other computers, as the relay lists it. */
+export const PeerLinkRelayMachine = Schema.Struct({
+  deviceId: TrimmedNonEmptyString,
+  name: Schema.String,
+  /** Whether it holds a relay connection right now. */
+  online: Schema.Boolean,
+  /** The environment this one already links to there, if it does. */
+  linkedEnvironmentId: Schema.optionalKey(EnvironmentId),
+});
+export type PeerLinkRelayMachine = typeof PeerLinkRelayMachine.Type;
+
+/** Why the account's machines could not be listed from this environment. */
+export const PeerLinkRelayProblem = Schema.Literals([
+  /** This computer has not signed in to the Gustaf relay (`gustaf relay login`, or Account in the app). */
+  "signed_out",
+  /** The relay did not answer. */
+  "unavailable",
+]);
+export type PeerLinkRelayProblem = typeof PeerLinkRelayProblem.Type;
+
+export const PeerLinkRelayMachines = Schema.Struct({
+  machines: Schema.Array(PeerLinkRelayMachine),
+  problem: Schema.optionalKey(PeerLinkRelayProblem),
+});
+export type PeerLinkRelayMachines = typeof PeerLinkRelayMachines.Type;
+
+/** A relay link waiting for its machine's user, with the code both screens must show. */
+export const PeerLinkRelayAttempt = Schema.Struct({
+  deviceId: TrimmedNonEmptyString,
+  /** What the machine is called on the account. */
+  name: Schema.String,
+  /** Null while this environment is still reaching the machine. */
+  safetyCode: Schema.NullOr(Schema.String),
+});
+export type PeerLinkRelayAttempt = typeof PeerLinkRelayAttempt.Type;
+
 export const PeerLinkRemoveInput = Schema.Struct({ environmentId: EnvironmentId });
 export type PeerLinkRemoveInput = typeof PeerLinkRemoveInput.Type;
 
@@ -82,6 +130,10 @@ export class PeerLinkError extends Schema.TaggedError<PeerLinkError>()("PeerLink
     "unknown_link",
     "storage",
     "disabled",
+    /** A relay link was asked for while this computer is not signed in to the relay. */
+    "relay_signed_out",
+    /** The other computer's user declined, or did not answer in time. */
+    "relay_denied",
   ]),
   message: Schema.String,
   /** The environment that answered at the addresses of the one the user picked, when one did. */
@@ -251,6 +303,12 @@ export const PeerLinkRequestAnswerInput = Schema.Struct({
       pairingCode: TrimmedNonEmptyString,
     }),
     /** Answers with a machine this environment is already linked to, as it is. */
+    /** Links a machine on the user's Gustaf account through the relay: no address, no code. */
+    Schema.Struct({
+      type: Schema.Literal("link-relay"),
+      deviceId: TrimmedNonEmptyString,
+      access: AuthMcpClientAccess,
+    }),
     Schema.Struct({ type: Schema.Literal("use-existing"), environmentId: EnvironmentId }),
     Schema.Struct({ type: Schema.Literal("decline") }),
   ]),

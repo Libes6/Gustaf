@@ -104,10 +104,15 @@ export function relayPrologue(hostDeviceId: string, clientDeviceId: string): Uin
   );
 }
 
-/** The client's third handshake message. A new device must carry the QR code's secret. */
+/**
+ * The client's third handshake message. A new device must carry the QR code's secret, or ask to
+ * link its agents there: the computer then asks its own user, so the account alone opens nothing.
+ */
 export interface RelayClientHello {
   readonly name: string;
   readonly pairingSecret?: string;
+  /** The access the client asks for as a linked environment (`AuthMcpClientAccess`). */
+  readonly peerLink?: { readonly access: string };
 }
 
 export const TunnelMessageType = {

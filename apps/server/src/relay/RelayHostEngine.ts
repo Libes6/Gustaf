@@ -38,6 +38,8 @@ export interface RelayClientIdentity {
   /** The client's Noise static key, base64url. */
   readonly clientKey: string;
   readonly hello: RelayClientHello;
+  /** Settles once the client's channel is gone, so a request nobody waits for any more can be dropped. */
+  readonly closed: Promise<void>;
 }
 
 export interface RelayHostEngineOptions {
@@ -111,6 +113,7 @@ interface Channel {
   receive: NoiseCipherState | null;
   ready: boolean;
   closed: boolean;
+  readonly gone: PromiseWithResolvers<void>;
   readonly streams: Map<number, HttpStream | WsStream>;
 }
 
@@ -218,6 +221,7 @@ export class RelayHostEngine {
               receive: null,
               ready: false,
               closed: false,
+              gone: Promise.withResolvers<void>(),
               streams: new Map(),
             });
             return;
@@ -272,7 +276,12 @@ export class RelayHostEngine {
       this.#clientKeys.set(channel.id, clientKey);
       await this.#admit(
         channel,
-        await this.#options.admit({ clientDeviceId: channel.clientDeviceId, clientKey, hello }),
+        await this.#options.admit({
+          clientDeviceId: channel.clientDeviceId,
+          clientKey,
+          hello,
+          closed: channel.gone.promise,
+        }),
       );
       return;
     }
@@ -506,6 +515,7 @@ export class RelayHostEngine {
   #closeChannel(channel: Channel, reason: string | null) {
     if (channel.closed) return;
     channel.closed = true;
+    channel.gone.resolve();
     this.#channels.delete(channel.id);
     this.#clientKeys.delete(channel.id);
     for (const stream of channel.streams.values()) {
@@ -528,9 +538,15 @@ function parseHello(payload: Uint8Array): RelayClientHello | null {
     const value = JSON.parse(new TextDecoder().decode(payload)) as Record<string, unknown>;
     const name = typeof value.name === "string" ? value.name.trim().slice(0, 100) : "";
     if (!name) return null;
+    const peerLink = value.peerLink;
+    const access =
+      typeof peerLink === "object" && peerLink !== null
+        ? (peerLink as Record<string, unknown>).access
+        : undefined;
     return {
       name,
       ...(typeof value.pairingSecret === "string" ? { pairingSecret: value.pairingSecret } : {}),
+      ...(typeof access === "string" ? { peerLink: { access } } : {}),
     };
   } catch {
     return null;

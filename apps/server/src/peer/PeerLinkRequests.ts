@@ -323,6 +323,14 @@ const make = Effect.gen(function* () {
             Effect.succeed<LinkRequestOutcome>({ linkStatus: "failed", failure: error.message }),
           ),
         );
+      case "link-relay":
+        // The other machine's own user allows it there, which can take minutes; the card waits.
+        return peerLinks.linkRelay({ deviceId: answer.deviceId, access: answer.access }).pipe(
+          Effect.map(linkedOutcome),
+          Effect.catch((error) =>
+            Effect.succeed<LinkRequestOutcome>({ linkStatus: "failed", failure: error.message }),
+          ),
+        );
       case "link": {
         const [url, ...alternateUrls] = answer.urls;
         return peerLinks

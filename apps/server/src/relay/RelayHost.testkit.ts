@@ -18,13 +18,42 @@ async function listen(server: NodeHttp.Server) {
 
 /** The cloud relay reduced to one host and its clients, same wire format as apps/api. */
 export async function startRelay() {
-  const server = NodeHttp.createServer();
+  const server = NodeHttp.createServer((request, response) => {
+    // `GET /v1/relay/hosts` as the API answers a device: the account's computers and who is online.
+    if (request.url === "/v1/relay/hosts") {
+      response.writeHead(200, { "content-type": "application/json" });
+      response.end(
+        JSON.stringify({
+          online: host ? ["laptop"] : [],
+          computers: [
+            { id: "laptop", name: "Box", online: host !== null },
+            { id: "pixel", name: "Mac", online: false },
+          ],
+        }),
+      );
+      return;
+    }
+    response.writeHead(404).end();
+  });
   const wss = new WebSocketServer({ server });
   let host: WsSocket | null = null;
+  // Settles each time a host says hello, so a test waits for the host instead of guessing.
+  let hostHello = Promise.withResolvers<void>();
+  /** `limit`: every new channel is refused as the relay does over a limit. */
+  let refuse: "limit" | null = null;
   const clients = new Map<number, { socket: WsSocket; channel: number }>();
   let next = 100;
   wss.on("connection", (socket) => {
     let role: string | null = null;
+    socket.on("close", () => {
+      // As the real relay does: a client that goes away ends its channels on the host.
+      if (role !== "client") return;
+      for (const [hostChannel, client] of clients) {
+        if (client.socket !== socket) continue;
+        clients.delete(hostChannel);
+        host?.send(JSON.stringify({ type: "close", channel: hostChannel, reason: "peer_closed" }));
+      }
+    });
     socket.on("message", (data, isBinary) => {
       if (!isBinary) {
         const message = JSON.parse(data.toString());
@@ -37,9 +66,26 @@ export async function startRelay() {
                 ? "pixel"
                 : null;
           if (!deviceId) return socket.close(4401);
-          if (role === "host") host = socket;
+          if (role === "host") {
+            host = socket;
+            socket.on("close", () => {
+              if (host === socket) host = null;
+              // As the real relay does: a host that goes away ends its clients' channels.
+              for (const [hostChannel, client] of clients) {
+                clients.delete(hostChannel);
+                client.socket.send(
+                  JSON.stringify({ type: "close", channel: client.channel, reason: "peer_closed" }),
+                );
+              }
+            });
+          }
           socket.send(JSON.stringify({ type: "ready", deviceId }));
+          if (role === "host") hostHello.resolve();
         } else if (message.type === "open") {
+          if (refuse !== null)
+            return socket.send(
+              JSON.stringify({ type: "close", channel: message.channel, reason: refuse }),
+            );
           if (!host)
             return socket.send(
               JSON.stringify({ type: "close", channel: message.channel, reason: "host_offline" }),
@@ -77,6 +123,17 @@ export async function startRelay() {
   const url = await listen(server);
   return {
     url,
+    /** Resolves once a host is connected, now or when it next says hello. */
+    nextHost: () => (host !== null ? Promise.resolve() : hostHello.promise),
+    /** Cuts every socket at once, as a relay restart or a network change does. */
+    dropEveryone: () => {
+      host = null;
+      hostHello = Promise.withResolvers<void>();
+      for (const socket of wss.clients) socket.terminate();
+    },
+    refuseChannels: (reason: "limit" | null) => {
+      refuse = reason;
+    },
     [Symbol.asyncDispose]: async () => {
       for (const socket of wss.clients) socket.terminate();
       wss.close();
@@ -87,10 +144,18 @@ export async function startRelay() {
 
 /** Stands in for the Gustaf server on localhost: an HTTP echo and a WebSocket echo. */
 export async function startLocalServer() {
+  // `/api/stream` sends one event, then waits for the test before the second and the end.
+  const release = Promise.withResolvers<void>();
   const server = NodeHttp.createServer((request, response) => {
     const chunks: Array<Buffer> = [];
     request.on("data", (chunk: Buffer) => chunks.push(chunk));
     request.on("end", () => {
+      if (request.url === "/api/stream") {
+        response.writeHead(200, { "content-type": "text/event-stream" });
+        response.write("data: first\n\n");
+        void release.promise.then(() => response.end("data: second\n\n"));
+        return;
+      }
       if (request.url === "/api/big") {
         response.writeHead(200, { "content-type": "application/octet-stream" });
         response.end(Buffer.alloc(300_000, 7));
@@ -117,9 +182,12 @@ export async function startLocalServer() {
   const url = await listen(server);
   return {
     url,
+    releaseStream: () => release.resolve(),
     [Symbol.asyncDispose]: async () => {
+      release.resolve();
       for (const socket of wss.clients) socket.terminate();
       wss.close();
+      server.closeAllConnections();
       server.close();
     },
   };

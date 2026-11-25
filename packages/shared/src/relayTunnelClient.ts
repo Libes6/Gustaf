@@ -34,16 +34,29 @@ export interface RelayTunnelClientOptions {
   readonly relayUrl: string;
   readonly deviceToken: string;
   readonly hostDeviceId: string;
-  /** The computer's static key from the QR code, base64url. The handshake fails on any other. */
-  readonly hostKey: string;
+  /**
+   * The computer's static key from the QR code or an earlier link, base64url. The handshake fails
+   * on any other. `null` trusts the key the computer presents: only for asking to link a computer
+   * this device has no key for, where the user compares the safety codes on both screens.
+   */
+  readonly hostKey: string | null;
   readonly clientKeyPair: NoiseKeyPair;
   readonly name: string;
   /** Only while pairing: the QR code's one-time secret. */
   readonly pairingSecret?: string;
+  /** Asks the computer's user to let this machine link its agents there at this access. */
+  readonly peerLink?: { readonly access: string };
   readonly randomBytes: RandomBytes;
-  /** Called when the computer asks its user to allow this device. */
-  readonly onPending?: () => void;
+  /** Called with the computer's key when it asks its user to allow this device. */
+  readonly onPending?: (hostKey: Uint8Array) => void;
   readonly createSocket?: (url: string) => WebSocket;
+  /** Ends the attempt while it waits (for the relay, or for the computer's user to answer). */
+  readonly signal?: AbortSignal;
+  /**
+   * Hands a response to the caller once its headers arrive and streams the body, as a server's
+   * event streams need. Clients that cannot build a streamed `Response` (React Native) leave it off.
+   */
+  readonly streamResponses?: boolean;
 }
 
 export type RelayTunnelFailure =
@@ -52,8 +65,26 @@ export type RelayTunnelFailure =
   | "host_offline"
   | "rejected"
   | "limit"
+  /** The computer does not know this device: removed there, or from before relay links. */
+  | "unknown_device"
+  /** The computer's Linked environments beta is off. */
+  | "linking_off"
+  /** The computer already has as many link requests waiting as it takes. */
+  | "busy"
+  /** The computer's managed policy does not allow the access asked for. */
+  | "policy"
   | "handshake_failed"
   | "closed";
+
+const HOST_CLOSE_REASONS: ReadonlySet<string> = new Set([
+  "host_offline",
+  "limit",
+  "rejected",
+  "unknown_device",
+  "linking_off",
+  "busy",
+  "policy",
+]);
 
 export class RelayTunnelClientError extends Error {
   override readonly name = "RelayTunnelClientError";
@@ -78,6 +109,8 @@ interface PendingHttp {
   readonly reject: (error: Error) => void;
   head: TunnelHead | null;
   readonly body: Array<Uint8Array>;
+  /** Set once a streamed response has been handed out: the rest of the body goes here. */
+  stream?: ReadableStreamDefaultController<Uint8Array>;
 }
 
 /** An open, approved tunnel. Create with `RelayTunnelClient.connect`. */
@@ -88,6 +121,7 @@ export class RelayTunnelClient {
   readonly #http = new Map<number, PendingHttp>();
   readonly #sockets = new Map<number, RelayTunnelWebSocket>();
   readonly #closeListeners = new Set<(error: RelayTunnelClientError) => void>();
+  readonly #streamResponses: boolean;
   #nextStream = 1;
   #closed: RelayTunnelClientError | null = null;
   #lastInbound = Date.now();
@@ -105,7 +139,9 @@ export class RelayTunnelClient {
     pairingToken: string | undefined;
     remoteStaticKey: Uint8Array;
     localStaticKey: Uint8Array;
+    streamResponses: boolean;
   }) {
+    this.#streamResponses = input.streamResponses;
     this.#socket = input.socket;
     this.#send = input.send;
     this.#receive = input.receive;
@@ -146,6 +182,11 @@ export class RelayTunnelClient {
       const sendFrame = (payload: Uint8Array) => {
         if (socket.readyState === WebSocket.OPEN) socket.send(encodeRelayFrame(CHANNEL, payload));
       };
+      const cancel = () => {
+        if (!client) fail("closed", "The attempt was cancelled.");
+      };
+      if (options.signal?.aborted) queueMicrotask(cancel);
+      else options.signal?.addEventListener("abort", cancel, { once: true });
 
       socket.addEventListener("open", () => {
         socket.send(JSON.stringify({ type: "hello", token: options.deviceToken, role: "client" }));
@@ -182,16 +223,10 @@ export class RelayTunnelClient {
           } else if (message?.type === "close" && message.channel === CHANNEL) {
             const reason = message.reason;
             fail(
-              reason === "host_offline" || reason === "limit" || reason === "rejected"
-                ? reason
+              reason !== undefined && HOST_CLOSE_REASONS.has(reason)
+                ? (reason as RelayTunnelFailure)
                 : "closed",
-              reason === "host_offline"
-                ? "The computer is not connected to the relay."
-                : reason === "rejected"
-                  ? "The computer did not allow this device."
-                  : reason === "limit"
-                    ? "The relay limit for this account is reached."
-                    : `The computer closed the connection (${reason ?? "closed"}).`,
+              closeMessage(reason),
             );
           }
           return;
@@ -205,7 +240,7 @@ export class RelayTunnelClient {
             handshake.readMessage(frame.payload);
             const remote = handshake.remoteStaticKey!;
             // The QR code's key is the only computer this device talks to: a relay in the middle fails here.
-            if (!bytesEqual(remote, fromBase64Url(options.hostKey))) {
+            if (options.hostKey !== null && !bytesEqual(remote, fromBase64Url(options.hostKey))) {
               return fail(
                 "handshake_failed",
                 "The computer's key does not match the one it was paired with.",
@@ -214,6 +249,7 @@ export class RelayTunnelClient {
             const hello = {
               name: options.name,
               ...(options.pairingSecret ? { pairingSecret: options.pairingSecret } : {}),
+              ...(options.peerLink ? { peerLink: options.peerLink } : {}),
             };
             sendFrame(handshake.writeMessage(new TextEncoder().encode(JSON.stringify(hello))));
             session = handshake.session();
@@ -226,7 +262,7 @@ export class RelayTunnelClient {
           if (status?.state === "pending") {
             // Waiting for the user's approval can take longer than a connect.
             clearTimeout(timer);
-            return options.onPending?.();
+            return options.onPending?.(session.remoteStaticKey);
           }
           if (status?.state !== "ready")
             return fail("handshake_failed", "Unexpected status from the computer.");
@@ -239,6 +275,7 @@ export class RelayTunnelClient {
             pairingToken: status.pairingToken,
             remoteStaticKey: session.remoteStaticKey,
             localStaticKey: options.clientKeyPair.publicKey,
+            streamResponses: options.streamResponses === true,
           });
           resolve(client);
         } catch {
@@ -392,10 +429,16 @@ export class RelayTunnelClient {
     switch (message.type) {
       case TunnelMessageType.head:
         http.head = readTunnelJson<TunnelHead>(message);
-        if (!http.head) this.#finishHttp(message.stream, new TypeError("Malformed response head."));
+        if (!http.head) {
+          this.#finishHttp(message.stream, new TypeError("Malformed response head."));
+          return;
+        }
+        if (this.#streamResponses && hasBody(http.head.status))
+          this.#streamHead(message.stream, http);
         return;
       case TunnelMessageType.data:
-        http.body.push(message.body.slice());
+        if (http.stream) http.stream.enqueue(message.body.slice());
+        else http.body.push(message.body.slice());
         return;
       case TunnelMessageType.end:
         return this.#finishHttp(message.stream, null);
@@ -410,14 +453,39 @@ export class RelayTunnelClient {
     }
   }
 
+  /** Resolves the request with its headers now; `data` messages feed the body as they come. */
+  #streamHead(stream: number, http: PendingHttp) {
+    const { status, headers } = http.head!;
+    const body = new ReadableStream<Uint8Array>({
+      start: (controller) => {
+        http.stream = controller;
+      },
+      // The reader gave up: tell the computer to stop sending.
+      cancel: () => {
+        if (!this.#http.delete(stream)) return;
+        this.#sendTunnel(
+          encodeTunnelJson(TunnelMessageType.reset, stream, { message: "cancelled" }),
+        );
+      },
+    });
+    http.resolve(
+      new Response(body, { status, headers: headers.map(([name, value]) => [name, value]) }),
+    );
+  }
+
   #finishHttp(stream: number, error: Error | null) {
     const http = this.#http.get(stream);
     if (!http) return;
     this.#http.delete(stream);
+    if (http.stream) {
+      if (error) http.stream.error(error);
+      else http.stream.close();
+      return;
+    }
     if (error || !http.head)
       return http.reject(error ?? new TypeError("The computer sent no response."));
     const { status, headers } = http.head;
-    const body = status === 204 || status === 304 || status === 101 ? null : concat(http.body);
+    const body = hasBody(status) ? concat(http.body) : null;
     http.resolve(
       new Response(body, { status, headers: headers.map(([name, value]) => [name, value]) }),
     );
@@ -591,6 +659,29 @@ function concat(parts: ReadonlyArray<Uint8Array>) {
   return out;
 }
 
+const hasBody = (status: number) => status !== 204 && status !== 304 && status !== 101;
+
+function closeMessage(reason: string | undefined): string {
+  switch (reason) {
+    case "host_offline":
+      return "The computer is not connected to the relay.";
+    case "rejected":
+      return "The computer did not allow this device.";
+    case "limit":
+      return "The relay limit for this account is reached.";
+    case "unknown_device":
+      return "The computer does not know this device. It may have been removed there, or run a Gustaf version from before relay links.";
+    case "linking_off":
+      return "Linked environments is off on that computer. Turn it on in its Settings → Labs.";
+    case "busy":
+      return "That computer already has link requests waiting. Answer them there, then try again.";
+    case "policy":
+      return "That computer's policy does not allow this access.";
+    default:
+      return `The computer closed the connection (${reason ?? "closed"}).`;
+  }
+}
+
 /** Clients reach a computer over the relay at this made-up origin; the pool intercepts it. */
 const RELAY_VIRTUAL_HOST_SUFFIX = ".relay.gustaf.invalid";
 
@@ -638,6 +729,11 @@ export class RelayTunnelPool {
     });
     this.#clients.set(hostDeviceId, connecting);
     return connecting;
+  }
+
+  /** Closes every tunnel, e.g. when the process that owns the pool stops. */
+  closeAll() {
+    for (const hostDeviceId of this.#clients.keys()) this.forget(hostDeviceId);
   }
 
   /** Drops a computer's tunnel, e.g. after its route is removed. */

@@ -132,6 +132,7 @@ export const EnvironmentRequestInvalidReason = Schema.Literals([
   "relay_not_online",
   "relay_item_not_found",
   "relay_invalid_url",
+  "relay_policy_refused",
 ]);
 export type EnvironmentRequestInvalidReason = typeof EnvironmentRequestInvalidReason.Type;
 

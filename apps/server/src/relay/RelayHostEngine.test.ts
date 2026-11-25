@@ -51,7 +51,7 @@ function startHost(
 
 const connect = (
   relayUrl: string,
-  hostKey: string,
+  hostKey: string | null,
   extra: Partial<Parameters<typeof RelayTunnelClient.connect>[0]> = {},
 ) =>
   RelayTunnelClient.connect({
@@ -188,5 +188,61 @@ describe("relay tunnel", () => {
     expect(await reply.promise).toBe("echo:hi:/ws");
     expect(opened).toBe(1);
     await expect(poolFetch("https://example.invalid/")).rejects.toThrow("not a relay URL");
+  });
+
+  it("hands a response over once its headers arrive when the client streams, and ends it with the request", async () => {
+    await using relay = await startRelay();
+    await using local = await startLocalServer();
+    using host = startHost(relay.url, local.url, async () => ({ kind: "ready" }));
+    await host.online;
+    const client = await connect(relay.url, host.hostKey, { streamResponses: true });
+
+    // The response is in hand while the server is still writing it: only a stream can do that.
+    const response = await client.fetch("https://relay.invalid/api/stream");
+    const reader = response.body!.getReader();
+    const decoder = new TextDecoder();
+    expect(decoder.decode((await reader.read()).value)).toBe("data: first\n\n");
+    local.releaseStream();
+    expect(decoder.decode((await reader.read()).value)).toBe("data: second\n\n");
+    expect((await reader.read()).done).toBe(true);
+
+    // Giving the stream up tells the computer to stop sending, and the tunnel stays usable.
+    const again = await client.fetch("https://relay.invalid/api/stream");
+    await again.body!.cancel();
+    expect((await client.fetch("https://relay.invalid/api/echo")).status).toBe(201);
+    client.close();
+  });
+
+  it("tells the host when a client that waits for approval gives up", async () => {
+    await using relay = await startRelay();
+    await using local = await startLocalServer();
+    const admitted: Array<RelayClientIdentity> = [];
+    using host = startHost(relay.url, local.url, async (client) => {
+      admitted.push(client);
+      return { kind: "pending", decision: new Promise<RelayAdmission>(() => {}) };
+    });
+    await host.online;
+    const controller = new AbortController();
+    const pending = Promise.withResolvers<void>();
+    const connecting = connect(relay.url, host.hostKey, {
+      peerLink: { access: "auto" },
+      onPending: pending.resolve,
+      signal: controller.signal,
+    });
+    await pending.promise;
+    expect(admitted[0]?.hello.peerLink).toEqual({ access: "auto" });
+    controller.abort();
+    await expect(connecting).rejects.toMatchObject({ reason: "closed" });
+    await admitted[0]!.closed;
+  });
+
+  it("trusts the key a computer presents only when asked to, and reports it", async () => {
+    await using relay = await startRelay();
+    await using local = await startLocalServer();
+    using host = startHost(relay.url, local.url, async () => ({ kind: "ready" }));
+    await host.online;
+    const client = await connect(relay.url, null);
+    expect(toBase64Url(client.remoteStaticKey)).toBe(host.hostKey);
+    client.close();
   });
 });

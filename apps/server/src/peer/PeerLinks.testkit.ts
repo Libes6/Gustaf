@@ -32,6 +32,7 @@ import * as ServerHttp from "../http.ts";
 import * as McpHttpServer from "../mcp/McpHttpServer.ts";
 import * as McpSessionRegistry from "../mcp/McpSessionRegistry.ts";
 import * as Sqlite from "../persistence/Sqlite.ts";
+import * as RelayPeerTransport from "../relay/RelayPeerTransport.ts";
 import * as PeerHttp from "./http.ts";
 import * as PeerClientPairing from "./PeerClientPairing.ts";
 import * as PeerLinks from "./PeerLinks.ts";
@@ -170,6 +171,8 @@ export const servePeer = <E, R, E2 = never, R2 = never>(
     const auth = Context.get(authContext, EnvironmentAuth.EnvironmentAuth);
     return {
       url,
+      /** Its own auth, secret store, settings and database, for services that run beside it. */
+      context: authContext,
       auth,
       /** Its settings, as for turning its Linked environments beta off. */
       settings: Context.get(authContext, ServerSettings.ServerSettingsService),
@@ -210,7 +213,11 @@ export const layerLinkingEnvironment = <E = never>(
     Layer.provideMerge(PeerLinks.layer),
     Layer.provideMerge(ServerSettings.layerTest({ linkedEnvironmentsEnabled: true })),
     Layer.provideMerge(database),
-    Layer.provide(Layer.mergeAll(secrets, FetchHttpClient.layer)),
+    // Peers answer over plain HTTP here; a relay link goes through the same client a server uses.
+    Layer.provide(RelayPeerTransport.layerHttpClient.pipe(Layer.provide(FetchHttpClient.layer))),
+    Layer.provide(RelayPeerTransport.layer),
+    // The secret store is exposed so a test can sign this environment in to a relay.
+    Layer.provideMerge(secrets),
     // Peers here are served on 127.0.0.1, so only `localhost` stands for this machine.
     Layer.provide(Layer.succeed(PeerLinks.LoopbackHost, (host) => host === "localhost")),
     // Services that act for this environment, such as delegation, name it too.
