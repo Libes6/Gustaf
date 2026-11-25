@@ -115,7 +115,6 @@ export function AccountComputersSection(props: {
         view.computers.map((computer) => (
           <ListRow
             key={computer.deviceId}
-            icon="desktopcomputer"
             leading={
               <ConnectionStatusDot
                 state={computer.online ? "connected" : "available"}
