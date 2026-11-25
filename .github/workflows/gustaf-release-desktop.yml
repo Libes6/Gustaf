@@ -1,0 +1,194 @@
+name: Gustaf release desktop build
+
+# One desktop platform of a Gustaf release, called by gustaf-release.yml. It builds the Electron
+# installers and the `gustaf` CLI archive on a runner of the platform's own architecture and
+# uploads them, named for the release, as `installers-<release_platform>`. Builds are unsigned
+# (no Apple or Windows certificate); updates are signed later, by the release job.
+
+on:
+  workflow_call:
+    inputs:
+      label:
+        required: true
+        type: string
+      runner:
+        required: true
+        type: string
+      # Electron's platform name: mac, linux or win.
+      platform:
+        required: true
+        type: string
+      target:
+        required: true
+        type: string
+      arch:
+        required: true
+        type: string
+      # The key under `platforms` in latest.json.
+      release_platform:
+        required: true
+        type: string
+      rust_target:
+        required: true
+        type: string
+      resource_key:
+        required: true
+        type: string
+      version:
+        required: true
+        type: string
+      # Windows embeds the Linux CLI archive, which the Linux build uploads, as its WSL runtime.
+      wsl_runtime_from_linux:
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build ${{ inputs.label }}
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: 75
+    defaults:
+      run:
+        shell: bash
+    env:
+      EXE_SUFFIX: ${{ inputs.platform == 'win' && '.exe' || '' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          sparse-checkout: |
+            /*
+            !/.repos/
+          sparse-checkout-cone-mode: false
+
+      - name: Setup dependencies
+        uses: ./.github/actions/setup-ci-deps
+        with:
+          install-args: --filter=t3... --filter=@t3tools/web... --filter=@t3tools/desktop... --filter=@t3tools/scripts...
+
+      - name: Install Linux build libraries
+        if: inputs.platform == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libsecret-1-dev pkg-config libgtk-3-0t64 libnss3 libasound2t64 libgbm1 patchelf xvfb
+          command -v magick >/dev/null 2>&1 || command -v convert >/dev/null 2>&1 || sudo apt-get install -y imagemagick
+
+      # Makes every package report the release version, as the desktop build expects.
+      - name: Align package versions to the release version
+        run: node scripts/update-release-package-versions.ts "${{ inputs.version }}"
+
+      # apps/server/dist (server and web client) and apps/desktop/dist-electron (Electron main).
+      - name: Build the JS bundle
+        env:
+          T3CODE_TELEMETRY_CHANNEL: dev
+        run: vp run build:desktop:bundle
+
+      - name: Apply web client branding
+        run: node scripts/apply-web-brand-assets.ts production apps/server/dist/client
+
+      # The CLI archive and the desktop app bundle the same binary, so it is built once, first.
+      - name: Build the resource monitor
+        run: cargo build --locked --release --manifest-path native/resource-monitor/Cargo.toml --target "${{ inputs.rust_target }}"
+
+      - name: Stage the resource monitor for the CLI archive
+        run: |
+          set -euo pipefail
+          target_dir="$RUNNER_TEMP/cli-resource-monitor/${{ inputs.resource_key }}"
+          mkdir -p "$target_dir"
+          cp "native/resource-monitor/target/${{ inputs.rust_target }}/release/t3-resource-monitor${EXE_SUFFIX}" "$target_dir/"
+
+      - name: Build the CLI single-executable
+        run: node apps/server/scripts/cli.ts build-exe --verbose
+
+      - name: Build the CLI archive
+        run: |
+          node scripts/build-cli-archive.ts \
+            --platform "${{ inputs.platform }}" \
+            --arch "${{ inputs.arch }}" \
+            --version "${{ inputs.version }}" \
+            --resource-monitor-dir "$RUNNER_TEMP/cli-resource-monitor" \
+            --output-dir release-cli
+
+      - name: Check the CLI archive unpacks and runs
+        run: node scripts/smoke-cli-archive.ts --archive release-cli/* --expect-version "${{ inputs.version }}"
+
+      - name: Upload the Linux CLI archive for the Windows build
+        if: inputs.platform == 'linux'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: cli-linux-${{ inputs.arch }}
+          path: release-cli/*
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 1
+
+      - name: Download the Linux CLI archive for WSL
+        if: inputs.wsl_runtime_from_linux
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: cli-linux-${{ inputs.arch }}
+          path: wsl-runtime
+
+      - name: Build the desktop installers
+        env:
+          GUSTAF_UPDATER_PUBLIC_KEY: ${{ vars.GUSTAF_UPDATER_PUBLIC_KEY || vars.M_CODE_UPDATER_PUBLIC_KEY }}
+          T3CODE_DESKTOP_REUSE_RESOURCE_MONITOR: "true"
+        run: |
+          set -euo pipefail
+          test -n "$GUSTAF_UPDATER_PUBLIC_KEY"
+          args=(
+            --platform "${{ inputs.platform }}"
+            --target "${{ inputs.target }}"
+            --arch "${{ inputs.arch }}"
+            --build-version "${{ inputs.version }}"
+            --skip-build
+            --verbose
+          )
+          if [[ "${{ inputs.wsl_runtime_from_linux }}" == "true" ]]; then
+            args+=(--wsl-runtime "$GITHUB_WORKSPACE"/wsl-runtime/t3-*-linux-${{ inputs.arch }}.tar.gz)
+          fi
+          vp run dist:desktop:artifact "${args[@]}"
+
+      # A build can package fine and still not open; this starts the shipped DMG or AppImage.
+      - name: Launch check
+        if: inputs.platform != 'win'
+        run: |
+          set -euo pipefail
+          check=(node scripts/smoke-desktop-app.ts --artifacts-dir "$RUNNER_TEMP/desktop-launch-check")
+          if [[ "${{ inputs.platform }}" == "mac" ]]; then
+            mount="$RUNNER_TEMP/desktop-launch-dmg"
+            hdiutil attach -nobrowse -readonly -mountpoint "$mount" "$(ls "$GITHUB_WORKSPACE"/release/*.dmg)"
+            trap 'hdiutil detach "$mount" -force >/dev/null || true' EXIT
+            app=$(ls -d "$mount"/*.app)
+            executable=$(/usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "$app/Contents/Info.plist")
+            "${check[@]}" --executable "$app/Contents/MacOS/$executable"
+          else
+            appimage=$(ls "$GITHUB_WORKSPACE"/release/*.AppImage)
+            chmod +x "$appimage"
+            (cd "$RUNNER_TEMP" && "$appimage" --appimage-extract >/dev/null)
+            xvfb-run -a "${check[@]}" --executable "$RUNNER_TEMP/squashfs-root/gustaf"
+          fi
+
+      - name: Upload the launch check output
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: launch-check-${{ inputs.release_platform }}
+          path: ${{ runner.temp }}/desktop-launch-check
+          if-no-files-found: ignore
+
+      - name: Stage the release files
+        run: node .github/scripts/gustaf-release.cjs stage "${{ inputs.release_platform }}" "${{ inputs.version }}" release release-cli release-assets
+
+      - name: Upload the release files
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: installers-${{ inputs.release_platform }}
+          path: release-assets/*
+          if-no-files-found: error
+          # Installers and archives are already compressed.
+          compression-level: 0

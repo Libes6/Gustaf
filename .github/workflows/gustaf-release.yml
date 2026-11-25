@@ -1,0 +1,344 @@
+name: Gustaf release
+
+# Pushing a tag vX.Y.Z builds Gustaf for macOS (arm64), Windows (x64), Linux (x64) and Android,
+# signs the desktop update files with the updater key, and publishes a GitHub Release holding the
+# installers, the `t3-*` CLI archives, the signed update files, `latest.json` (what the desktop
+# app reads), the Android APK and `latest-android.json`. A manual run is a dry run: it builds and
+# signs everything, uploads it as the `release-files` artifact, and publishes nothing.
+# See docs/operations/03_release.md.
+
+on:
+  push:
+    tags: ["v*.*.*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to build, such as 0.2.0. Empty uses the version in apps/desktop/package.json."
+        required: false
+        default: ""
+        type: string
+
+concurrency:
+  group: gustaf-release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  # SHA-256 of the owner's Android release certificate. A different key would stop installed apps from updating.
+  EXPECTED_CERT_SHA256: "84:6C:A3:53:98:86:D0:05:86:B6:FA:C4:A9:E1:E2:2C:A0:0C:12:13:6A:CF:0F:1B:53:A3:DD:18:AB:08:25:09"
+  ANDROID_PACKAGE: io.github.libes6.gustaf
+
+jobs:
+  meta:
+    name: Resolve the release
+    if: github.repository == 'Libes6/Gustaf'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+      tag: ${{ steps.meta.outputs.tag }}
+      publish: ${{ steps.meta.outputs.publish }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: package.json
+      - id: meta
+        name: Resolve and check the version
+        env:
+          DISPATCH_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          package_version=$(jq -er .version apps/desktop/package.json)
+          if [[ "$GITHUB_REF_TYPE" == tag ]]; then
+            [[ "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::Release tags look like v1.2.3, got $GITHUB_REF_NAME."; exit 1; }
+            version="${GITHUB_REF_NAME#v}"
+            # A tag must name the version the code carries, and sit on main.
+            [[ "$version" == "$package_version" ]] || { echo "::error::Tag $GITHUB_REF_NAME does not match apps/desktop/package.json ($package_version). Bump the versions, then tag."; exit 1; }
+            git fetch --no-tags origin main
+            git merge-base --is-ancestor HEAD origin/main || { echo "::error::Tag $GITHUB_REF_NAME is not on main."; exit 1; }
+            publish=true
+          else
+            version="${DISPATCH_VERSION:-$package_version}"
+            publish=false
+          fi
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::Invalid version $version."; exit 1; }
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+          echo "publish=$publish" >> "$GITHUB_OUTPUT"
+      - name: Test the release scripts
+        run: node --test .github/scripts/gustaf-release.test.cjs
+
+  desktop_linux:
+    name: Desktop Linux x64
+    needs: [meta]
+    uses: ./.github/workflows/gustaf-release-desktop.yml
+    with:
+      label: Linux x64
+      runner: ubuntu-24.04
+      platform: linux
+      target: AppImage
+      arch: x64
+      release_platform: linux-x86_64
+      rust_target: x86_64-unknown-linux-gnu
+      resource_key: linux-x64
+      version: ${{ needs.meta.outputs.version }}
+
+  desktop_macos:
+    name: Desktop macOS arm64
+    needs: [meta]
+    uses: ./.github/workflows/gustaf-release-desktop.yml
+    with:
+      label: macOS arm64
+      runner: macos-15
+      platform: mac
+      target: dmg
+      arch: arm64
+      release_platform: darwin-aarch64
+      rust_target: aarch64-apple-darwin
+      resource_key: darwin-arm64
+      version: ${{ needs.meta.outputs.version }}
+
+  # Windows embeds the Linux CLI archive as its WSL runtime, so it starts once Linux has built it.
+  desktop_windows:
+    name: Desktop Windows x64
+    needs: [meta, desktop_linux]
+    uses: ./.github/workflows/gustaf-release-desktop.yml
+    with:
+      label: Windows x64
+      runner: windows-2025
+      platform: win
+      target: nsis
+      arch: x64
+      release_platform: windows-x86_64
+      rust_target: x86_64-pc-windows-msvc
+      resource_key: win32-x64
+      version: ${{ needs.meta.outputs.version }}
+      wsl_runtime_from_linux: true
+
+  android:
+    name: Android APK
+    needs: [meta]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      APP_VARIANT: production
+      EXPO_NO_DOTENV: "1"
+      EXPO_NO_GIT_STATUS: "1"
+      VERSION: ${{ needs.meta.outputs.version }}
+      TAG: ${{ needs.meta.outputs.tag }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          sparse-checkout: |
+            /*
+            !/.repos/
+          sparse-checkout-cone-mode: false
+      - uses: ./.github/actions/setup-ci-deps
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: gradle/actions/setup-gradle@v5
+      - name: Derive the Android version from the tag
+        id: version
+        run: |
+          set -euo pipefail
+          node --input-type=module -e '
+            const { androidReleaseVersion } = await import(process.argv[1]);
+            const { versionName, versionCode } = androidReleaseVersion(process.argv[2]);
+            console.log(`name=${versionName}\ncode=${versionCode}`);
+          ' "$GITHUB_WORKSPACE/apps/mobile/androidVersion.ts" "$TAG" >> "$GITHUB_OUTPUT"
+      - name: Generate the Android project
+        working-directory: apps/mobile
+        env:
+          GUSTAF_VERSION_NAME: ${{ steps.version.outputs.name }}
+        run: vp exec expo prebuild --platform android --no-install
+      - name: Decode the release keystore
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          set -euo pipefail
+          if [ -z "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "::error::ANDROID_KEYSTORE_BASE64 is not set."
+            exit 1
+          fi
+          umask 077
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/gustaf-release.p12"
+      - name: Build the signed release APK
+        working-directory: apps/mobile/android
+        env:
+          NODE_ENV: production
+          GUSTAF_VERSION_NAME: ${{ steps.version.outputs.name }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        # A PKCS12 keystore has one password for the store and its key. The injected properties
+        # replace the generated project's debug signing for the release variant.
+        run: |
+          set -euo pipefail
+          ./gradlew :app:assembleRelease --no-daemon \
+            -PreactNativeArchitectures=arm64-v8a,armeabi-v7a \
+            -Pandroid.injected.signing.store.file="$RUNNER_TEMP/gustaf-release.p12" \
+            -Pandroid.injected.signing.store.password="$KEYSTORE_PASSWORD" \
+            -Pandroid.injected.signing.key.alias="$KEY_ALIAS" \
+            -Pandroid.injected.signing.key.password="$KEYSTORE_PASSWORD"
+      - name: Verify the APK's signature and version
+        env:
+          VERSION_NAME: ${{ steps.version.outputs.name }}
+          VERSION_CODE: ${{ steps.version.outputs.code }}
+        run: |
+          set -euo pipefail
+          build_tools=$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)
+          mkdir dist
+          apk="dist/Gustaf-$VERSION_NAME-Android.apk"
+          cp apps/mobile/android/app/build/outputs/apk/release/app-release.apk "$apk"
+
+          certs=$("$build_tools/apksigner" verify --print-certs "$apk")
+          # apksigner words the signer line differently across versions, so match the digest text itself.
+          digests=$(sed -n -E 's/^.*certificate SHA-256 digest: //p' <<< "$certs" | sort -u)
+          expected=$(tr -d ':' <<< "$EXPECTED_CERT_SHA256" | tr '[:upper:]' '[:lower:]')
+          if [ "$digests" != "$expected" ]; then
+            echo "::error::APK is not signed with the release key only. Signer digests: ${digests:-none}"
+            exit 1
+          fi
+
+          badging=$("$build_tools/aapt2" dump badging "$apk")
+          grep -qF "package: name='$ANDROID_PACKAGE' versionCode='$VERSION_CODE' versionName='$VERSION_NAME'" <<< "$badging" || {
+            echo "::error::APK identity does not match $ANDROID_PACKAGE $VERSION_NAME ($VERSION_CODE):"
+            grep '^package:' <<< "$badging"
+            exit 1
+          }
+          abis=$(sed -n "s/^native-code: //p" <<< "$badging" | tr -d "'" | tr ' ' '\n' | sort | xargs)
+          if [ "$abis" != "arm64-v8a armeabi-v7a" ]; then
+            echo "::error::APK must contain exactly arm64-v8a and armeabi-v7a native code, got: ${abis:-none}"
+            exit 1
+          fi
+      - name: Write the checksum and latest-android.json
+        env:
+          VERSION_NAME: ${{ steps.version.outputs.name }}
+          VERSION_CODE: ${{ steps.version.outputs.code }}
+        run: |
+          set -euo pipefail
+          name="Gustaf-$VERSION_NAME-Android.apk"
+          (cd dist && sha256sum -- "$name" > "$name.sha256")
+          jq -n \
+            --arg version "$VERSION_NAME" \
+            --argjson versionCode "$VERSION_CODE" \
+            --arg apkUrl "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/download/$TAG/$name" \
+            --arg sha256 "$(cut -d ' ' -f 1 "dist/$name.sha256")" \
+            --argjson size "$(stat -c %s "dist/$name")" \
+            --arg pubDate "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            '{version: $version, versionCode: $versionCode, apkUrl: $apkUrl, sha256: $sha256, size: $size, pubDate: $pubDate}' \
+            > dist/latest-android.json
+          cat dist/latest-android.json
+      - name: Remove the release keystore
+        if: always()
+        run: rm -f "$RUNNER_TEMP/gustaf-release.p12"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: android-release
+          path: dist/*
+          if-no-files-found: error
+          compression-level: 0
+
+  # The only job that holds the update signing key. It checks every file against the public key the
+  # apps carry before anything is published, so a key mismatch fails here, not on a user's machine.
+  release:
+    name: Sign and publish
+    needs: [meta, desktop_linux, desktop_macos, desktop_windows, android]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ needs.meta.outputs.version }}
+      TAG: ${{ needs.meta.outputs.tag }}
+      PUBLISH: ${{ needs.meta.outputs.publish }}
+      GH_TOKEN: ${{ github.token }}
+      GUSTAF_UPDATER_PUBLIC_KEY: ${{ vars.GUSTAF_UPDATER_PUBLIC_KEY || vars.M_CODE_UPDATER_PUBLIC_KEY }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: package.json
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: installers-*
+          path: downloaded
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: android-release
+          path: android
+      - name: Group the files by platform
+        run: |
+          set -euo pipefail
+          mkdir release-assets
+          for dir in downloaded/installers-*; do mv "$dir" "release-assets/${dir##*/installers-}"; done
+          node .github/scripts/gustaf-release.cjs check release-assets "$VERSION"
+      # The Tauri signer writes `<file>.sig`, a minisign signature of the file; the app verifies it.
+      - name: Sign the update files
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "$TAURI_SIGNING_PRIVATE_KEY" || { echo "::error::TAURI_SIGNING_PRIVATE_KEY is not set."; exit 1; }
+          test -n "$GUSTAF_UPDATER_PUBLIC_KEY" || { echo "::error::The updater public key variable is not set."; exit 1; }
+          shopt -s nullglob
+          files=(release-assets/*/*.app.tar.gz release-assets/*/*-setup.exe release-assets/*/*.AppImage)
+          test "${#files[@]}" -eq 3
+          for file in "${files[@]}"; do
+            npx --yes @tauri-apps/cli@2.12.6 signer sign "$file"
+          done
+      - name: Check the signatures against the app's update key
+        run: node .github/scripts/gustaf-release.cjs verify release-assets "$VERSION"
+      - name: Write the release notes
+        run: |
+          set -euo pipefail
+          previous=""
+          if [[ "$PUBLISH" == true ]]; then
+            previous=$(git describe --tags --abbrev=0 --match 'v*.*.*' "$TAG^" 2>/dev/null || true)
+          fi
+          node .github/scripts/gustaf-release.cjs notes "$VERSION" "$previous" "$RUNNER_TEMP/release-notes.md"
+          cat "$RUNNER_TEMP/release-notes.md"
+      - name: Write latest.json
+        run: |
+          node .github/scripts/gustaf-release.cjs manifest release-assets "$VERSION" "$RUNNER_TEMP/release-notes.md"
+          node .github/scripts/gustaf-release.cjs check release-assets "$VERSION" --signed
+          cat release-assets/latest.json
+      - name: Collect the release files
+        run: |
+          set -euo pipefail
+          mkdir publish
+          cp release-assets/*/* release-assets/latest.json android/* publish/
+          # Installers and `gustaf update` check CLI archives against this file.
+          (cd publish && sha256sum -- t3-* > SHA256SUMS)
+          cat publish/SHA256SUMS
+          ls -l publish
+      - name: Keep the files of a dry run
+        if: needs.meta.outputs.publish != 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-files
+          path: publish/*
+          retention-days: 7
+          compression-level: 0
+      # A draft first, so nobody sees `releases/latest/download/latest.json` change before every file is attached.
+      - name: Publish the release
+        if: needs.meta.outputs.publish == 'true'
+        run: |
+          set -euo pipefail
+          if state=$(gh release view "$TAG" --json isDraft --jq .isDraft); then
+            test "$state" = true || { echo "::error::Release $TAG is already published."; exit 1; }
+            gh release edit "$TAG" --notes-file "$RUNNER_TEMP/release-notes.md"
+          else
+            gh release create "$TAG" --draft --verify-tag --title "Gustaf $TAG" --notes-file "$RUNNER_TEMP/release-notes.md"
+          fi
+          gh release upload "$TAG" --clobber publish/*
+          gh release edit "$TAG" --draft=false --latest
