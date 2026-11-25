@@ -242,50 +242,50 @@ const T3_TOOL_SENTENCES: ReadonlyMap<string, T3ToolSentence> = new Map<string, T
     },
   ],
   [
-    "Create\nCreating\nCreated\nT3 threads",
+    "Create\nCreating\nCreated\nGustaf threads",
     {
       detail: msg(
-        "{status, select, inProgress {Creating T3 threads} completed {Created T3 threads} failed {Failed to create T3 threads} declined {Declined to create T3 threads} stopped {Stopped creating T3 threads} other {Creating T3 threads}}",
+        "{status, select, inProgress {Creating Gustaf threads} completed {Created Gustaf threads} failed {Failed to create Gustaf threads} declined {Declined to create Gustaf threads} stopped {Stopped creating Gustaf threads} other {Creating Gustaf threads}}",
       ),
     },
   ],
   [
-    "Start\nStarting\nStarted\na T3 thread",
+    "Start\nStarting\nStarted\na Gustaf thread",
     {
       detail: msg(
-        "{status, select, inProgress {Starting a T3 thread} completed {Started a T3 thread} failed {Failed to start a T3 thread} declined {Declined to start a T3 thread} stopped {Stopped starting a T3 thread} other {Starting a T3 thread}}",
+        "{status, select, inProgress {Starting a Gustaf thread} completed {Started a Gustaf thread} failed {Failed to start a Gustaf thread} declined {Declined to start a Gustaf thread} stopped {Stopped starting a Gustaf thread} other {Starting a Gustaf thread}}",
       ),
     },
   ],
   [
-    "List\nListing\nListed\nT3 threads",
+    "List\nListing\nListed\nGustaf threads",
     {
       detail: msg(
-        "{status, select, inProgress {Listing T3 threads} completed {Listed T3 threads} failed {Failed to list T3 threads} declined {Declined to list T3 threads} stopped {Stopped listing T3 threads} other {Listing T3 threads}}",
+        "{status, select, inProgress {Listing Gustaf threads} completed {Listed Gustaf threads} failed {Failed to list Gustaf threads} declined {Declined to list Gustaf threads} stopped {Stopped listing Gustaf threads} other {Listing Gustaf threads}}",
       ),
     },
   ],
   [
-    "Read\nReading\nRead\na T3 thread",
+    "Read\nReading\nRead\na Gustaf thread",
     {
       detail: msg(
-        "{status, select, inProgress {Reading a T3 thread} completed {Read a T3 thread} failed {Failed to read a T3 thread} declined {Declined to read a T3 thread} stopped {Stopped reading a T3 thread} other {Reading a T3 thread}}",
+        "{status, select, inProgress {Reading a Gustaf thread} completed {Read a Gustaf thread} failed {Failed to read a Gustaf thread} declined {Declined to read a Gustaf thread} stopped {Stopped reading a Gustaf thread} other {Reading a Gustaf thread}}",
       ),
     },
   ],
   [
-    "Send\nSending\nSent\nto a T3 thread",
+    "Send\nSending\nSent\nto a Gustaf thread",
     {
       detail: msg(
-        "{status, select, inProgress {Sending to a T3 thread} completed {Sent to a T3 thread} failed {Failed to send to a T3 thread} declined {Declined to send to a T3 thread} stopped {Stopped sending to a T3 thread} other {Sending to a T3 thread}}",
+        "{status, select, inProgress {Sending to a Gustaf thread} completed {Sent to a Gustaf thread} failed {Failed to send to a Gustaf thread} declined {Declined to send to a Gustaf thread} stopped {Stopped sending to a Gustaf thread} other {Sending to a Gustaf thread}}",
       ),
     },
   ],
   [
-    "Wait\nWaiting\nWaited\nfor a T3 thread",
+    "Wait\nWaiting\nWaited\nfor a Gustaf thread",
     {
       detail: msg(
-        "{status, select, inProgress {Waiting for a T3 thread} completed {Waited for a T3 thread} failed {Failed to wait for a T3 thread} declined {Declined to wait for a T3 thread} stopped {Stopped waiting for a T3 thread} other {Waiting for a T3 thread}}",
+        "{status, select, inProgress {Waiting for a Gustaf thread} completed {Waited for a Gustaf thread} failed {Failed to wait for a Gustaf thread} declined {Declined to wait for a Gustaf thread} stopped {Stopped waiting for a Gustaf thread} other {Waiting for a Gustaf thread}}",
       ),
     },
   ],
@@ -306,10 +306,10 @@ const T3_TOOL_SENTENCES: ReadonlyMap<string, T3ToolSentence> = new Map<string, T
     },
   ],
   [
-    "Interrupt\nInterrupting\nRequested an interrupt of\na T3 thread",
+    "Interrupt\nInterrupting\nRequested an interrupt of\na Gustaf thread",
     {
       detail: msg(
-        "{status, select, inProgress {Interrupting a T3 thread} completed {Requested an interrupt of a T3 thread} failed {Failed to interrupt a T3 thread} declined {Declined to interrupt a T3 thread} stopped {Stopped interrupting a T3 thread} other {Interrupting a T3 thread}}",
+        "{status, select, inProgress {Interrupting a Gustaf thread} completed {Requested an interrupt of a Gustaf thread} failed {Failed to interrupt a Gustaf thread} declined {Declined to interrupt a Gustaf thread} stopped {Stopped interrupting a Gustaf thread} other {Interrupting a Gustaf thread}}",
       ),
     },
   ],
@@ -682,10 +682,10 @@ const T3_TOOL_SENTENCES: ReadonlyMap<string, T3ToolSentence> = new Map<string, T
     },
   ],
   [
-    "Update\nUpdating\nUpdated\nT3 thread metadata",
+    "Update\nUpdating\nUpdated\nGustaf thread metadata",
     {
       detail: msg(
-        "{status, select, inProgress {Updating T3 thread metadata} completed {Updated T3 thread metadata} failed {Failed to update T3 thread metadata} declined {Declined to update T3 thread metadata} stopped {Stopped updating T3 thread metadata} other {Updating T3 thread metadata}}",
+        "{status, select, inProgress {Updating Gustaf thread metadata} completed {Updated Gustaf thread metadata} failed {Failed to update Gustaf thread metadata} declined {Declined to update Gustaf thread metadata} stopped {Stopped updating Gustaf thread metadata} other {Updating Gustaf thread metadata}}",
       ),
     },
   ],
