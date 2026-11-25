@@ -50,6 +50,7 @@ import { toolOutputImages } from "@t3tools/shared/toolOutput";
 import { resolveAttachmentPathById } from "../../attachmentStore.ts";
 import * as Fiber from "effect/Fiber";
 import * as Layer from "effect/Layer";
+import * as Logger from "effect/Logger";
 import * as PubSub from "effect/PubSub";
 import * as Queue from "effect/Queue";
 import * as Ref from "effect/Ref";
@@ -1735,6 +1736,7 @@ describe("CodexAdapterV2 post-settle continuation", () => {
     promptSuggestions: Effect.Effect<boolean> = Effect.succeed(false),
     onNotification: (method: string) => Effect.Effect<void> = () => Effect.void,
     models?: CodexAdapterV2.CodexAdapterV2Options["models"],
+    awaitServerReady?: CodexAdapterV2.CodexAdapterV2Options["awaitServerReady"],
   ) =>
     Effect.gen(function* () {
       const fileSystem = yield* FileSystem.FileSystem;
@@ -1799,6 +1801,7 @@ describe("CodexAdapterV2 post-settle continuation", () => {
         clientFactory,
         ...(onUsageLimits ? { onUsageLimits } : {}),
         ...(models ? { models } : {}),
+        ...(awaitServerReady ? { awaitServerReady } : {}),
         digest: yield* Digest.Digest,
         fileSystem,
         idAllocator,
@@ -2814,6 +2817,141 @@ describe("CodexAdapterV2 post-settle continuation", () => {
       ),
     ),
   );
+
+  describe("waiting for the server to serve /mcp", () => {
+    // Codex sends the MCP initialize once; /mcp answers 503 until the server serves.
+    const startThreadWith = (scenario: string, awaitServerReady: Effect.Effect<void>) =>
+      Effect.gen(function* () {
+        yield* (yield* McpProviderSessions.McpProviderSessions).set({
+          environmentId: EnvironmentId.make("environment-codex-mcp"),
+          threadId: ThreadId.make(`thread-${scenario}`),
+          providerSessionId: `provider-session-${scenario}`,
+          providerInstanceId: ProviderInstanceId.make("codex"),
+          endpoint: "http://127.0.0.1:43123/mcp",
+          authorizationHeader: "Bearer secret-codex-token",
+          browserToolsAvailable: true,
+        });
+        const requests: Array<string> = [];
+        const preamble = codexReplayPreamble({
+          nativeThreadId: "launch-mcp-thread",
+          nativeTurnId: "unused",
+          prompt: "unused",
+        });
+        return {
+          requests,
+          start: makeCodexReplayHarness(
+            makeCodexReplayTranscript({
+              scenario,
+              entries: [
+                ...preamble.slice(0, 3),
+                {
+                  type: "expect_outbound",
+                  label: "config/read",
+                  frame: { id: 2, method: "config/read", params: { includeLayers: false } },
+                },
+                {
+                  type: "emit_inbound",
+                  label: "config/read",
+                  frame: { id: 2, result: { config: { mcp_servers: {} }, origins: {} } },
+                },
+                ...preamble.slice(3, 5).map((entry) => withReplayRequestId(entry, 3)),
+              ],
+            }),
+            () => Effect.void,
+            (method) => Effect.sync(() => void requests.push(method)),
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            awaitServerReady,
+          ),
+        };
+      });
+    const provide = Effect.provide(
+      Layer.mergeAll(
+        IdAllocator.layer,
+        McpProviderSessions.layer,
+        NodeServices.layer,
+        NodeCrypto.layer,
+      ),
+    );
+
+    it.effect("holds thread/start until the server serves, then starts it", () =>
+      Effect.gen(function* () {
+        const waiting = yield* Deferred.make<void>();
+        const serving = yield* Deferred.make<void>();
+        const { requests, start } = yield* startThreadWith(
+          "launch-mcp-waits-for-server",
+          Deferred.succeed(waiting, undefined).pipe(Effect.andThen(Deferred.await(serving))),
+        );
+        const started = yield* Effect.forkScoped(start);
+        yield* Deferred.await(waiting);
+        assert.notInclude(requests, "thread/start");
+        yield* Deferred.succeed(serving, undefined);
+        yield* Fiber.join(started);
+        assert.equal(requests.filter((method) => method === "thread/start").length, 1);
+      }).pipe(Effect.scoped, provide),
+    );
+
+    it.effect("starts the thread without waiting once the server already serves", () =>
+      Effect.gen(function* () {
+        // A wait would sleep on the TestClock, which nothing here advances.
+        const { requests, start } = yield* startThreadWith(
+          "launch-mcp-already-serving",
+          Effect.void,
+        );
+        yield* start;
+        assert.equal(requests.filter((method) => method === "thread/start").length, 1);
+      }).pipe(Effect.scoped, provide),
+    );
+
+    it.effect("gives up on a server that never serves and starts the thread", () => {
+      const warnings: Array<unknown> = [];
+      const logger = Logger.make(({ message, logLevel }) => {
+        if (logLevel === "Warn") warnings.push(message);
+      });
+      return Effect.gen(function* () {
+        const waiting = yield* Deferred.make<void>();
+        const { requests, start } = yield* startThreadWith(
+          "launch-mcp-never-serves",
+          Deferred.succeed(waiting, undefined).pipe(Effect.andThen(Effect.never)),
+        );
+        const started = yield* Effect.forkScoped(start);
+        yield* Deferred.await(waiting);
+        assert.notInclude(requests, "thread/start");
+        yield* TestClock.adjust("10 seconds");
+        yield* Fiber.join(started);
+        assert.equal(requests.filter((method) => method === "thread/start").length, 1);
+        assert.equal(warnings.length, 1);
+      }).pipe(
+        Effect.scoped,
+        provide,
+        Effect.provide(Logger.layer([logger], { mergeWithExisting: false })),
+      );
+    });
+
+    it.effect("stops waiting after the first timeout", () => {
+      const warnings: Array<unknown> = [];
+      const logger = Logger.make(({ message, logLevel }) => {
+        if (logLevel === "Warn") warnings.push(message);
+      });
+      return Effect.gen(function* () {
+        const waiting = yield* Deferred.make<void>();
+        const gate = CodexAdapterV2.makeCodexMcpServingGate(
+          Deferred.succeed(waiting, undefined).pipe(Effect.andThen(Effect.never)),
+        );
+        const first = yield* Effect.forkScoped(gate);
+        yield* Deferred.await(waiting);
+        yield* TestClock.adjust("10 seconds");
+        yield* Fiber.join(first);
+        // Nothing advances the clock again, so a second wait would hang.
+        yield* gate;
+        assert.equal(warnings.length, 1);
+      }).pipe(Effect.scoped, Effect.provide(Logger.layer([logger], { mergeWithExisting: false })));
+    });
+  });
 
   it.effect("hands user MCP servers to the thread with their disabled tools", () =>
     Effect.gen(function* () {

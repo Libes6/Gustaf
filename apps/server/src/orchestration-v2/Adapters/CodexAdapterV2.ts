@@ -136,6 +136,7 @@ import { codexAppServerArgs, resolveCodexLaunchArgs } from "../../provider/codex
 import { mergeProviderInstanceEnvironment } from "@t3tools/provider-core/server/instanceEnvironment";
 import * as McpProviderSession from "@t3tools/provider-core/server/mcpSession";
 import * as McpProviderSessions from "@t3tools/provider-core/server/McpProviderSessions";
+import * as ProviderHost from "@t3tools/provider-core/server/ProviderHost";
 import {
   MCP_APP_EXTENSION_ID,
   MCP_APP_MIME_TYPE,
@@ -1683,6 +1684,39 @@ const CODEX_T3_MCP_TOOL_TIMEOUT_SEC = 65 * 60;
 const CODEX_T3_DIRECT_MCP_SERVER = "t3-code-direct";
 const CODEX_DIRECT_ONLY_T3_TOOLS = ["t3_thread_wait", "delegate_task"];
 
+// Longer than a normal start, short enough that a server which never serves cannot hold a thread.
+const CODEX_MCP_SERVING_WAIT = "10 seconds";
+
+/**
+ * Codex sends the MCP `initialize` once when a thread starts and never retries, but `/mcp`
+ * answers 503 until the server serves. Holds a thread's start until then. A server that never
+ * serves is given up on once: the wait ends, one warning is logged, and later starts go straight on.
+ */
+export const makeCodexMcpServingGate = (
+  awaitServerReady: Effect.Effect<void> | undefined,
+): Effect.Effect<void> => {
+  if (awaitServerReady === undefined) return Effect.void;
+  let gaveUp = false;
+  return Effect.suspend(() =>
+    gaveUp
+      ? Effect.void
+      : awaitServerReady.pipe(
+          Effect.timeoutOption(CODEX_MCP_SERVING_WAIT),
+          Effect.flatMap(
+            Option.match({
+              onSome: () => Effect.void,
+              onNone: () => {
+                gaveUp = true;
+                return Effect.logWarning(
+                  `The server was not serving after ${CODEX_MCP_SERVING_WAIT}; starting Codex threads without waiting, so their Gustaf MCP servers may fail to start.`,
+                );
+              },
+            }),
+          ),
+        ),
+  );
+};
+
 /** Names of the stdio MCP servers in a `config/read` config, the ones Codex starts per thread. */
 function codexStdioMcpServerNames(mcpServers: unknown): ReadonlyArray<string> {
   if (mcpServers === null || typeof mcpServers !== "object") return [];
@@ -2056,11 +2090,13 @@ export const createCodexAdapterV2 = Effect.fn("CodexAdapterV2.createCodexAdapter
   { instanceId, environment, enabled, config }: ProviderAdapterDriverCreateInput<CodexSettings>,
   hooks: Pick<
     CodexAdapterV2Options,
-    "onUsageLimits" | "resolveRuntime" | "compatibility" | "models"
+    "onUsageLimits" | "resolveRuntime" | "compatibility" | "models" | "awaitServerReady"
   > = {},
 ) {
   const clientFactory = yield* CodexAppServerClientFactory;
   const continuationRequests = yield* ProviderContinuationRequests.ProviderContinuationRequests;
+  // Optional like the other host hooks: hosts built without a lifecycle still construct.
+  const host = yield* Effect.serviceOption(ProviderHost.ProviderHost);
   const digest = yield* Digest.Digest;
   const fileSystem = yield* FileSystem.FileSystem;
   const hostEnvironment = yield* HostProcess.Environment;
@@ -2100,6 +2136,9 @@ export const createCodexAdapterV2 = Effect.fn("CodexAdapterV2.createCodexAdapter
     serverConfig,
     continuationRequests,
     watchCommandStops: portDiscovery.watchAgentCommandStops,
+    ...(Option.isSome(host) && host.value.awaitServerReady !== undefined
+      ? { awaitServerReady: host.value.awaitServerReady }
+      : {}),
     ...hooks,
   });
 });
@@ -2120,6 +2159,8 @@ export interface CodexAdapterV2Options {
   readonly fileSystem: FileSystem.FileSystem;
   readonly idAllocator: IdAllocator.IdAllocatorV2["Service"];
   readonly serverConfig: ServerConfig["Service"];
+  /** Completes once the server serves `/mcp`; omitting it starts threads without waiting. */
+  readonly awaitServerReady?: Effect.Effect<void>;
   /** Omitting this leaves late completions projection-only. */
   readonly continuationRequests?: {
     readonly offer: (
@@ -2134,8 +2175,14 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
   adapterOptions: CodexAdapterV2Options,
 ) {
   const mcpSessions = yield* McpProviderSessions.McpProviderSessions;
+  const awaitMcpServing = makeCodexMcpServingGate(adapterOptions.awaitServerReady);
+  // Every read that feeds codexThreadRuntimeParams, so Codex never starts the MCP servers early.
   const readMcpSession = (threadId: ThreadId | null) =>
-    threadId === null ? Effect.undefined : mcpSessions.read(threadId);
+    threadId === null
+      ? Effect.undefined
+      : mcpSessions
+          .read(threadId)
+          .pipe(Effect.tap((session) => (session === undefined ? Effect.void : awaitMcpServing)));
   const { clientFactory, digest, fileSystem, idAllocator, serverConfig } = adapterOptions;
   const continuationRequests = adapterOptions.continuationRequests;
 
@@ -8357,7 +8404,7 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
               Effect.andThen(ensureInitialized),
               Effect.andThen(
                 Effect.all([
-                  mcpSessions.read(threadInput.threadId),
+                  readMcpSession(threadInput.threadId),
                   readStdioMcpServers(threadInput.runtimePolicy.cwd),
                 ]),
               ),
@@ -9470,7 +9517,7 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
                 ...(boundary.lastTurnId === undefined ? {} : { lastTurnId: boundary.lastTurnId }),
                 ...codexThreadRuntimeParams({
                   threadId: threadInput.targetThreadId,
-                  mcpSession: yield* mcpSessions.read(threadInput.targetThreadId),
+                  mcpSession: yield* readMcpSession(threadInput.targetThreadId),
                   stdioMcpServers: yield* readStdioMcpServers(threadInput.runtimePolicy?.cwd),
                   ...(threadInput.modelSelection === undefined
                     ? {}
