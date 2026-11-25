@@ -1,8 +1,9 @@
 import type { DesktopBridge, DesktopUpdateState } from "@t3tools/contracts";
+import { GUSTAF_ISSUES_URL, GUSTAF_LATEST_RELEASE_URL } from "@t3tools/shared/gustafService";
 
 const FALLBACK_TRIAGE_COMMAND = "npx t3 triage";
-const DOWNLOAD_URL = "https://t3.codes/download";
-const ISSUE_URL = "https://github.com/pingdotgg/t3code/issues/new";
+const DOWNLOAD_URL = GUSTAF_LATEST_RELEASE_URL;
+const ISSUE_URL = `${GUSTAF_ISSUES_URL}/new`;
 const LAST_FAILURE_KEY = "t3code:boot-failed-at";
 const REPEAT_FAILURE_MS = 5 * 60_000;
 const MAX_CAUSES = 3;

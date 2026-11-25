@@ -65,12 +65,10 @@ function retryDelayMs(failures: number, random: number): number {
 }
 
 const TelemetryEnvConfig = Config.all({
-  posthogKey: Config.String("T3CODE_POSTHOG_KEY").pipe(
-    Config.withDefault("phc_XOWci4oZP4VvLiEyrFqkFjP4CZn55mjYYBMREK5Wd6m"),
-  ),
-  posthogHost: Config.String("T3CODE_POSTHOG_HOST").pipe(
-    Config.withDefault("https://ingest.t3.codes"),
-  ),
+  // Gustaf has no product analytics of its own, so there is no built-in key or host: events are
+  // sent only when the operator sets both.
+  posthogKey: Config.String("T3CODE_POSTHOG_KEY").pipe(Config.option),
+  posthogHost: Config.String("T3CODE_POSTHOG_HOST").pipe(Config.option),
   enabled: Config.Boolean("T3CODE_TELEMETRY_ENABLED").pipe(Config.withDefault(true)),
   flushBatchSize: Config.Number("T3CODE_TELEMETRY_FLUSH_BATCH_SIZE").pipe(Config.withDefault(20)),
   maxBufferedEvents: Config.Number("T3CODE_TELEMETRY_MAX_BUFFERED_EVENTS").pipe(
@@ -147,7 +145,12 @@ export const telemetryConsent = Effect.gen(function* () {
 /** @public */
 export const make = Effect.gen(function* () {
   const telemetryConfig = yield* TelemetryEnvConfig;
-  const telemetryEnabled = yield* telemetryConsent;
+  const posthogTarget =
+    Option.isSome(telemetryConfig.posthogKey) && Option.isSome(telemetryConfig.posthogHost)
+      ? { key: telemetryConfig.posthogKey.value, host: telemetryConfig.posthogHost.value }
+      : undefined;
+  const consent = yield* telemetryConsent;
+  const telemetryEnabled = posthogTarget === undefined ? Effect.succeed(false) : consent;
   const httpClient = yield* HttpClient.HttpClient;
   const serverConfig = yield* ServerConfig.ServerConfig;
   const { distinctId, installId } = yield* getTelemetryIdentity;
@@ -204,10 +207,10 @@ export const make = Effect.gen(function* () {
   const sendBatch = Effect.fn("AnalyticsService.sendBatch")(function* (
     events: ReadonlyArray<BufferedAnalyticsEvent>,
   ) {
-    if (!(yield* telemetryEnabled) || !distinctId) return;
+    if (!(yield* telemetryEnabled) || !distinctId || posthogTarget === undefined) return;
 
     const payload = {
-      api_key: telemetryConfig.posthogKey,
+      api_key: posthogTarget.key,
       batch: events.map((event) => ({
         uuid: event.uuid,
         event: event.event,
@@ -232,7 +235,7 @@ export const make = Effect.gen(function* () {
       })),
     };
 
-    yield* HttpClientRequest.post(`${telemetryConfig.posthogHost}/batch/`).pipe(
+    yield* HttpClientRequest.post(`${posthogTarget.host}/batch/`).pipe(
       HttpClientRequest.bodyJson(payload),
       Effect.flatMap(httpClient.execute),
       Effect.flatMap(HttpClientResponse.filterStatusOk),

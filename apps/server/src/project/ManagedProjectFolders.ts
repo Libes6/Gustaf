@@ -6,6 +6,7 @@ import {
   type ThreadId,
   VcsProcessSpawnError,
 } from "@t3tools/contracts";
+import { GUSTAF_REPOSITORY_URL } from "@t3tools/shared/gustafService";
 import { foldLatinDiacritics, newProjectFolderName } from "@t3tools/shared/path";
 import * as Cause from "effect/Cause";
 import * as Context from "effect/Context";
@@ -199,7 +200,7 @@ function namedProjectReadme(name: string): string {
     "",
     `# ${name}`,
     "",
-    "Created in [T3 Code](https://t3.codes).",
+    `Created in [Gustaf](${GUSTAF_REPOSITORY_URL}).`,
     "",
   ].join("\n");
 }

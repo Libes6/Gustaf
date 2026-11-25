@@ -21,6 +21,21 @@ type Environment = Readonly<Record<string, string | undefined>>;
 
 const REPO_ROOT = NodePath.resolve(NodeURL.fileURLToPath(import.meta.url), "../../..");
 
+// Gustaf ships none of T3 Connect: its Clerk sign-in, relay, and trace exporters belong to T3's
+// services (the Gustaf account and `gustaf relay` replace them). No .env file, CI variable, or
+// process env may bake these into a build, so they are dropped here for every consumer. The macOS
+// passkey RP domains only shape the signing entitlements and reach no bundle, so they stay.
+const T3_SERVICE_ENV_PATTERN =
+  /^(?:T3CODE_(?:CLERK_(?!PASSKEY_RP_DOMAINS$)|RELAY_URL$|RELAY_CLIENT_OTLP_|MOBILE_OTLP_)|VITE_(?:CLERK_|T3CODE_RELAY_URL$|RELAY_OTLP_)|EXPO_PUBLIC_(?:CLERK_|OTLP_))/u;
+
+function withoutT3Service(
+  env: Record<string, string | undefined>,
+): Record<string, string | undefined> {
+  return Object.fromEntries(
+    Object.entries(env).filter(([name]) => !T3_SERVICE_ENV_PATTERN.test(name)),
+  );
+}
+
 export function loadRepoEnv({
   baseEnv = process.env,
   repoRoot = REPO_ROOT,
@@ -32,7 +47,7 @@ export function loadRepoEnv({
   const localEnv = readEnvFile(NodePath.join(repoRoot, ".env.local"));
   const config = resolvePublicConfig(baseEnv, localEnv, rootEnv);
 
-  return {
+  return withoutT3Service({
     ...rootEnv,
     ...localEnv,
     ...baseEnv,
@@ -98,7 +113,7 @@ export function loadRepoEnv({
           VITE_RELAY_OTLP_TRACES_TOKEN: config.relayClientOtlpTracesToken,
         }
       : {}),
-  };
+  });
 }
 
 function resolvePublicConfig(...sources: readonly Environment[]): T3CodePublicConfig {

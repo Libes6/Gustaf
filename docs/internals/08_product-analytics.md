@@ -26,6 +26,10 @@ an authenticated connection does not count as product use.
 
 ## Collection boundary and delivery
 
+Gustaf has no PostHog project: `AnalyticsService` has no built-in key or host and records nothing
+unless the operator sets both `T3CODE_POSTHOG_KEY` and `T3CODE_POSTHOG_HOST`. Gustaf's own usage
+totals go through `AiUsageReporter` to Gustaf Cloud instead.
+
 - Payloads stay strictly to product metadata, closed contract enums, and normalized measurements:
   never attach prompts, file paths, credentials, raw provider payloads, device names, conversation
   IDs, or user-named provider instance IDs. Model IDs are reported as the provider used them,
