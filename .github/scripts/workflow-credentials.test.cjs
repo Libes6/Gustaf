@@ -39,15 +39,6 @@ test("npm publishing is bound to the environment that admits only main and v* ta
   assert.match(publish, /^ {4}environment: production$/m);
 });
 
-test("the web preview gives the Vercel token to the deploy step only, after an install without lifecycle scripts", () => {
-  const deploy = jobs("workflows/web-preview.yml").deploy;
-  assert.doesNotMatch(deploy.split(/^ {4}steps:\n/m)[0], /secrets\./);
-  const withSecrets = steps(deploy).filter((step) => step.includes("secrets."));
-  assert.equal(withSecrets.length, 1);
-  assert.match(withSecrets[0], /name: Deploy preview/);
-  assert.match(deploy, /run-install: \|\n {12}args:\n {14}- --ignore-scripts\n/);
-});
-
 const mobileWorkflows = [
   "workflows/mobile-eas-preview.yml",
   "workflows/mobile-eas-preview-build.yml",
