@@ -1,0 +1,127 @@
+name: Gustaf Admin
+
+on:
+  pull_request:
+    paths:
+      - "apps/admin/**"
+      - ".github/workflows/admin.yml"
+  push:
+    branches: [dev]
+    paths:
+      - "apps/admin/**"
+      - ".github/workflows/admin.yml"
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: Deploy the checked image to Coolify production (dev branch only)
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: admin-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  image:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.image.outputs.name }}
+      tag: ${{ steps.image.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: docker/setup-buildx-action@v3
+      - name: Image reference
+        id: image
+        env:
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          echo "name=ghcr.io/${REPOSITORY,,}/admin" >> "$GITHUB_OUTPUT"
+          echo "tag=sha-${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+      # The build stage runs the unit tests before `vite build`.
+      - name: Build, test and package
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/admin/Dockerfile
+          load: true
+          tags: gustaf-admin:local
+          build-args: VITE_API_URL=https://api.libes6.ru
+          cache-from: type=gha,scope=admin
+          cache-to: type=gha,mode=max,scope=admin
+      - name: Verify the image serves the SPA with its headers
+        run: |
+          set -euo pipefail
+          docker run -d --name admin-ci -p 127.0.0.1:8080:80 gustaf-admin:local
+          trap 'docker rm -f admin-ci >/dev/null' EXIT
+          for _ in $(seq 1 20); do curl -fsS http://127.0.0.1:8080/healthz >/dev/null && break; sleep 1; done
+          headers=$(curl -fsS -D - -o /dev/null http://127.0.0.1:8080/users/some-id)
+          echo "$headers"
+          grep -qi '^content-security-policy:.*connect-src .self. https://api.libes6.ru' <<<"$headers"
+          grep -qi '^x-frame-options: DENY' <<<"$headers"
+          grep -qi '^cache-control: no-cache' <<<"$headers"
+          asset=$(curl -fsS http://127.0.0.1:8080/ | grep -o '/assets/[^"]*\.js' | head -1)
+          curl -fsS -D - -o /dev/null "http://127.0.0.1:8080$asset" | grep -qi '^cache-control: .*immutable'
+      - name: Log in to GHCR
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish checked image
+        if: github.event_name != 'pull_request'
+        env:
+          IMAGE: ${{ steps.image.outputs.name }}
+          TAG: ${{ steps.image.outputs.tag }}
+        run: |
+          docker tag gustaf-admin:local "$IMAGE:$TAG"
+          docker push "$IMAGE:$TAG"
+          echo "Published: \`$IMAGE:$TAG\` (linux/amd64)" >> "$GITHUB_STEP_SUMMARY"
+
+  deploy:
+    if: github.ref == 'refs/heads/dev' && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.deploy))
+    needs: image
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    environment: cloud-production
+    concurrency:
+      group: admin-production-deploy
+      cancel-in-progress: false
+    steps:
+      - name: Select image and request Coolify deployment
+        env:
+          COOLIFY_URL: ${{ vars.COOLIFY_URL }}
+          COOLIFY_APP_UUID: ${{ vars.COOLIFY_ADMIN_APP_UUID }}
+          COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
+          IMAGE: ${{ needs.image.outputs.image }}
+          TAG: ${{ needs.image.outputs.tag }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$COOLIFY_APP_UUID" ]]; then
+            echo "::notice::COOLIFY_ADMIN_APP_UUID is not set; skipping the admin deployment."
+            echo "Admin deploy skipped: set the variable \`COOLIFY_ADMIN_APP_UUID\` (see docs/operations/admin.md)." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          : "${COOLIFY_URL:?Set cloud-production variable COOLIFY_URL}"
+          : "${COOLIFY_TOKEN:?Set cloud-production secret COOLIFY_TOKEN}"
+          [[ "$COOLIFY_URL" == https://* ]] || { echo "COOLIFY_URL must use HTTPS"; exit 1; }
+          [[ "$COOLIFY_APP_UUID" =~ ^[a-zA-Z0-9_-]+$ ]] || exit 1
+          API="${COOLIFY_URL%/}/api/v1"
+          BODY=$(jq -nc --arg image "$IMAGE" --arg tag "$TAG" '{docker_registry_image_name:$image,docker_registry_image_tag:$tag}')
+          curl --silent --show-error --fail --connect-timeout 10 --max-time 60 \
+            --request PATCH "$API/applications/$COOLIFY_APP_UUID" \
+            --header "Authorization: Bearer $COOLIFY_TOKEN" \
+            --header 'Content-Type: application/json' --data "$BODY" --output /dev/null
+          curl --silent --show-error --fail --connect-timeout 10 --max-time 60 \
+            --request POST "$API/deploy" \
+            --header "Authorization: Bearer $COOLIFY_TOKEN" \
+            --header 'Content-Type: application/json' \
+            --data "$(jq -nc --arg uuid "$COOLIFY_APP_UUID" '{uuid:$uuid,force:false}')" --output /dev/null
+          echo "Coolify accepted deployment request for \`$IMAGE:$TAG\`. Verify completion in Coolify and at https://admin.libes6.ru/healthz." >> "$GITHUB_STEP_SUMMARY"
