@@ -29,6 +29,7 @@ import * as ThreadSearch from "../../../orchestration-v2/ThreadSearch.ts";
 import * as ScheduledTaskService from "../../../scheduledTasks/ScheduledTaskService.ts";
 import * as ThreadManagementService from "../../../orchestration-v2/ThreadManagementService.ts";
 import * as McpInvocationContext from "../../McpInvocationContext.ts";
+import { hiddenFromSubagentsTool } from "../hiddenFromSubagentsTool.ts";
 
 const ThreadOrganizeTool = Tool.make("t3_thread_organize", {
   description:
@@ -255,12 +256,12 @@ const SubmitOutputTool = Tool.make("t3_submit_output", {
   .annotate(McpSchema.EnabledWhen, McpInvocationContext.hiddenFromOutsideClients);
 
 export const ThreadToolkit = Toolkit.make(
-  ScheduledTaskRunTool,
-  ThreadSearchTool,
-  ThreadConfigureTool,
-  ThreadTransferTool,
-  ThreadOrganizeTool,
-  PendingRequestTool,
-  QueueTool,
+  hiddenFromSubagentsTool(ScheduledTaskRunTool),
+  hiddenFromSubagentsTool(ThreadSearchTool),
+  hiddenFromSubagentsTool(ThreadConfigureTool),
+  hiddenFromSubagentsTool(ThreadTransferTool),
+  hiddenFromSubagentsTool(ThreadOrganizeTool),
+  hiddenFromSubagentsTool(PendingRequestTool),
+  hiddenFromSubagentsTool(QueueTool),
   SubmitOutputTool,
 );

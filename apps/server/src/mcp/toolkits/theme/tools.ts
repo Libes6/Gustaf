@@ -10,6 +10,7 @@ import * as EnvironmentTheme from "../../../environmentTheme.ts";
 import * as McpInvocationContext from "../../McpInvocationContext.ts";
 import * as ThreadCommandExecutor from "../../../orchestration-v2/ThreadCommandExecutor.ts";
 import * as ThreadManagementService from "../../../orchestration-v2/ThreadManagementService.ts";
+import { hiddenFromSubagentsTool } from "../hiddenFromSubagentsTool.ts";
 
 const Appearance = Schema.Literals(["light", "dark", "system"]);
 
@@ -68,4 +69,7 @@ const ThemeSetTool = Tool.make("t3_theme_set", {
   }),
 }).annotate(Tool.Destructive, true);
 
-export const ThemeToolkit = Toolkit.make(ThemeReadTool, ThemeSetTool);
+export const ThemeToolkit = Toolkit.make(
+  hiddenFromSubagentsTool(ThemeReadTool),
+  hiddenFromSubagentsTool(ThemeSetTool),
+);

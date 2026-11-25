@@ -12,6 +12,7 @@ import { Tool, Toolkit } from "effect/ai";
 import * as ThreadManagementService from "../../../orchestration-v2/ThreadManagementService.ts";
 import * as SubscriptionService from "../../../subscriptions/SubscriptionService.ts";
 import * as McpInvocationContext from "../../McpInvocationContext.ts";
+import { hiddenFromSubagentsTool } from "../hiddenFromSubagentsTool.ts";
 
 const SubscriptionWithNextCharge = Schema.Struct({
   ...Subscription.fields,
@@ -97,7 +98,7 @@ const SubscriptionsDeleteTool = Tool.make("t3_subscriptions_delete", {
   .annotate(Tool.Destructive, true);
 
 export const SubscriptionsToolkit = Toolkit.make(
-  SubscriptionsListTool,
-  SubscriptionsUpsertTool,
-  SubscriptionsDeleteTool,
+  hiddenFromSubagentsTool(SubscriptionsListTool),
+  hiddenFromSubagentsTool(SubscriptionsUpsertTool),
+  hiddenFromSubagentsTool(SubscriptionsDeleteTool),
 );

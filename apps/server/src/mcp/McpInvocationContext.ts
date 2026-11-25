@@ -205,6 +205,16 @@ export const hiddenFromSubagents = (): boolean => {
 };
 
 /**
+ * `hiddenFromOutsideClients`, and hidden from a delegated child as well: tools that start
+ * unrelated top-level work, which a child hands back to its parent instead.
+ */
+export const hiddenFromOutsideClientsAndSubagents = (): boolean => {
+  const fiber = Fiber.getCurrent();
+  const scope = fiber && Context.getOrUndefined(fiber.context, McpInvocationContext);
+  return scope === undefined || (scope.thread !== undefined && scope.thread.subagent !== true);
+};
+
+/**
  * `McpSchema.EnabledWhen` for tools that act as the calling thread: a client
  * from outside has none. Discovery only; `McpToolAccess` still refuses the
  * call, and `toLayer` requires this on every thread-bound declaration.
@@ -259,6 +269,13 @@ export const hiddenFromThreads = (): boolean => {
   const fiber = Fiber.getCurrent();
   const scope = fiber && Context.getOrUndefined(fiber.context, McpInvocationContext);
   return scope?.thread === undefined;
+};
+
+/** `hiddenWhileLinksOff`, and hidden from a delegated child, which has no machines of its own to link. */
+export const hiddenWhileLinksOffOrFromSubagents = (): boolean => {
+  const fiber = Fiber.getCurrent();
+  const scope = fiber && Context.getOrUndefined(fiber.context, McpInvocationContext);
+  return scope?.linkedEnvironments !== false && scope?.thread?.subagent !== true;
 };
 
 /** `McpSchema.EnabledWhen` for tools that only serve links, hidden while the beta is off. */

@@ -3,6 +3,7 @@ import * as KeyedLock from "@t3tools/shared/KeyedLock";
 import { resolveProjectSettings } from "@t3tools/shared/projectSettings";
 import {
   CommandId,
+  isDelegatedAppThread,
   isOrchestrationV2WorkActive,
   McpServerId,
   ModelSelection,
@@ -770,7 +771,7 @@ export const layerWithOptions = (
                   capabilities.add("background-wait");
                 }
                 const subagent = yield* projectionStore.getThread(threadId).pipe(
-                  Effect.map((thread) => thread.lineage.relationshipToParent === "subagent"),
+                  Effect.map(isDelegatedAppThread),
                   Effect.orElseSucceed(() => false),
                 );
                 const {
