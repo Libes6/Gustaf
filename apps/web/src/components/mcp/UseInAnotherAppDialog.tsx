@@ -100,7 +100,9 @@ function UseInAnotherAppDialog({ requested }: { readonly requested: EnvironmentI
                 title={
                   environment === null
                     ? gt("Connect to an environment first.")
-                    : gt("T3 Connect is not available in this build.")
+                    : gt(
+                        "Connecting another app needs a public address, which this build cannot create.",
+                      )
                 }
               />
             </WizardPanel>

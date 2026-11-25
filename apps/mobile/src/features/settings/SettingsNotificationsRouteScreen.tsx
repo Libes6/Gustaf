@@ -197,7 +197,7 @@ export function SettingsNotificationsRouteScreen() {
           contentContainerClassName="px-5 pt-4"
         >
           <Text className="text-base text-foreground-muted">
-            {gt("Notifications require {product} in this app build.", { product: "T3 Connect" })}
+            {gt("Notifications are not available in this app build.")}
           </Text>
         </ScrollView>
       </SettingsScreen>

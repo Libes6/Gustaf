@@ -73,7 +73,7 @@ export function WorktreesDirectoryRow() {
     <SettingsRow
       {...setting("storage-worktrees-location")}
       description={gt(
-        "Folder where new worktrees are created, on any drive, such as D:\\worktrees or ~/worktrees. Existing worktrees stay where they are. Leave empty to use the T3 home folder.",
+        "Folder where new worktrees are created, on any drive, such as D:\\worktrees or ~/worktrees. Existing worktrees stay where they are. Leave empty to use the Gustaf data folder (~/.t3).",
       )}
       serverScoped
       settingKeys={["worktreesDirectory"]}

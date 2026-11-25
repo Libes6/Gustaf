@@ -287,7 +287,7 @@ export const layer = Layer.effect(
         DesktopHomeOwner.readLiveHomeOwner().pipe(
           Effect.flatMap((owner) =>
             electronDialog.showErrorBox(
-              m(msg("This T3 home is unavailable")),
+              m(msg("This Gustaf data folder is unavailable")),
               DesktopHomeOwner.homeOwnedMessage(owner),
             ),
           ),
