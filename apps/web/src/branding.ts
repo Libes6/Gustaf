@@ -15,6 +15,9 @@ function readInjectedDesktopAppBranding(): DesktopAppBranding | null {
 }
 
 const injectedDesktopAppBranding = readInjectedDesktopAppBranding();
+// The web bundle's version is the server package's, not the installed desktop app's.
+const injectedDesktopAppVersion =
+  typeof window === "undefined" ? null : (window.desktopBridge?.getAppVersion?.() ?? null);
 const hostedAppChannel = import.meta.env.VITE_HOSTED_APP_CHANNEL?.trim().toLowerCase();
 
 export const HOSTED_APP_CHANNEL =
@@ -30,7 +33,7 @@ export const APP_STAGE_LABEL =
 export const APP_DISPLAY_NAME =
   injectedDesktopAppBranding?.displayName ??
   formatAppDisplayName({ baseName: APP_BASE_NAME, stageLabel: APP_STAGE_LABEL });
-export const APP_VERSION = import.meta.env.APP_VERSION || "0.0.0";
+export const APP_VERSION = injectedDesktopAppVersion || import.meta.env.APP_VERSION || "0.0.0";
 export const DESKTOP_DOWNLOAD_URL = GUSTAF_LATEST_RELEASE_URL;
 // The release page lists the Android build; Gustaf has no store listing to redirect by phone.
 export const MOBILE_APP_URL = GUSTAF_LATEST_RELEASE_URL;

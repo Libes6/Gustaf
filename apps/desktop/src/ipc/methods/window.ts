@@ -87,7 +87,7 @@ export const getAppVersion = DesktopIpc.makeSyncIpcMethod({
   result: Schema.String,
   handler: Effect.fn("desktop.ipc.window.getAppVersion")(function* () {
     const environment = yield* DesktopEnvironment.DesktopEnvironment;
-    return environment.appVersion;
+    return DesktopEnvironment.releaseVersionOf(environment);
   }),
 });
 

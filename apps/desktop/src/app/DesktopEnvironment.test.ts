@@ -4,6 +4,7 @@ import { assert, describe, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 
+import desktopPackageJson from "../../package.json" with { type: "json" };
 import * as DesktopEnvironment from "./DesktopEnvironment.ts";
 import * as DesktopConfig from "./DesktopConfig.ts";
 
@@ -76,6 +77,19 @@ describe("DesktopEnvironment", () => {
         production.stateDir,
         "/Users/alice/Library/Application Support/io.github.libes6.gustaf/userdata",
       );
+    }),
+  );
+
+  it.effect("reports the desktop package version for an unpackaged dev run", () =>
+    Effect.gen(function* () {
+      const development = yield* makeEnvironment(
+        { appVersion: "41.0.0" },
+        { VITE_DEV_SERVER_URL: "http://localhost:5173" },
+      );
+      const production = yield* makeEnvironment({ appVersion: "0.23.4", isPackaged: true });
+
+      assert.equal(DesktopEnvironment.releaseVersionOf(development), desktopPackageJson.version);
+      assert.equal(DesktopEnvironment.releaseVersionOf(production), "0.23.4");
     }),
   );
 });

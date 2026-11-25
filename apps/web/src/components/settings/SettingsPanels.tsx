@@ -215,6 +215,8 @@ function AboutVersionSection() {
 
   const hasDesktopBridge = typeof window !== "undefined" && Boolean(window.desktopBridge);
   const selectedUpdateChannel = updateState?.channel ?? "latest";
+  // Gustaf publishes stable releases only, so the picker stays for an install already on nightly.
+  const showUpdateTrack = hasDesktopBridge && updateState?.channel === "nightly";
   // The desktop updates this machine, whose policy the primary environment reports.
   const primaryPolicy = usePrimaryManagedPolicy();
   const updatesDenial = hasDesktopBridge
@@ -392,7 +394,7 @@ function AboutVersionSection() {
           </Tooltip>
         }
       />
-      {hasDesktopBridge ? (
+      {showUpdateTrack ? (
         <SettingsRow
           {...setting("update-track")}
           description={

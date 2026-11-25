@@ -1770,7 +1770,7 @@ export function settingsForThisPlatform(
     (item) =>
       (isElectron || item.desktopOnly !== true) &&
       (!item.shellAccountOnly || hasShellAccount) &&
-      (!item.releaseChannelOnly || isElectron || HOSTED_APP_CHANNEL !== null) &&
+      (!item.releaseChannelOnly || HOSTED_APP_CHANNEL !== null) &&
       (!item.macOnly || isMacPlatform(platform)) &&
       (!item.windowsOnly || isWindowsPlatform(platform)),
   );
