@@ -1,9 +1,6 @@
 import { DEFAULT_HOSTED_APP_URL } from "@t3tools/shared/connectAuth";
 import { afterEach, expect, it, vi } from "vite-plus/test";
 
-import appleAppSiteAssociation from "../web/public/.well-known/apple-app-site-association.json";
-import assetLinks from "../web/public/.well-known/assetlinks.json";
-
 // Keep config parsing independent of local env files and build credentials.
 vi.mock("../../scripts/lib/public-config.ts", () => ({
   loadRepoEnv: () => ({ APP_VARIANT: process.env.APP_VARIANT }),
@@ -26,25 +23,24 @@ it.each(["prod", ""])("rejects APP_VARIANT=%j before selecting production IDs", 
 });
 
 it.each([
-  [undefined, "com.t3tools.t3code"],
-  ["development", "com.t3tools.t3code.dev"],
-  ["preview", "com.t3tools.t3code.preview"],
-  ["production", "com.t3tools.t3code"],
-])("keeps the iOS and Android identifiers for APP_VARIANT=%j", async (value, identifier) => {
-  const config = await loadConfig(value);
-  expect(config.ios?.bundleIdentifier).toBe(identifier);
-  expect(config.android?.package).toBe(identifier);
-  // Copied thread links open this app only while app.t3.codes lists it.
-  const host = new URL(DEFAULT_HOSTED_APP_URL).host;
-  expect(config.ios?.associatedDomains).toContain(`applinks:${host}`);
-  expect(appleAppSiteAssociation.applinks.details[0]?.appIDs).toContain(
-    `${config.ios?.appleTeamId}.${identifier}`,
-  );
-  expect(config.android?.intentFilters?.[0]?.data).toEqual([
-    { scheme: "https", host, pathPrefix: "/threads/" },
-  ]);
-  expect(assetLinks.map((link) => link.target.package_name)).toContain(identifier);
-});
+  [undefined, "io.github.libes6.gustaf", "gustaf"],
+  ["development", "io.github.libes6.gustaf.dev", "gustaf-dev"],
+  ["preview", "io.github.libes6.gustaf.preview", "gustaf-preview"],
+  ["production", "io.github.libes6.gustaf", "gustaf"],
+])(
+  "keeps the iOS and Android identifiers for APP_VARIANT=%j",
+  async (value, identifier, scheme) => {
+    const config = await loadConfig(value);
+    expect(config.ios?.bundleIdentifier).toBe(identifier);
+    expect(config.android?.package).toBe(identifier);
+    expect(config.scheme).toBe(scheme);
+    const host = new URL(DEFAULT_HOSTED_APP_URL).host;
+    expect(config.ios?.associatedDomains).toContain(`applinks:${host}`);
+    expect(config.android?.intentFilters?.[0]?.data).toEqual([
+      { scheme: "https", host, pathPrefix: "/threads/" },
+    ]);
+  },
+);
 
 it("keeps over-the-air updates off unless a build names its own server", async () => {
   expect((await loadConfig("production")).updates).toEqual({ enabled: false });

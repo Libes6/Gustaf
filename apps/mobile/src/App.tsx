@@ -151,8 +151,6 @@ const appLinking = {
     "gustaf-dev://",
     "gustaf-preview://",
     "t3code://",
-    "t3code-dev://",
-    "t3code-preview://",
     DEFAULT_HOSTED_APP_URL,
   ],
   config: { initialRouteName: "Home" },

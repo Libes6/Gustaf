@@ -126,7 +126,7 @@ object AgentNotifications {
     val fresh = System.currentTimeMillis() - updatedAt in -MAX_MESSAGE_AGE_MS..MAX_MESSAGE_AGE_MS
     if (registered && fresh && NotificationManagerCompat.from(context).areNotificationsEnabled()) {
       channels(context)
-      val scheme = prefs.getString("scheme", "t3code") ?: "t3code"
+      val scheme = prefs.getString("scheme", "gustaf") ?: "gustaf"
       val alerted = showAlert(context, prefs, scheme, data)
       updateActivity(context, prefs, data, updatedAt, alerted)
     }
@@ -256,7 +256,7 @@ object AgentNotifications {
     if (prefs.getBoolean("dismissed", false) || isCovered(prefs, terminal)) {
       cancelActivity(context)
     } else {
-      val scheme = prefs.getString("scheme", "t3code") ?: "t3code"
+      val scheme = prefs.getString("scheme", "gustaf") ?: "gustaf"
       showActivity(context, scheme, data, active, remainingMs)
     }
   }

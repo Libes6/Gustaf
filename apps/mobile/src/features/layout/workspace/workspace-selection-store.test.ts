@@ -29,7 +29,7 @@ vi.mock(expoLinking.modulesCore, () => ({
   Platform: { select: (options: { readonly ios?: unknown }) => options.ios },
 }));
 vi.mock("expo-constants", () => ({
-  default: { executionEnvironment: "bare", expoConfig: { scheme: "t3code-dev" } },
+  default: { executionEnvironment: "bare", expoConfig: { scheme: "gustaf-dev" } },
   ExecutionEnvironment: { Bare: "bare", Standalone: "standalone", StoreClient: "storeClient" },
 }));
 vi.mock("expo/internal/bundle-origin", () => ({ getBundleOrigin: () => null }));
@@ -69,7 +69,7 @@ it("reopens a remembered chat whose id has reserved characters at that same chat
   const url = await launchWorkspaceURL();
   expect(url).not.toBeNull();
 
-  const state = getStateFromPath(url!.replace(/^t3code-dev:\/\//, ""), {
+  const state = getStateFromPath(url!.replace(/^gustaf-dev:\/\//, ""), {
     screens: { Thread: "threads/:environmentId/:threadId" },
   });
 

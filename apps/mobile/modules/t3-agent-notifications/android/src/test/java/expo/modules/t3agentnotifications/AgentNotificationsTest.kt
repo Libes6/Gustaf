@@ -47,7 +47,7 @@ abstract class AgentNotificationsFixture {
       }
     )
     AgentNotifications.clear(context)
-    AgentNotifications.configure(context, "device", "user", "t3code-dev", true)
+    AgentNotifications.configure(context, "device", "user", "gustaf-dev", true)
     AgentNotifications.setThreadOnScreen("/threads/environment/thread")
   }
 
@@ -181,7 +181,7 @@ class AgentNotificationsTest : AgentNotificationsFixture() {
     val alert = manager.activeNotifications.single()
     assertEquals("5 agents finished", alert.notification.extras.getString(Notification.EXTRA_TITLE))
     assertEquals(titles, alert.notification.extras.getString(Notification.EXTRA_BIG_TEXT))
-    assertEquals("t3code-dev://", shadowOf(alert.notification.contentIntent).savedIntent.dataString)
+    assertEquals("gustaf-dev://", shadowOf(alert.notification.contentIntent).savedIntent.dataString)
   }
 
   @Test
@@ -206,10 +206,10 @@ class AgentNotificationsTest : AgentNotificationsFixture() {
   fun reopeningSameAccountPreservesCardsDeduplicationAndDismissal() {
     val message = update("attention", true)
     AgentNotifications.receive(context, message)
-    AgentNotifications.configure(context, "device", "user", "t3code-dev", true)
+    AgentNotifications.configure(context, "device", "user", "gustaf-dev", true)
     assertEquals(2, manager.activeNotifications.size)
     AgentNotifications.dismiss(context)
-    AgentNotifications.configure(context, "device", "user", "t3code-dev", true)
+    AgentNotifications.configure(context, "device", "user", "gustaf-dev", true)
     AgentNotifications.receive(context, message)
     assertEquals("t3-agent-alert", manager.activeNotifications.single().tag)
   }
@@ -217,10 +217,10 @@ class AgentNotificationsTest : AgentNotificationsFixture() {
   @Test
   fun changingAccountOrDeviceClearsOldCardsAndRejectsOldPushes() {
     AgentNotifications.receive(context, update("attention", true))
-    AgentNotifications.configure(context, "device", "different-user", "t3code-dev", true)
+    AgentNotifications.configure(context, "device", "different-user", "gustaf-dev", true)
     AgentNotifications.receive(context, update("attention", true))
     assertTrue(manager.activeNotifications.isEmpty())
-    AgentNotifications.configure(context, "different-device", "user", "t3code-dev", true)
+    AgentNotifications.configure(context, "different-device", "user", "gustaf-dev", true)
     AgentNotifications.receive(context, update("attention", true))
     assertTrue(manager.activeNotifications.isEmpty())
     AgentNotifications.clear(context)
@@ -247,7 +247,7 @@ class AgentNotificationsTest : AgentNotificationsFixture() {
     val card = manager.activeNotifications.single().notification
     assertEquals(lines.joinToString("\n"), card.extras.getString(Notification.EXTRA_BIG_TEXT))
     assertEquals(
-      "t3code-dev://threads/environment/thread",
+      "gustaf-dev://threads/environment/thread",
       shadowOf(card.contentIntent).savedIntent.dataString
     )
   }
@@ -298,7 +298,7 @@ class AgentNotificationsTest : AgentNotificationsFixture() {
     assertTrue(manager.activeNotifications.isEmpty())
     AgentNotifications.receive(context, update("new-work", true))
     assertEquals("t3-agent-activity", manager.activeNotifications.single().tag)
-    AgentNotifications.configure(context, "device", "user", "t3code-dev", false)
+    AgentNotifications.configure(context, "device", "user", "gustaf-dev", false)
     assertTrue(manager.activeNotifications.isEmpty())
   }
 
@@ -327,7 +327,7 @@ class AgentNotificationsTest : AgentNotificationsFixture() {
     )
     assertEquals(listOf("Approve", "Dismiss"), card.actions.map { it.title.toString() })
     assertEquals(
-      "t3code-dev://threads/environment/thread",
+      "gustaf-dev://threads/environment/thread",
       shadowOf(card.actions[0].actionIntent).savedIntent.dataString
     )
     assertEquals("Approve", card.extras.getString(NotificationCompat.EXTRA_SHORT_CRITICAL_TEXT))
@@ -344,7 +344,7 @@ class AgentNotificationsTest : AgentNotificationsFixture() {
     assertEquals("2 need you", next.extras.getCharSequence(Notification.EXTRA_TITLE).toString())
     assertEquals("Answer", next.actions[0].title.toString())
     assertEquals(
-      "t3code-dev://threads/another-environment/another-thread",
+      "gustaf-dev://threads/another-environment/another-thread",
       shadowOf(next.actions[0].actionIntent).savedIntent.dataString
     )
     assertEquals("Answer", next.extras.getString(NotificationCompat.EXTRA_SHORT_CRITICAL_TEXT))
@@ -536,13 +536,13 @@ class AgentNotificationsTest : AgentNotificationsFixture() {
     AgentNotifications.receive(context, update("work", true))
     AgentNotifications.dismiss(context)
     assertTrue(alarms.scheduledAlarms.isEmpty())
-    AgentNotifications.configure(context, "device", "user", "t3code-dev", false)
-    AgentNotifications.configure(context, "device", "user", "t3code-dev", true)
+    AgentNotifications.configure(context, "device", "user", "gustaf-dev", false)
+    AgentNotifications.configure(context, "device", "user", "gustaf-dev", true)
     AgentNotifications.receive(context, update("work", true))
     assertEquals(1, alarms.scheduledAlarms.size)
-    AgentNotifications.configure(context, "device", "user", "t3code-dev", false)
+    AgentNotifications.configure(context, "device", "user", "gustaf-dev", false)
     assertTrue(alarms.scheduledAlarms.isEmpty())
-    AgentNotifications.configure(context, "device", "user", "t3code-dev", true)
+    AgentNotifications.configure(context, "device", "user", "gustaf-dev", true)
     AgentNotifications.receive(context, update("work", true))
     AgentNotifications.clear(context)
     assertTrue(alarms.scheduledAlarms.isEmpty())
@@ -661,7 +661,7 @@ class AgentNotificationChannelsTest {
     val manager = context.getSystemService(NotificationManager::class.java)
     shadowOf(manager).setNotificationsEnabled(true)
     AgentNotifications.clear(context)
-    AgentNotifications.configure(context, "device", "user", "t3code-dev", true)
+    AgentNotifications.configure(context, "device", "user", "gustaf-dev", true)
     val running = mapOf(
       "device_id" to "device",
       "user_id" to "user",
@@ -676,7 +676,7 @@ class AgentNotificationChannelsTest {
     val initialCard = manager.activeNotifications.single()
     assertEquals("t3-agent-activity", initialCard.tag)
 
-    AgentNotifications.configure(context, "device", "user", "t3code-dev", true)
+    AgentNotifications.configure(context, "device", "user", "gustaf-dev", true)
     AgentNotifications.receive(
       context,
       running + mapOf(
