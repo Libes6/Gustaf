@@ -5,24 +5,27 @@ on:
   push:
     branches:
       - main
+      - dev
+      - "feat/**"
 
 permissions:
   contents: read
 
+# Pull requests and feature branches supersede their own earlier runs. main and dev keep
+# every run: each push there is the backstop for something the change gate missed.
 concurrency:
-  group: ci-${{ github.event.pull_request.number || github.sha }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' || startsWith(github.ref, 'refs/heads/feat/') }}
 
 jobs:
-  # Skips jobs a pull request cannot affect: a web change does not run the
-  # server shards, a server change does not run the mobile tests, and the macOS
-  # lint (~6.7x a Linux minute) runs only for native mobile sources.
-  # .github/scripts/ci-changes.cjs maps changed files to workspace packages and
-  # their dependents. Pushes to main still run every Linux job. Detection fails
-  # open: if the diff cannot be resolved, everything runs.
+  # Skips jobs a change cannot affect: a web change does not run the server shards, a
+  # server change does not run the mobile tests, and the macOS lint (10x a Linux minute)
+  # runs only for native mobile sources. .github/scripts/ci-changes.cjs maps changed
+  # files to workspace packages and their dependents. Pushes to main and dev run every
+  # job. Detection fails open: if the diff cannot be resolved, everything runs.
   changes:
     name: Changes
-    runs-on: blacksmith-2vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:
       typecheck: ${{ steps.detect.outputs.typecheck }}
@@ -60,12 +63,9 @@ jobs:
   # file, docs included. The `Check` job at the end of this file passes only
   # when every other job passes or was skipped by `changes`.
   lint:
-    permissions:
-      contents: read
-      id-token: write
     name: Lint
-    runs-on: blacksmith-8vcpu-ubuntu-2404
-    timeout-minutes: 10
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
@@ -86,8 +86,6 @@ jobs:
 
       - name: Setup Vite+
         uses: ./.github/actions/setup-ci-deps
-        with:
-          task-cache-read-token: ${{ secrets.T3_TASK_CACHE_READ_TOKEN }}
 
       # electron's install.js (run by ensure:electron) reads this cache before it
       # downloads from GitHub. The key changes only with the Electron version.
@@ -120,14 +118,11 @@ jobs:
         run: vp check
 
   build:
-    permissions:
-      contents: read
-      id-token: write
     name: Build and Typecheck
     needs: changes
     if: ${{ !cancelled() && (needs.changes.outputs.build != 'false' || needs.changes.outputs.typecheck != 'false') }}
-    runs-on: blacksmith-8vcpu-ubuntu-2404
-    timeout-minutes: 10
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
@@ -138,31 +133,21 @@ jobs:
             !/apps/mobile/modules/t3-terminal/Vendor/**/*.a
           sparse-checkout-cone-mode: false
 
-      - uses: ./.github/actions/setup-apt-mirrors
-        if: needs.changes.outputs.build != 'false'
-
       # Runs in the background while Vite+ installs; the step before the build waits for it.
-      # Xvfb is for the desktop launch check below.
-      - name: Start installing browser secret helper build libraries
+      # libsecret builds the browser secret helper; the rest, with Xvfb, is for the desktop
+      # launch check below.
+      - name: Start installing desktop build libraries
         if: needs.changes.outputs.build != 'false'
         run: |
-          # Fetch only the indexes these main and universe packages need. The full set is ~42 MB,
-          # which a slow mirror can stretch past the wait below.
-          sudo sed -i -e 's|http://|https://|g' -e 's/^Components: .*/Components: main universe/' \
-            /etc/apt/blacksmith-ubuntu-mirrors.txt /etc/apt/sources.list.d/ubuntu.sources
           (
             set +e
-            sudo apt-get update -o Acquire::Languages=none \
-              -o Acquire::IndexTargets::deb::DEP-11::DefaultEnabled=false \
-              -o Acquire::IndexTargets::deb::CNF::DefaultEnabled=false &&
-              sudo apt-get install -y libsecret-1-dev pkg-config xvfb
+            sudo apt-get update &&
+              sudo apt-get install -y libsecret-1-dev pkg-config xvfb libgtk-3-0t64 libnss3 libasound2t64 libgbm1
             echo "$?" > "$RUNNER_TEMP/apt-status"
           ) > "$RUNNER_TEMP/apt.log" 2>&1 < /dev/null &
 
       - name: Setup Vite+
         uses: ./.github/actions/setup-ci-deps
-        with:
-          task-cache-read-token: ${{ secrets.T3_TASK_CACHE_READ_TOKEN }}
 
       # electron's install.js (run by ensure:electron) reads this cache before it
       # downloads from GitHub. The key changes only with the Electron version.
@@ -188,7 +173,7 @@ jobs:
             echo "$?" > "$RUNNER_TEMP/typecheck-status"
           ) > "$RUNNER_TEMP/typecheck.log" 2>&1 < /dev/null &
 
-      - name: Finish installing browser secret helper build libraries
+      - name: Finish installing desktop build libraries
         id: apt
         if: ${{ !cancelled() && needs.changes.outputs.build != 'false' }}
         timeout-minutes: 5
@@ -218,7 +203,7 @@ jobs:
       - name: Open the seeded thread in the built desktop app
         id: desktop_launch
         if: ${{ !cancelled() && steps.build.outcome == 'success' && needs.changes.outputs.desktop_launch != 'false' }}
-        timeout-minutes: 4
+        timeout-minutes: 6
         run: |
           electron=$(node -p "require('./apps/desktop/node_modules/electron')")
           xvfb-run -a node scripts/smoke-desktop-app.ts --executable "$electron" --app apps/desktop \
@@ -269,27 +254,23 @@ jobs:
 
       - name: Typecheck
         if: ${{ !cancelled() && steps.typecheck.outcome == 'success' }}
-        timeout-minutes: 5
+        timeout-minutes: 10
         run: |
           until test -s "$RUNNER_TEMP/typecheck-status"; do sleep 1; done
           cat "$RUNNER_TEMP/typecheck.log"
           exit "$(cat "$RUNNER_TEMP/typecheck-status")"
 
-  # Everything except `t3` (apps/server) and the web app, which has its own job
-  # below. `--parallel` drops the package dependency ordering that `vp run`
-  # applies by default: these `test` tasks declare no `dependsOn` and resolve
-  # workspace deps from source, so ordering only bought us idle runners between
-  # dependency layers. The concurrency limit stays at the default 4 so peak load
-  # per runner is unchanged.
+  # Everything except `t3` (apps/server) and the web app, which have their own jobs
+  # below, plus the .github script tests and the apps/api tests. `--parallel` drops
+  # the package dependency ordering that `vp run` applies by default: these `test`
+  # tasks declare no `dependsOn` and resolve workspace deps from source, so ordering
+  # only bought us idle runners between dependency layers.
   test:
-    permissions:
-      contents: read
-      id-token: write
     name: Test
     needs: changes
     if: ${{ !cancelled() && needs.changes.outputs.test != 'false' }}
-    runs-on: blacksmith-8vcpu-ubuntu-2404
-    timeout-minutes: 10
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
@@ -300,29 +281,18 @@ jobs:
             !/apps/mobile/modules/t3-terminal/Vendor/**/*.a
           sparse-checkout-cone-mode: false
 
-      - uses: ./.github/actions/setup-apt-mirrors
-
       # The desktop tests compile the browser secret helper. The install runs in
       # the background while Vite+ installs; the step before the tests waits for it.
       - name: Start installing browser secret helper build libraries
         run: |
-          # Fetch only the indexes these main and universe packages need. The full set is ~42 MB,
-          # which a slow mirror can stretch past the wait below.
-          sudo sed -i -e 's|http://|https://|g' -e 's/^Components: .*/Components: main universe/' \
-            /etc/apt/blacksmith-ubuntu-mirrors.txt /etc/apt/sources.list.d/ubuntu.sources
           (
             set +e
-            sudo apt-get update -o Acquire::Languages=none \
-              -o Acquire::IndexTargets::deb::DEP-11::DefaultEnabled=false \
-              -o Acquire::IndexTargets::deb::CNF::DefaultEnabled=false &&
-              sudo apt-get install -y libsecret-1-dev pkg-config
+            sudo apt-get update && sudo apt-get install -y libsecret-1-dev pkg-config
             echo "$?" > "$RUNNER_TEMP/apt-status"
           ) > "$RUNNER_TEMP/apt.log" 2>&1 < /dev/null &
 
       - name: Setup Vite+
         uses: ./.github/actions/setup-ci-deps
-        with:
-          task-cache-read-token: ${{ secrets.T3_TASK_CACHE_READ_TOKEN }}
 
       # electron's install.js (run by ensure:electron) reads this cache before it
       # downloads from GitHub. The key changes only with the Electron version.
@@ -336,7 +306,7 @@ jobs:
         run: vp run --filter @t3tools/desktop ensure:electron
 
       - name: Test release checks
-        run: node --test .github/scripts/gustaf-release.test.cjs .github/scripts/test-delta.test.cjs .github/scripts/workflow-credentials.test.cjs
+        run: node --test .github/scripts/*.test.cjs
 
       - name: Finish installing browser secret helper build libraries
         timeout-minutes: 5
@@ -363,20 +333,15 @@ jobs:
               sys.stdout.write(line.encode("ascii", "backslashreplace").decode("ascii"))
           '
 
-  # The web suite is the largest outside the server. In the shared Test job it
-  # started last and ran alone for about 40s after everything else finished.
-  # Browser tests are bound by the Vite server transforming modules for each
-  # file, not by Chromium, so a second runner (and Vite server) halves the job
-  # that gated every run. release.yml mirrors this test, test_web, and test_server split.
+  # The web suite is the largest outside the server. Browser tests are bound by
+  # the Vite server transforming modules for each file, not by Chromium, so a
+  # second runner (and Vite server) roughly halves the job that gated every run.
   test_web:
-    permissions:
-      contents: read
-      id-token: write
     name: Test Web ${{ matrix.shard }}
     needs: changes
     if: ${{ !cancelled() && needs.changes.outputs.test_web != 'false' }}
-    runs-on: blacksmith-8vcpu-ubuntu-2404
-    timeout-minutes: 10
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -393,8 +358,6 @@ jobs:
 
       - name: Setup Vite+
         uses: ./.github/actions/setup-ci-deps
-        with:
-          task-cache-read-token: ${{ secrets.T3_TASK_CACHE_READ_TOKEN }}
 
       # The browser project runs React tests in headless Chromium. Same cache key as
       # test_server, so both jobs share one downloaded browser.
@@ -427,20 +390,14 @@ jobs:
   # apps/server sets `fileParallelism: false`, so its test files run strictly
   # one at a time. Sharding spreads them over separate runners instead of
   # separate workers, so no two server test files ever share a machine and the
-  # isolation that flag buys is preserved exactly. One file at a time keeps
-  # about 1.5 cores busy, so 4 vCPU runners lose nothing against 8. The shards
-  # split files by recorded duration (apps/server/src/testUtils/weightedShardSequencer.ts).
+  # isolation that flag buys is preserved exactly. The shards split files by
+  # recorded duration (apps/server/src/testUtils/weightedShardSequencer.ts).
   # The shards are the longest jobs, so they gate themselves instead of waiting
-  # ~15s for `changes`: a shard the change cannot affect stops after checkout.
+  # for `changes`: a shard the change cannot affect stops after checkout.
   test_server:
-    permissions:
-      contents: read
-      id-token: write
     name: Test Server ${{ matrix.shard }}
-    runs-on: blacksmith-4vcpu-ubuntu-2404
-    # Shards take 2-5 minutes. When the shared task cache throttles reads, each
-    # failed fetch stalls vp for 15-90s, which pushed shards past 10 minutes.
-    timeout-minutes: 20
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -464,8 +421,6 @@ jobs:
       - name: Setup Vite+
         if: steps.changes.outputs.test_server != 'false'
         uses: ./.github/actions/setup-ci-deps
-        with:
-          task-cache-read-token: ${{ secrets.T3_TASK_CACHE_READ_TOKEN }}
 
       # No Electron setup here: `t3` (apps/server) has no Electron dependency
       # and none of its tests touch the runtime. Only the non-server `test`
@@ -499,7 +454,7 @@ jobs:
 
       # Each server test file runs in its own Vitest process, and a fresh install starts
       # Vitest's content-keyed module cache empty, so every file re-transformed its imports.
-      # Only pushes to main save it, so pull requests never evict each other's entries.
+      # Only pushes to main and dev save it, so pull requests never evict each other's entries.
       - name: Restore Vitest module cache
         if: steps.changes.outputs.test_server != 'false'
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -510,56 +465,18 @@ jobs:
 
       - name: Test
         if: steps.changes.outputs.test_server != 'false'
-        env:
-          T3CODE_TRANSFER_BUDGET_REPORT_PATH: ${{ runner.temp }}/t3code-transfer-budget.md
-          T3CODE_TRANSFER_BUDGET_RESULT_PATH: ${{ runner.temp }}/thread-transfer-result.json
-          T3CODE_TRANSFER_BUDGET_SCENARIOS_PATH: ${{ runner.temp }}/thread-transfer-scenarios.json
         # One process per file spends ~2s starting before its tests run; one file per vCPU overlaps that.
         run: >-
           vp run test:cached -- --shard ${{ matrix.shard }}/${{ strategy.job-total }} --concurrency 4
           --uncached apps/server/integration/transferBudgetV2.integration.test.ts
-          --verify-hits 1 apps/server
+          apps/server
 
       - name: Save Vitest module cache
-        if: github.event_name == 'push' && steps.changes.outputs.test_server != 'false'
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev') && steps.changes.outputs.test_server != 'false'
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: node_modules/.vitest-cache
           key: vitest-modules-server-${{ matrix.shard }}-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
-
-      # integration/transferBudgetV2.integration.test.ts writes the report; exactly one shard
-      # produces these files. Gating the upload on their presence keeps a
-      # single `thread-transfer-results` artifact per run, which is the name
-      # thread-transfer-report.yml resolves.
-      - name: Detect transfer budget report
-        id: transfer_budget
-        if: always()
-        run: |
-          if test -f "${{ runner.temp }}/thread-transfer-result.json"; then
-            echo "present=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "present=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Publish transfer budget report
-        if: always() && steps.transfer_budget.outputs.present == 'true'
-        run: |
-          if test -f "${{ runner.temp }}/t3code-transfer-budget.md"; then
-            tee -a "$GITHUB_STEP_SUMMARY" < "${{ runner.temp }}/t3code-transfer-budget.md"
-          else
-            echo "Transfer budget report was not produced." >> "$GITHUB_STEP_SUMMARY"
-          fi
-
-      - name: Upload thread transfer result
-        if: always() && steps.transfer_budget.outputs.present == 'true'
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: thread-transfer-results
-          path: |
-            ${{ runner.temp }}/thread-transfer-result.json
-            ${{ runner.temp }}/thread-transfer-scenarios.json
-          if-no-files-found: ignore
-          retention-days: 30
 
   # Split out of Check and Test: both paid ~7-9s to install a Rust toolchain
   # for checks that take under 3s, on the critical path of every PR.
@@ -567,8 +484,8 @@ jobs:
     name: Rust
     needs: changes
     if: ${{ !cancelled() && needs.changes.outputs.rust != 'false' }}
-    runs-on: blacksmith-4vcpu-ubuntu-2404
-    timeout-minutes: 10
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
@@ -597,12 +514,14 @@ jobs:
             cargo test --locked --manifest-path "native/$crate/Cargo.toml"
           done
 
+  # SwiftLint needs macOS, so this is the one job off Linux. It runs only when native
+  # mobile sources (or this workflow) change.
   mobile_native_static_analysis:
     name: Mobile Native Static Analysis
     needs: changes
     if: ${{ !cancelled() && needs.changes.outputs.mobile_native != 'false' }}
-    runs-on: blacksmith-6vcpu-macos-27
-    timeout-minutes: 10
+    runs-on: macos-26
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
@@ -628,14 +547,11 @@ jobs:
         run: vp run lint:mobile
 
   release_smoke:
-    permissions:
-      contents: read
-      id-token: write
     name: Release Smoke
     needs: changes
     if: ${{ !cancelled() && needs.changes.outputs.release_smoke != 'false' }}
-    runs-on: blacksmith-8vcpu-ubuntu-2404
-    timeout-minutes: 15
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
@@ -648,8 +564,6 @@ jobs:
 
       - name: Setup Vite+
         uses: ./.github/actions/setup-ci-deps
-        with:
-          task-cache-read-token: ${{ secrets.T3_TASK_CACHE_READ_TOKEN }}
 
       - name: Exercise release-only workflow steps
         run: node scripts/release-smoke.ts
@@ -674,7 +588,7 @@ jobs:
         mobile_native_static_analysis,
         release_smoke,
       ]
-    runs-on: blacksmith-2vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - name: Require every job to pass
@@ -691,12 +605,3 @@ jobs:
                 .value.result == "success"
                 or (.value.result == "skipped"
                   and (($renamed[.key] // [.key]) | all(.[]; $gates[.] == "false"))))' > /dev/null
-
-      # thread-transfer-report.yml reads this artifact after CI, so a run whose
-      # server tests ran must have produced it.
-      - name: Require transfer measurements
-        if: needs.test_server.result == 'success' && needs.changes.outputs.test_server != 'false'
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: thread-transfer-results
-          path: ${{ runner.temp }}/thread-transfer

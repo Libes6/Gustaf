@@ -53,8 +53,11 @@ runs:
           base=$BEFORE_SHA
           git fetch --quiet --no-tags --depth=1 --filter=blob:none origin "$base" \
             || fail_open "Could not fetch ${base}."
-          # main keeps a full run as the backstop for anything the gate misses.
-          mode=(--full)
+          # main and dev keep a full run as the backstop for anything the gate misses.
+          mode=()
+          if [[ "$GITHUB_REF" == refs/heads/main || "$GITHUB_REF" == refs/heads/dev ]]; then
+            mode=(--full)
+          fi
         fi
 
         # --no-renames lists a rename as its old and new path: renaming a file out
