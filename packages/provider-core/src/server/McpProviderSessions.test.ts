@@ -158,4 +158,94 @@ describe("McpProviderSessions tool results", () => {
       );
     }).pipe(Effect.provide(McpProviderSessions.layer)),
   );
+
+  describe("full results kept for providers that show a stand-in", () => {
+    const rawThread = ThreadId.make("thread-raw-results");
+    const MiB = 1024 * 1024;
+    const screenshot = (megabytes: number) => ({
+      content: [
+        { type: "text", text: "Screenshot taken." },
+        { type: "image", mimeType: "image/png", data: "A".repeat(megabytes * MiB) },
+      ],
+    });
+
+    it.effect("evicts the oldest results once a thread holds 16 MB", () =>
+      Effect.gen(function* () {
+        const sessions = yield* McpProviderSessions.McpProviderSessions;
+        yield* sessions.keepToolResults(rawThread);
+        for (const step of [1, 2, 3, 4, 5, 6]) {
+          yield* sessions.recordRawToolResult(rawThread, "device_screenshot", { step }, () =>
+            screenshot(3),
+          );
+        }
+        // Six results of about 3 MB do not fit 16 MB: the first one is gone, the rest remain.
+        assert.strictEqual(
+          yield* sessions.takeRawToolResult(rawThread, "device_screenshot", { step: 1 }),
+          undefined,
+        );
+        for (const step of [2, 3, 4, 5, 6]) {
+          assert.isDefined(
+            yield* sessions.takeRawToolResult(rawThread, "device_screenshot", { step }),
+          );
+        }
+      }).pipe(Effect.provide(McpProviderSessions.layer)),
+    );
+
+    it.effect("keeps the text of a result whose image is over the entry limit", () =>
+      Effect.gen(function* () {
+        const sessions = yield* McpProviderSessions.McpProviderSessions;
+        yield* sessions.keepToolResults(rawThread);
+        yield* sessions.recordRawToolResult(rawThread, "device_screenshot", { id: "big" }, () =>
+          screenshot(5),
+        );
+        yield* sessions.recordRawToolResult(rawThread, "device_screenshot", { id: "ok" }, () =>
+          screenshot(1),
+        );
+        const big = yield* sessions.takeRawToolResult(rawThread, "device_screenshot", {
+          id: "big",
+        });
+        assert.deepEqual(big?.result, {
+          content: [
+            { type: "text", text: "Screenshot taken." },
+            { type: "text", text: "[Image too large to keep]" },
+          ],
+        });
+        const ok = (yield* sessions.takeRawToolResult(rawThread, "device_screenshot", {
+          id: "ok",
+        }))?.result as ReturnType<typeof screenshot>;
+        assert.strictEqual(ok.content[1]?.type, "image");
+      }).pipe(Effect.provide(McpProviderSessions.layer)),
+    );
+
+    it.effect("keeps nothing of an oversized result that has no images to drop", () =>
+      Effect.gen(function* () {
+        const sessions = yield* McpProviderSessions.McpProviderSessions;
+        yield* sessions.keepToolResults(rawThread);
+        yield* sessions.recordRawToolResult(rawThread, "t3_thread_read", { id: 1 }, () => ({
+          structuredContent: { text: "x".repeat(5 * MiB) },
+        }));
+        assert.strictEqual(
+          yield* sessions.takeRawToolResult(rawThread, "t3_thread_read", { id: 1 }),
+          undefined,
+        );
+      }).pipe(Effect.provide(McpProviderSessions.layer)),
+    );
+
+    it.effect("still keeps at most 64 small results", () =>
+      Effect.gen(function* () {
+        const sessions = yield* McpProviderSessions.McpProviderSessions;
+        yield* sessions.keepToolResults(rawThread);
+        for (let step = 0; step < 70; step++) {
+          yield* sessions.recordRawToolResult(rawThread, "t3_queue", { step }, () => ({
+            content: [{ type: "text", text: "ok" }],
+          }));
+        }
+        assert.strictEqual(
+          yield* sessions.takeRawToolResult(rawThread, "t3_queue", { step: 5 }),
+          undefined,
+        );
+        assert.isDefined(yield* sessions.takeRawToolResult(rawThread, "t3_queue", { step: 6 }));
+      }).pipe(Effect.provide(McpProviderSessions.layer)),
+    );
+  });
 });
