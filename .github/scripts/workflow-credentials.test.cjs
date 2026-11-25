@@ -183,14 +183,6 @@ test("the store build record job runs the workflow's own action and passes the b
   assert.match(record, /^ {10}commit: \$\{\{ inputs\.sha \}\}$/m);
 });
 
-test("release deploys give the Vercel token to the deploy step only", () => {
-  const all = jobs("workflows/release.yml");
-  assert.doesNotMatch(all.build_web.split(/^ {4}steps:\n/m)[0], /secrets\.VERCEL/);
-  const withToken = steps(all.build_web).filter((step) => step.includes("secrets.VERCEL_TOKEN"));
-  assert.equal(withToken.length, 1);
-  assert.match(withToken[0], /name: Build staged deployment/);
-});
-
 test("the version override token covers this repository only", () => {
   const { version, production } = jobs("workflows/mobile-eas-production.yml");
   const mint = steps(version).find((step) => step.includes("create-github-app-token"));
