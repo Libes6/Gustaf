@@ -85,7 +85,8 @@ behaves like a link request ([`RelayHost`](../../apps/server/src/relay/RelayHost
   direct route changes it. When on, a key whose user allowed it by hand as a client skips the
   prompt for an account pairing and gets the same pairing a hand-allowed phone gets. Keys allowed
   only as linked machines, keys from before the mark existed, and new keys still ask. A relay
-  that swapped keys cannot use it: it holds no pinned key's secret.
+  that swapped keys cannot use it: it holds no pinned key's secret. A stolen phone holds both factors (its key and the
+  account token), so removing it under Account and revoking it here are the answer to that case.
 - **Links are left out on purpose.** A link hands another computer's agents standing access, the
   requester takes this host's key on trust each time, and a used link renews itself, so a skipped
   prompt would remove the only human check for little convenience.

@@ -445,6 +445,10 @@ the first approval:
   at once and ends its tunnel and its sessions. Turning the option off ends the
   sessions it let in without asking and leaves the ones you allowed by hand.
 
+With the option on, a phone's own key is what skips the question, so a lost phone
+that is still signed in could pair again. Remove it under **Account** (it can no
+longer open a tunnel) and **Revoke** it here.
+
 ## Connect an outside agent
 
 Claude Code, Codex, ChatGPT and other agents Gustaf did not start can drive
