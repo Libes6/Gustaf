@@ -19,6 +19,10 @@
       "types": "./src/errors.ts",
       "import": "./src/errors.ts"
     },
+    "./progress": {
+      "types": "./src/progress.ts",
+      "import": "./src/progress.ts"
+    },
     "./tunnel": {
       "types": "./src/tunnel.ts",
       "import": "./src/tunnel.ts"

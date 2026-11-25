@@ -13,6 +13,7 @@ import { contextBridge, ipcRenderer, webFrame, webUtils } from "electron";
 
 import * as IpcChannels from "./ipc/channels.ts";
 import { mergeLegacyLocalStorage } from "./legacyLocalStorageMerge.ts";
+import { subscribeSshEnsureProgress } from "./sshEnsureProgressBridge.ts";
 
 const SNAP_SHOT_EVENT_TYPES = new Set([
   "requested",
@@ -214,6 +215,8 @@ contextBridge.exposeInMainWorld("desktopBridge", {
         ...(options === undefined ? {} : { options }),
       }),
     ),
+  onSshEnsureProgress: (progressRequestId, listener) =>
+    subscribeSshEnsureProgress(ipcRenderer, progressRequestId, listener),
   disconnectSshEnvironment: (target) =>
     ipcRenderer.invoke(IpcChannels.DISCONNECT_SSH_ENVIRONMENT_CHANNEL, target),
   fetchSshEnvironmentDescriptor: (httpBaseUrl) =>

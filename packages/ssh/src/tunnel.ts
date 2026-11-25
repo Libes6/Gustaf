@@ -53,6 +53,14 @@ import {
   SshPasswordPromptError,
   SshReadinessError,
 } from "./errors.ts";
+import {
+  applyRemoteProgressMarker,
+  makeSshProgressReporter,
+  SSH_PROGRESS_MARKER,
+  type SshProgressReporter,
+  type SshProgressSink,
+  type SshRemoteProgressContext,
+} from "./progress.ts";
 
 const DEFAULT_REMOTE_PORT = 3773;
 const REMOTE_PORT_SCAN_WINDOW = 200;
@@ -165,9 +173,27 @@ function sshRunnerLogFields(runner: RemoteT3RunnerOptions | undefined) {
   return { runner: "archive" };
 }
 
+function remoteRunnerProgressContext(
+  runner: RemoteT3RunnerOptions | undefined,
+): SshRemoteProgressContext {
+  const version = runner?.archiveVersion?.trim() || null;
+  if (isNodeScriptRunner(runner)) return { version, downloadHost: null };
+  try {
+    const downloadHost = new URL(cliReleaseDownloadBaseUrl("", runner?.releaseBaseUrl ?? undefined))
+      .host;
+    return { version, downloadHost: downloadHost || null };
+  } catch {
+    return { version, downloadHost: null };
+  }
+}
+
+const sshTargetProgressLabel = (target: DesktopSshEnvironmentTarget) =>
+  target.alias.trim() || target.hostname.trim();
+
 interface SshAuthOperationInput<T> {
   readonly key: string;
   readonly target: DesktopSshEnvironmentTarget;
+  readonly progress?: SshProgressReporter;
   readonly operation: (
     authOptions: SshAuth.SshAuthOptions,
   ) => Effect.Effect<T, SshEnvironmentEffectError, SshEnvironmentEffectContext>;
@@ -178,10 +204,16 @@ interface SshAuthAttemptInput<T> extends SshAuthOperationInput<T> {
   readonly authSecret: string | null;
 }
 
+export interface SshEnsureEnvironmentOptions {
+  readonly issuePairingToken?: boolean;
+  /** Receives one event per step change; it must not throw or block. */
+  readonly onProgress?: SshProgressSink;
+}
+
 export interface SshEnvironmentManagerShape {
   readonly ensureEnvironment: (
     target: DesktopSshEnvironmentTarget,
-    options?: { readonly issuePairingToken?: boolean },
+    options?: SshEnsureEnvironmentOptions,
   ) => Effect.Effect<
     DesktopSshEnvironmentBootstrap,
     SshEnvironmentEffectError,
@@ -469,6 +501,7 @@ ensure_remote_node_path() {
 
 const REMOTE_RUNNER_SCRIPT = `#!/bin/sh
 set -eu
+t3_progress() { printf '${SSH_PROGRESS_MARKER} %s\\n' "$1" >&2; }
 @@T3_NODE_ENV_SCRIPT@@
 T3_NODE_SCRIPT_PATH=@@T3_NODE_SCRIPT_PATH@@
 if [ -n "$T3_NODE_SCRIPT_PATH" ]; then
@@ -554,8 +587,10 @@ if ! t3_runtime_ready; then
       exit 1
     }
   }
+  t3_progress runtime.download
   t3_fetch "$T3_RELEASE_BASE_URL/v$T3_ARCHIVE_VERSION/SHA256SUMS" "$T3_STAGING/SHA256SUMS" @@T3_ARCHIVE_CHECKSUMS_SECONDS@@
   t3_fetch "$T3_RELEASE_BASE_URL/v$T3_ARCHIVE_VERSION/$T3_ARCHIVE" "$T3_STAGING/$T3_ARCHIVE" @@T3_ARCHIVE_DOWNLOAD_SECONDS@@
+  t3_progress runtime.verify
   T3_EXPECTED="$(grep " \\*\\{0,1\\}$T3_ARCHIVE$" "$T3_STAGING/SHA256SUMS" | cut -d' ' -f1)"
   if command -v sha256sum >/dev/null 2>&1; then
     T3_ACTUAL="$(sha256sum < "$T3_STAGING/$T3_ARCHIVE" | cut -d' ' -f1)"
@@ -565,6 +600,7 @@ if ! t3_runtime_ready; then
   if [ -z "$T3_EXPECTED" ] || [ "$T3_ACTUAL" != "$T3_EXPECTED" ]; then
     printf 'Checksum mismatch for %s.\\n' "$T3_ARCHIVE" >&2; exit 1
   fi
+  t3_progress runtime.install
   if ! T3_TAR_ERROR="$(tar -xzf "$T3_STAGING/$T3_ARCHIVE" -C "$T3_STAGING" --strip-components=1 2>&1)"; then
     # Some tars (BusyBox) gunzip internally, so gzip is only blamed once extraction fails.
     if command -v gzip >/dev/null 2>&1; then printf '%s\\n' "$T3_TAR_ERROR" >&2
@@ -610,6 +646,8 @@ const REMOTE_ENSURE_T3_HOME_SCRIPT = `if [ -L "$HOME/.t3" ] && [ ! -e "$HOME/.t3
 fi`;
 
 const REMOTE_LAUNCH_SCRIPT = `set -eu
+t3_progress() { printf '${SSH_PROGRESS_MARKER} %s\\n' "$1" >&2; }
+t3_progress connected
 @@T3_NODE_ENV_SCRIPT@@
 STATE_KEY="$1"
 LAUNCHER_ID="\${2:-}"
@@ -649,13 +687,16 @@ if [ "$T3_ARCHIVE_MODE" = "1" ]; then
   # The archive ships the helpers below inside the executable; the remote
   # needs no Node at all. Resolving the runner once here also downloads the
   # archive before the port and readiness probes rely on it.
+  t3_progress runtime.check
   "$RUNNER_NEXT" --version >/dev/null
+  t3_progress runtime.ready
 elif ! ensure_remote_node_path; then
   if ! command -v node >/dev/null 2>&1; then
     printf 'Remote host is missing node on PATH. Install Node or configure a supported version manager for non-interactive shells.\\n' >&2
   fi
   exit 1
 fi
+t3_progress server.check
 # Recovery runs under its own lock and re-reads the owner there, so a waiter
 # that judged an earlier lock stale cannot remove its successor's lock. No
 # launch removes another's recovery lock: only SIGKILL inside these lines
@@ -1016,6 +1057,7 @@ while [ -z "$REMOTE_PORT" ] && ! managed_server_running "$(cat "$PID_FILE" 2>/de
   OWNER_WAITED=$((OWNER_WAITED + 1))
 done
 if [ -z "$REMOTE_PORT" ]; then
+  t3_progress server.start
   REMOTE_PORT="$(pick_port)" || true
   if [ -z "$REMOTE_PORT" ]; then
     if [ "$T3_ARCHIVE_MODE" = "1" ]; then
@@ -1052,6 +1094,7 @@ if [ -z "$REMOTE_PORT" ]; then
     rm -f "$PID_FILE" "$PORT_FILE" "$MANAGED_FILE"
     exit 1
   fi
+  t3_progress server.ready
   # Keep the lock until another alias's launch can find this server, or it
   # would start a second one that loses the home's owner lock.
   RECORD_DEADLINE=$(($(date +%s) + @@T3_RUNTIME_RECORD_WAIT_SECONDS@@))
@@ -1073,6 +1116,8 @@ if [ -z "$REMOTE_PORT" ]; then
     fi
     sleep 0.1
   done
+else
+  t3_progress server.reuse
 fi
 printf '{"remotePort":%s,"serverKind":"%s"}\\n' "$REMOTE_PORT" "\${REMOTE_MANAGED:-managed}"
 `;
@@ -1255,6 +1300,7 @@ export const launchOrReuseRemoteServer = Effect.fn("ssh/tunnel.launchOrReuseRemo
     input?: SshAuth.SshAuthOptions,
     runner?: RemoteT3RunnerOptions,
     launcherId?: string | null,
+    progress?: SshProgressReporter,
   ): Effect.fn.Return<
     { readonly remotePort: number; readonly remoteServerKind: "external" | "managed" | null },
     SshCommandError | SshInvalidTargetError | SshLaunchError,
@@ -1268,9 +1314,17 @@ export const launchOrReuseRemoteServer = Effect.fn("ssh/tunnel.launchOrReuseRemo
       ...sshRunnerLogFields(runner),
       stateKey,
     });
+    const progressContext = remoteRunnerProgressContext(runner);
+    progress?.enter("connect", sshTargetProgressLabel(target));
     const result = yield* runSshCommand(target, {
       remoteCommandArgs: remoteLoginShellArgs(launchArgs),
       stdin: buildRemoteLaunchScript(runner),
+      ...(progress === undefined
+        ? {}
+        : {
+            onRemoteProgress: (marker: string) =>
+              applyRemoteProgressMarker(progress, marker, progressContext),
+          }),
       timeoutMs: isNodeScriptRunner(runner)
         ? REMOTE_LAUNCH_TIMEOUT_MS
         : REMOTE_ARCHIVE_LAUNCH_TIMEOUT_MS,
@@ -1300,6 +1354,7 @@ export const launchOrReuseRemoteServer = Effect.fn("ssh/tunnel.launchOrReuseRemo
         stdout: result.stdout,
       });
     }
+    progress?.finish();
     yield* Effect.logInfo("ssh.remoteServer.launch.ready", {
       ...sshTargetLogFields(target),
       remotePort: parsed.remotePort,
@@ -1854,6 +1909,7 @@ const makeSshEnvironmentManager = Effect.fn("ssh/tunnel.SshEnvironmentManager.ma
   const promptForPassword = Effect.fn("ssh/tunnel.promptForPassword")(function* (
     target: DesktopSshEnvironmentTarget,
     attempt: number,
+    progress?: SshProgressReporter,
   ): Effect.fn.Return<
     string,
     SshInvalidTargetError | SshPasswordPromptError,
@@ -1875,6 +1931,7 @@ const makeSshEnvironmentManager = Effect.fn("ssh/tunnel.SshEnvironmentManager.ma
       ...sshTargetLogFields(target),
       attempt,
     });
+    progress?.enter("password", `attempt ${attempt}`);
     const password = yield* promptService.request({
       attempt,
       destination: target.alias.trim() || target.hostname.trim(),
@@ -1894,6 +1951,7 @@ const makeSshEnvironmentManager = Effect.fn("ssh/tunnel.SshEnvironmentManager.ma
       ...sshTargetLogFields(target),
       attempt,
     });
+    progress?.finish();
     return password;
   });
 
@@ -1925,7 +1983,12 @@ const makeSshEnvironmentManager = Effect.fn("ssh/tunnel.SshEnvironmentManager.ma
       }
 
       const nextPromptCount = input.promptCount + 1;
-      const nextAuthSecret = yield* promptForPassword(input.target, nextPromptCount);
+      input.progress?.finish("key login not accepted");
+      const nextAuthSecret = yield* promptForPassword(
+        input.target,
+        nextPromptCount,
+        input.progress,
+      );
       authSecrets.set(input.key, nextAuthSecret);
       return yield* runWithSshAuthAttempt({
         ...input,
@@ -1970,6 +2033,7 @@ const makeSshEnvironmentManager = Effect.fn("ssh/tunnel.SshEnvironmentManager.ma
     readonly key: string;
     readonly resolvedTarget: DesktopSshEnvironmentTarget;
     readonly runner?: RemoteT3RunnerOptions;
+    readonly progress?: SshProgressReporter;
   }): Effect.fn.Return<SshTunnelEntry, SshEnvironmentEffectError, SshEnvironmentEffectContext> {
     yield* Effect.logDebug("ssh.environment.tunnel.create.start", {
       ...sshTargetLogFields(input.resolvedTarget),
@@ -1980,8 +2044,15 @@ const makeSshEnvironmentManager = Effect.fn("ssh/tunnel.SshEnvironmentManager.ma
     const remoteLaunch = yield* runWithSshAuth({
       key: input.key,
       target: input.resolvedTarget,
+      ...(input.progress === undefined ? {} : { progress: input.progress }),
       operation: (authOptions) =>
-        launchOrReuseRemoteServer(input.resolvedTarget, authOptions, input.runner, launcherId),
+        launchOrReuseRemoteServer(
+          input.resolvedTarget,
+          authOptions,
+          input.runner,
+          launcherId,
+          input.progress,
+        ),
     });
     const remotePort = remoteLaunch.remotePort;
     yield* Effect.logDebug("ssh.environment.remotePort.ready", {
@@ -2000,9 +2071,11 @@ const makeSshEnvironmentManager = Effect.fn("ssh/tunnel.SshEnvironmentManager.ma
       remotePort,
     });
     const entryScope = yield* Scope.make("sequential");
+    input.progress?.enter("tunnel", `localhost:${localPort}`);
     const tunnelEntry = yield* runWithSshAuth({
       key: input.key,
       target: input.resolvedTarget,
+      ...(input.progress === undefined ? {} : { progress: input.progress }),
       operation: (authOptions) => {
         const start = (controlPath: string | null) =>
           startSshTunnel({
@@ -2035,6 +2108,7 @@ const makeSshEnvironmentManager = Effect.fn("ssh/tunnel.SshEnvironmentManager.ma
       ),
     );
     tunnels.set(input.key, tunnelEntry);
+    input.progress?.finish();
     const spawnerService = yield* ChildProcessSpawner.ChildProcessSpawner;
     const digestService = yield* Digest.Digest;
     const fileSystemService = yield* FileSystem.FileSystem;
@@ -2103,8 +2177,13 @@ const makeSshEnvironmentManager = Effect.fn("ssh/tunnel.SshEnvironmentManager.ma
     key: string,
     resolvedTarget: DesktopSshEnvironmentTarget,
     runner?: RemoteT3RunnerOptions,
+    progress?: SshProgressReporter,
   ): Effect.fn.Return<SshTunnelEntry, SshEnvironmentEffectError, SshEnvironmentEffectContext> {
     const entry = tunnels.get(key) ?? null;
+    const noteReusedTunnel = (reused: SshTunnelEntry) => {
+      progress?.enter("tunnel", `reusing localhost:${reused.localPort}`);
+      progress?.finish();
+    };
 
     if (entry !== null) {
       yield* Effect.logDebug("ssh.environment.tunnel.existing.check", {
@@ -2150,6 +2229,7 @@ const makeSshEnvironmentManager = Effect.fn("ssh/tunnel.SshEnvironmentManager.ma
           localPort: entry.localPort,
           remotePort: entry.remotePort,
         });
+        noteReusedTunnel(entry);
         return entry;
       }
       if (Exit.isSuccess(readinessExit)) {
@@ -2159,6 +2239,7 @@ const makeSshEnvironmentManager = Effect.fn("ssh/tunnel.SshEnvironmentManager.ma
           localPort: entry.localPort,
           remotePort: entry.remotePort,
         });
+        noteReusedTunnel(entry);
         return entry;
       }
       yield* Effect.logWarning("ssh.environment.tunnel.existing.stale", {
@@ -2177,6 +2258,7 @@ const makeSshEnvironmentManager = Effect.fn("ssh/tunnel.SshEnvironmentManager.ma
       key,
       resolvedTarget,
       ...(runner === undefined ? {} : { runner }),
+      ...(progress === undefined ? {} : { progress }),
     }).pipe(
       Effect.tapError((cause) =>
         Effect.logWarning("ssh.environment.tunnel.create.failed", {
@@ -2188,9 +2270,10 @@ const makeSshEnvironmentManager = Effect.fn("ssh/tunnel.SshEnvironmentManager.ma
     );
   });
 
-  const ensureEnvironment = Effect.fn("ssh/tunnel.ensureEnvironment")(function* (
+  const ensureEnvironmentWithProgress = Effect.fn("ssh/tunnel.ensureEnvironment")(function* (
     target: DesktopSshEnvironmentTarget,
-    requestOptions?: { readonly issuePairingToken?: boolean },
+    requestOptions: SshEnsureEnvironmentOptions | undefined,
+    progress: SshProgressReporter,
   ): Effect.fn.Return<
     DesktopSshEnvironmentBootstrap,
     SshEnvironmentEffectError,
@@ -2200,12 +2283,14 @@ const makeSshEnvironmentManager = Effect.fn("ssh/tunnel.SshEnvironmentManager.ma
       ...sshTargetLogFields(target),
       issuePairingToken: requestOptions?.issuePairingToken === true,
     });
+    progress.enter("resolve-host", sshTargetProgressLabel(target));
     const baseResolved = yield* resolveSshTarget(target.alias || target.hostname);
     const resolvedTarget: DesktopSshEnvironmentTarget = {
       ...baseResolved,
       ...(target.username !== null ? { username: target.username } : {}),
       ...(target.port !== null ? { port: target.port } : {}),
     };
+    progress.finish();
     const key = targetConnectionKey(resolvedTarget);
     yield* Effect.logDebug("ssh.environment.target.resolved", {
       ...sshTargetLogFields(resolvedTarget),
@@ -2221,17 +2306,20 @@ const makeSshEnvironmentManager = Effect.fn("ssh/tunnel.SshEnvironmentManager.ma
     return yield* withTargetLock(
       key,
       Effect.gen(function* () {
-        const entry = yield* ensureTunnelEntry(key, resolvedTarget, runner);
+        const entry = yield* ensureTunnelEntry(key, resolvedTarget, runner, progress);
 
+        if (requestOptions?.issuePairingToken) progress.enter("pairing");
         const pairingResult = requestOptions?.issuePairingToken
           ? yield* runWithSshAuth({
               key,
               target: entry.target,
+              progress,
               operation: (authOptions) =>
                 issueRemotePairingToken(entry.target, authOptions, runner),
             })
           : null;
         const pairingToken = pairingResult?.credential ?? null;
+        progress.finish();
 
         yield* Effect.logInfo("ssh.environment.ensure.succeeded", {
           ...sshTargetLogFields(entry.target),
@@ -2253,6 +2341,16 @@ const makeSshEnvironmentManager = Effect.fn("ssh/tunnel.SshEnvironmentManager.ma
       }),
     );
   });
+
+  const ensureEnvironment = (
+    target: DesktopSshEnvironmentTarget,
+    requestOptions?: SshEnsureEnvironmentOptions,
+  ) => {
+    const progress = makeSshProgressReporter(requestOptions?.onProgress);
+    return ensureEnvironmentWithProgress(target, requestOptions, progress).pipe(
+      Effect.tapError((error) => Effect.sync(() => progress.fail(error.message))),
+    );
+  };
 
   const disconnectEnvironment = Effect.fn("ssh/tunnel.disconnectEnvironment")(function* (
     target: DesktopSshEnvironmentTarget,

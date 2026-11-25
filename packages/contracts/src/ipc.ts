@@ -458,8 +458,41 @@ export const DesktopSshPasswordPromptCancelledResultSchema = Schema.Struct({
   message: Schema.String,
 });
 
+export const DesktopSshEnsureProgressStepSchema = Schema.Literals([
+  "resolve-host",
+  "connect",
+  "password",
+  "runtime-check",
+  "runtime-download",
+  "runtime-verify",
+  "runtime-install",
+  "server-check",
+  "server-reuse",
+  "server-start",
+  "tunnel",
+  "pairing",
+]);
+export type DesktopSshEnsureProgressStep = typeof DesktopSshEnsureProgressStepSchema.Type;
+
+/** `detail` is short and scrubbed: a version, host or port while running, the cause when failed. */
+export const DesktopSshEnsureProgressSchema = Schema.Struct({
+  step: DesktopSshEnsureProgressStepSchema,
+  status: Schema.Literals(["running", "done", "failed"]),
+  detail: Schema.optionalKey(Schema.String),
+  at: Schema.Number,
+});
+export type DesktopSshEnsureProgress = typeof DesktopSshEnsureProgressSchema.Type;
+
+export const DesktopSshEnsureProgressEventSchema = Schema.Struct({
+  requestId: Schema.String,
+  ...DesktopSshEnsureProgressSchema.fields,
+});
+export type DesktopSshEnsureProgressEvent = typeof DesktopSshEnsureProgressEventSchema.Type;
+
 export const DesktopSshEnvironmentEnsureOptionsSchema = Schema.Struct({
   issuePairingToken: Schema.optionalKey(Schema.Boolean),
+  /** Tags the progress events this call emits, so concurrent calls do not mix. */
+  progressRequestId: Schema.optionalKey(Schema.String),
 });
 
 export const DesktopSshEnvironmentEnsureInputSchema = Schema.Struct({
@@ -1169,8 +1202,13 @@ export interface DesktopBridge {
   acknowledgeSnapShot: (id: string) => Promise<void>;
   ensureSshEnvironment: (
     target: DesktopSshEnvironmentTarget,
-    options?: { issuePairingToken?: boolean },
+    options?: { issuePairingToken?: boolean; progressRequestId?: string },
   ) => Promise<DesktopSshEnvironmentBootstrap>;
+  /** Progress of the `ensureSshEnvironment` call started with the same `progressRequestId`. */
+  onSshEnsureProgress: (
+    progressRequestId: string,
+    listener: (event: DesktopSshEnsureProgressEvent) => void,
+  ) => () => void;
   disconnectSshEnvironment: (target: DesktopSshEnvironmentTarget) => Promise<void>;
   fetchSshEnvironmentDescriptor: (httpBaseUrl: string) => Promise<ExecutionEnvironmentDescriptor>;
   bootstrapSshBearerSession: (

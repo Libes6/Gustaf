@@ -13,6 +13,7 @@ import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
 import { buildSshChildEnvironment, type SshAuthOptions } from "./auth.ts";
 import { SshCommandError, SshInvalidTargetError } from "./errors.ts";
+import { makeRemoteProgressLineFilter } from "./progress.ts";
 
 const DEFAULT_SSH_COMMAND_TIMEOUT_MS = 60_000;
 const MAX_SSH_ERROR_OUTPUT_LENGTH = 4_000;
@@ -41,6 +42,8 @@ export interface RunSshCommandOptions extends SshAuthOptions {
   readonly timeoutMs?: number;
   /** Keep the end of long failed-command stdout, where the final cause usually is. */
   readonly keepErrorOutputTail?: boolean;
+  /** Receives each remote stage marker the script prints; marker lines never reach `stderr`. */
+  readonly onRemoteProgress?: (marker: string) => void;
 }
 
 function parseSshConfigOutput(stdout: string): Map<string, string> {
@@ -154,12 +157,13 @@ const collectProcessOutput = <E>(
   stream: Stream.Stream<Uint8Array, E>,
   output: SshCommandOutput,
   key: keyof SshCommandOutput,
+  filter: (chunk: string) => string = (chunk) => chunk,
 ): Effect.Effect<void, E> =>
   stream.pipe(
     Stream.decodeText(),
     Stream.runForEach((chunk) =>
       Effect.sync(() => {
-        output[key] += chunk;
+        output[key] += filter(chunk);
       }),
     ),
   );
@@ -318,7 +322,12 @@ const runSshCommandInScope = Effect.fn("ssh/command.runSshCommand.inScope")(func
   const [, , exitCode] = yield* Effect.all(
     [
       collectProcessOutput(child.stdout, output, "stdout"),
-      collectProcessOutput(child.stderr, output, "stderr"),
+      collectProcessOutput(
+        child.stderr,
+        output,
+        "stderr",
+        makeRemoteProgressLineFilter(input.onRemoteProgress ?? (() => {})),
+      ),
       child.exitCode.pipe(Effect.map(Number)),
     ],
     { concurrency: "unbounded" },
