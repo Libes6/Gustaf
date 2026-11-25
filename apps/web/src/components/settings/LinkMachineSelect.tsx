@@ -2,7 +2,10 @@ import {
   ANOTHER_ADDRESS,
   type LinkableMachine,
   linkDestination,
+  relayChoice,
+  relayDeviceOfChoice,
 } from "@t3tools/client-runtime/link-request";
+import type { PeerLinkRelayMachine } from "@t3tools/contracts";
 import { T, useGT } from "gt-react";
 import { useId } from "react";
 
@@ -61,14 +64,49 @@ function MachineName({ machine }: { readonly machine: LinkableMachine }) {
   );
 }
 
-/** The user's other machines, including those on their T3 Connect account, then an address. */
+/** One of the account's other computers, reached through the Gustaf relay. */
+export function RelayMachineName({ machine }: { readonly machine: PeerLinkRelayMachine }) {
+  return (
+    <span className="flex min-w-0 items-center gap-2">
+      <EnvironmentMachineIcon kind="server" className="size-4 shrink-0 opacity-80" />
+      <span className="min-w-0 truncate">{machine.name}</span>
+    </span>
+  );
+}
+
+/** Whether a relay computer is linked already, or why it cannot be right now. */
+export function RelayMachineBadge({ machine }: { readonly machine: PeerLinkRelayMachine }) {
+  if (machine.linkedEnvironmentId !== undefined) {
+    return (
+      <Badge variant="success" size="sm">
+        <T>Linked</T>
+      </Badge>
+    );
+  }
+  return machine.online ? (
+    <Badge variant="outline" size="sm">
+      <T>Gustaf relay</T>
+    </Badge>
+  ) : (
+    <Badge variant="outline" size="sm">
+      <T>Offline</T>
+    </Badge>
+  );
+}
+
+/**
+ * The user's other machines, including those on their T3 Connect account and the computers on
+ * their Gustaf account that the relay reaches with no address, then an address.
+ */
 export function LinkMachineSelect({
   machines,
+  relayMachines = [],
   value,
   onChange,
   disabled,
 }: {
   readonly machines: ReadonlyArray<LinkableMachine>;
+  readonly relayMachines?: ReadonlyArray<PeerLinkRelayMachine>;
   readonly value: string | null;
   readonly onChange: (value: string) => void;
   readonly disabled: boolean;
@@ -91,6 +129,12 @@ export function LinkMachineSelect({
           <SelectValue>
             {(selected: string | null) => {
               if (selected === ANOTHER_ADDRESS) return gt("Another address…");
+              const relayDevice = relayDeviceOfChoice(selected);
+              const relayMachine =
+                relayDevice === null
+                  ? undefined
+                  : relayMachines.find((candidate) => candidate.deviceId === relayDevice);
+              if (relayMachine !== undefined) return <RelayMachineName machine={relayMachine} />;
               const machine = machines.find((candidate) => candidate.environmentId === selected);
               return machine === undefined ? (
                 gt("Choose a machine")
@@ -106,6 +150,19 @@ export function LinkMachineSelect({
               <span className="flex min-w-0 items-center justify-between gap-3">
                 <MachineName machine={machine} />
                 <LinkMachineBadge machine={machine} />
+              </span>
+            </SelectItem>
+          ))}
+          {relayMachines.map((machine) => (
+            <SelectItem
+              key={machine.deviceId}
+              value={relayChoice(machine.deviceId)}
+              disabled={!machine.online}
+              hideIndicator
+            >
+              <span className="flex min-w-0 items-center justify-between gap-3">
+                <RelayMachineName machine={machine} />
+                <RelayMachineBadge machine={machine} />
               </span>
             </SelectItem>
           ))}

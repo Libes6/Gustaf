@@ -110,6 +110,8 @@
   "85b2c80d3832bd14": "Impossible d’obtenir un code d’appairage là-bas",
   "c7b1524d9b492428": "Association impossible",
   "b455e8f32a9d4c40": "une machine",
+  "4c99fe00acba8f5e": "This computer is not signed in to the Gustaf relay, so it cannot list your account's other machines. Run gustaf relay login in a terminal on it, or sign in under Account.",
+  "7780cb1664c299b7": "The Gustaf relay did not answer, so your account's machines cannot be listed.",
   "4cded869dea19ab2": "En attente d’une réponse dans le fil d’origine",
   "2b94dca2d528688f": "Machine associée",
   "929e93b30d895f49": "{target} associé",
@@ -4334,12 +4336,14 @@
   "1138f95b01382016": "Associer une machine",
   "ea745611e41bb8b5": "Associer {targetName}",
   "7fc043db70cdbe3f": "Machine",
+  "58b7b0e79013a091": "Associé",
+  "e182f99f5c5c00ca": "Gustaf relay",
+  "4ba692b01a327ce3": "Hors ligne",
   "4474db19bf5700c9": "Autre adresse…",
   "5f94f772730a004b": "Associez une machine que cette app ne connaît pas, par son adresse https ou Tailscale.",
   "57a631f659db8c6b": "Collez le code",
   "8b61f3e4b14d099b": "Utiliser ce lien",
   "b2a0c42daed47c36": "Associer",
-  "58b7b0e79013a091": "Associé",
   "481373fbd4042755": "Seule une session qui gère les accès ici peut répondre.",
   "a5df4321e1820773": "Les agents d’ici pourront alors lancer des fils là-bas, leur envoyer des messages et les attendre. L’association apparaît sous Clients autorisés dans Partage et accès de cette machine, où elle peut être révoquée.",
   "9cab5bd6475291cf": "Vérifier cette adresse",
@@ -4362,6 +4366,14 @@
     },
     ". L’agent peut utiliser cette association telle quelle ; modifiez son accès dans Paramètres → Environnements."
   ],
+  "a665fa0f52a947ed": [
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " is on your Gustaf account, so no address or pairing code is needed. Someone there still has to allow this in Gustaf."
+  ],
   "e8235ebb43ad7228": "Créez un lien sur une machine : Paramètres → Partage et accès → Clients autorisés → Créer un lien, puis collez son code ici.",
   "a974e6c3c613e452": [
     "Créez un lien sur ",
@@ -4373,6 +4385,24 @@
     " : Paramètres → Partage et accès → Clients autorisés → Créer un lien, puis collez son code ici."
   ],
   "f4df93b2da86737f": "Un agent d’ici n’obtient jamais non plus là-bas plus que son propre mode ici. Les fils qu’il y démarre ne peuvent pas modifier les fils, projets ou paramètres propres à cet environnement.",
+  "d70736252324cc3c": [
+    "Reaching ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " through the Gustaf relay…"
+  ],
+  "bce910f7009f87a9": [
+    "Waiting for ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " to allow this. Open Gustaf there and check that it shows this code before allowing it:"
+  ],
   "9aa1f2dc2d32625a": "{term, select, mr {Merge request {number}, {title}} cr {Demande de modification {number}, {title}} other {Pull request {number}, {title}}}",
   "3a293ca2b7fb24c4": "en attente de l’état de l’hôte",
   "dcccf73d0270243f": "en conflit avec {branch}",
@@ -4460,7 +4490,6 @@
   "292cccd1075abd6e": "Le fournisseur n’a aucune trace des sous-agents lancés par cet appel.",
   "9c1ae7fa9c9b2d0d": "Les étapes précédentes ne sont pas affichées.",
   "19074843c7d134dc": "Pas encore de transcription.",
-  "4ba692b01a327ce3": "Hors ligne",
   "60f1e4428eca5eac": "Masquer les détails de connexion de {title}",
   "400667ed9c6be7f1": "Afficher les détails de connexion de {title}",
   "70a6342814614ba1": "Se reconnecter maintenant",

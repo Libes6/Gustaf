@@ -6,6 +6,8 @@ import {
   type OrchestrationV2TurnItem,
   type PeerLinkRequestAnswerInput,
   type PeerLinkName,
+  type PeerLinkRelayMachine,
+  type PeerLinkRelayProblem,
   type PeerLinkSummary,
   resolveEnvironmentMachineKind,
   type ServerConfig,
@@ -224,6 +226,63 @@ export function linkRequestInitialMachine(
 /** The machine choice for linking by an address typed in. */
 export const ANOTHER_ADDRESS = "another-address";
 
+const RELAY_CHOICE_PREFIX = "relay:";
+
+/**
+ * The machine choice for one of the account's computers reached over the Gustaf relay. It is a
+ * device id, not an environment id: the environment is only learned once the computer answers.
+ */
+export const relayChoice = (deviceId: string) => `${RELAY_CHOICE_PREFIX}${deviceId}`;
+
+/** The device id a relay choice names, or null for any other choice. */
+export const relayDeviceOfChoice = (choice: string | null): string | null =>
+  choice?.startsWith(RELAY_CHOICE_PREFIX) === true
+    ? choice.slice(RELAY_CHOICE_PREFIX.length)
+    : null;
+
+/**
+ * Orders the account's computers for an agent's hint, as machines are: its best match first.
+ * Offline ones come last, since they cannot be linked right now.
+ */
+export function rankRelayMachinesByHint(
+  machines: ReadonlyArray<PeerLinkRelayMachine>,
+  hint: string | undefined,
+): ReadonlyArray<PeerLinkRelayMachine> {
+  const ranked = rankMachinesByHint(
+    machines.map((machine) => ({ ...machine, label: machine.name })),
+    hint,
+  );
+  return [
+    ...ranked.filter((machine) => machine.online),
+    ...ranked.filter((machine) => !machine.online),
+  ];
+}
+
+/** The relay computer a card opens on: the one its hint names, if it is online. */
+export function linkRequestInitialRelayMachine(
+  item: Pick<LinkRequestItem, "hint">,
+  machines: ReadonlyArray<PeerLinkRelayMachine>,
+): string | null {
+  if (item.hint === undefined) return null;
+  const [best] = rankRelayMachinesByHint(machines, item.hint);
+  return best !== undefined && best.online && hintRank(best.name, item.hint) < NO_MATCH
+    ? relayChoice(best.deviceId)
+    : null;
+}
+
+/** Why the account's computers are not listed, in words for the user. */
+export const relayProblemMessage = (
+  problem: PeerLinkRelayProblem,
+  resolve: MFunctionType = mFallback,
+): string =>
+  problem === "signed_out"
+    ? resolve(
+        msg(
+          "This computer is not signed in to the Gustaf relay, so it cannot list your account's other machines. Run gustaf relay login in a terminal on it, or sign in under Account.",
+        ),
+      )
+    : resolve(msg("The Gustaf relay did not answer, so your account's machines cannot be listed."));
+
 /**
  * What a link request links: a machine from the client's catalog, or an address.
  * `urls` is empty when the client knows no direct address for the machine,
@@ -352,6 +411,12 @@ export function linkRequestAnswerInput(
           | { readonly url: string };
         readonly access: AuthMcpClientAccess;
         readonly pairingCode: string;
+      }
+    | {
+        /** One of the account's computers, through the relay: no address and no pairing code. */
+        readonly type: "link-relay";
+        readonly deviceId: string;
+        readonly access: AuthMcpClientAccess;
       }
     | { readonly type: "use-existing"; readonly environmentId: EnvironmentId }
     | { readonly type: "decline" },

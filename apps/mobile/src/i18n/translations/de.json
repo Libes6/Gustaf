@@ -110,6 +110,8 @@
   "85b2c80d3832bd14": "Dort konnte kein Kopplungscode erstellt werden",
   "c7b1524d9b492428": "Verknüpfen fehlgeschlagen",
   "b455e8f32a9d4c40": "einen Rechner",
+  "4c99fe00acba8f5e": "This computer is not signed in to the Gustaf relay, so it cannot list your account's other machines. Run gustaf relay login in a terminal on it, or sign in under Account.",
+  "7780cb1664c299b7": "The Gustaf relay did not answer, so your account's machines cannot be listed.",
   "4cded869dea19ab2": "Wartet auf eine Antwort im ursprünglichen Thread",
   "2b94dca2d528688f": "Rechner verknüpft",
   "929e93b30d895f49": "{target} verknüpft",
@@ -4339,12 +4341,14 @@
   "1138f95b01382016": "Rechner verknüpfen",
   "ea745611e41bb8b5": "{targetName} verknüpfen",
   "7fc043db70cdbe3f": "Rechner",
+  "58b7b0e79013a091": "Verknüpft",
+  "e182f99f5c5c00ca": "Gustaf relay",
+  "4ba692b01a327ce3": "Offline",
   "4474db19bf5700c9": "Andere Adresse…",
   "5f94f772730a004b": "Verknüpfe einen Rechner, den diese App nicht kennt, über seine https- oder Tailscale-Adresse.",
   "57a631f659db8c6b": "Code einfügen",
   "8b61f3e4b14d099b": "Diesen Link verwenden",
   "b2a0c42daed47c36": "Verknüpfen",
-  "58b7b0e79013a091": "Verknüpft",
   "481373fbd4042755": "Nur eine Sitzung, die hier den Zugriff verwaltet, kann darauf antworten.",
   "a5df4321e1820773": "Agenten hier können dort dann Threads starten, ihnen Nachrichten senden und auf sie warten. Sie erscheint unter „Autorisierte Clients“ in „Freigabe & Zugriff“ dieses Rechners und kann dort widerrufen werden.",
   "9cab5bd6475291cf": "Diese Adresse prüfen",
@@ -4367,6 +4371,14 @@
     },
     " verknüpft. Der Agent kann diese Verknüpfung so verwenden; ändere den Zugriff unter Einstellungen → Umgebungen."
   ],
+  "a665fa0f52a947ed": [
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " is on your Gustaf account, so no address or pairing code is needed. Someone there still has to allow this in Gustaf."
+  ],
   "e8235ebb43ad7228": "Erstelle auf einem Rechner einen Link: Einstellungen → Freigabe & Zugriff → Autorisierte Clients → Link erstellen, und füge dann seinen Code hier ein.",
   "a974e6c3c613e452": [
     "Erstelle einen Link auf ",
@@ -4378,6 +4390,24 @@
     ": Einstellungen → Freigabe & Zugriff → Autorisierte Clients → Link erstellen, und füge den Code dann hier ein."
   ],
   "f4df93b2da86737f": "Ein Agent von hier bekommt dort ebenfalls nie mehr als seinen eigenen Modus hier. Threads, die er dort startet, können die eigenen Threads, Projekte oder Einstellungen dieser Umgebung nicht ändern.",
+  "d70736252324cc3c": [
+    "Reaching ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " through the Gustaf relay…"
+  ],
+  "bce910f7009f87a9": [
+    "Waiting for ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " to allow this. Open Gustaf there and check that it shows this code before allowing it:"
+  ],
   "9aa1f2dc2d32625a": "{term, select, mr {Merge Request {number}, {title}} cr {Änderungsanfrage {number}, {title}} other {Pull Request {number}, {title}}}",
   "3a293ca2b7fb24c4": "warte auf Host-Status",
   "dcccf73d0270243f": "Konflikte mit {branch}",
@@ -4466,7 +4496,6 @@
   "292cccd1075abd6e": "Der Anbieter hat keine Aufzeichnung darüber, welche Subagenten dieser Aufruf gestartet hat.",
   "9c1ae7fa9c9b2d0d": "Frühere Schritte werden nicht angezeigt.",
   "19074843c7d134dc": "Noch kein Transkript.",
-  "4ba692b01a327ce3": "Offline",
   "60f1e4428eca5eac": "Verbindungsdetails für {title} ausblenden",
   "400667ed9c6be7f1": "Verbindungsdetails für {title} anzeigen",
   "70a6342814614ba1": "Jetzt neu verbinden",

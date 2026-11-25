@@ -4,7 +4,12 @@ import {
   linkBatchFailureLabel,
   linkWithMintedCode,
 } from "@t3tools/client-runtime/link-batch";
-import { ANOTHER_ADDRESS, linkRequestFailureMessage } from "@t3tools/client-runtime/link-request";
+import {
+  ANOTHER_ADDRESS,
+  linkRequestFailureMessage,
+  relayDeviceOfChoice,
+  relayProblemMessage,
+} from "@t3tools/client-runtime/link-request";
 import {
   AuthAccessWriteScope,
   type AuthMcpClientAccess,
@@ -16,6 +21,7 @@ import {
   squashAtomCommandFailure,
 } from "@t3tools/client-runtime/state/runtime";
 import { peerLinkHealth, type PeerLinkHealth } from "@t3tools/client-runtime/state/peerLinks";
+import { relayHostFromUrl } from "@t3tools/shared/relayTunnelClient";
 import * as DateTime from "effect/DateTime";
 import * as Option from "effect/Option";
 import * as Result from "effect/Result";
@@ -31,6 +37,8 @@ import {
   useLinkableMachines,
   useLinkBackOffers,
   useLinkThroughRoutes,
+  useRelayAttempts,
+  useRelayMachines,
 } from "~/state/peerLinks";
 import { useEnvironments } from "~/state/environments";
 import { useEnvironmentQuery } from "~/state/query";
@@ -57,6 +65,7 @@ import { ITEM_ROW_CLASSNAME, ITEM_ROW_INNER_CLASSNAME } from "./itemRows";
 import { LinkAccessPicker } from "./LinkAccessPicker";
 import { LinkAddressWarning, LinkMachineSelect } from "./LinkMachineSelect";
 import { LinkSeveralEnvironmentsAction } from "./LinkSeveralEnvironments";
+import { RelayLinkWaiting } from "./RelayLinkWaiting";
 import { SettingsRow, SettingsSection } from "./settingsLayout";
 import { useLiveRefresh } from "../../hooks/useLiveRefresh";
 import { m as resolveMessage } from "../../i18n/messages";
@@ -66,6 +75,17 @@ import { useSearchableSetting } from "./settingsSearch";
 // Console log labels for the atom commands.
 const UNLINK_COMMAND_LABEL = "unlink environment";
 const LINK_COMMAND_LABEL = "link environment";
+
+/** A failed link's message when the server wrote it for the user, else its plain text. */
+const peerLinkFailureText = (failure: unknown) =>
+  typeof failure === "object" &&
+  failure !== null &&
+  "_tag" in failure &&
+  failure._tag === "PeerLinkError" &&
+  "message" in failure &&
+  typeof failure.message === "string"
+    ? failure.message
+    : String(failure);
 
 const failureToast = (title: string, description: string) =>
   toastManager.add(stackedThreadToast({ type: "error", title, description }));
@@ -178,7 +198,11 @@ function LinkedEnvironmentRow({
           <p className="text-xs text-muted-foreground">
             {m(accessConfig[link.access].label)} · {status}
           </p>
-          <p className="truncate text-xs text-muted-foreground/80">{link.urls.join(", ")}</p>
+          <p className="truncate text-xs text-muted-foreground/80">
+            {link.urls
+              .map((url) => (relayHostFromUrl(url) === null ? url : gt("Gustaf relay")))
+              .join(", ")}
+          </p>
         </div>
         {canUnlink ? (
           <div className="flex w-full shrink-0 items-center gap-2 sm:w-auto sm:justify-end">
@@ -293,6 +317,12 @@ export function LinkEnvironmentDialog({
     reportFailure: false,
     reportDefect: false,
   });
+  const relayLink = useAtomCommand(peerLinkEnvironment.relayLink, {
+    label: "link environment through the relay",
+    reportFailure: false,
+  });
+  // Cancels a relay link that waits for the other machine's user.
+  const relayCancel = useRef<AbortController | null>(null);
   const pairThrough = useAtomCommand(peerLinkEnvironment.pairLink, {
     label: "pair link through a linked environment",
     // The answer is a credential; keep it out of the console.
@@ -302,7 +332,19 @@ export function LinkEnvironmentDialog({
   // Machines that would not give a code through a link, so the dialog asks for one instead.
   const [throughFailed, setThroughFailed] = useState<ReadonlySet<EnvironmentId>>(new Set());
   const [alsoLinkBack, setAlsoLinkBack] = useState(false);
-  const selected = choice ?? (machines.length === 0 ? ANOTHER_ADDRESS : null);
+  const relay = useRelayMachines(environmentId, open);
+  const selected =
+    choice ?? (machines.length === 0 && relay.machines.length === 0 ? ANOTHER_ADDRESS : null);
+  // A computer of the user's Gustaf account: reached through the relay with no address and no
+  // pairing code, because its own user allows the link on that computer.
+  const relayDevice = relayDeviceOfChoice(selected);
+  const relayMachine =
+    relayDevice === null
+      ? null
+      : (relay.machines.find((candidate) => candidate.deviceId === relayDevice) ?? null);
+  const viaRelay = relayMachine !== null;
+  const relayAttempts = useRelayAttempts(environmentId, busy && viaRelay);
+  const relayAttempt = relayAttempts.find((attempt) => attempt.deviceId === relayDevice);
   // Only for the machine the dialog opened for: another choice or address is another machine.
   const prefilledThrough =
     prefill?.through !== undefined &&
@@ -315,11 +357,13 @@ export function LinkEnvironmentDialog({
   const connected = usePreparedConnection(targetId);
   const mayMint = useEnvironmentScope(targetId, AuthAccessWriteScope);
   // A picked machine that left the list has no address here either.
-  const needsAddress = selected !== null && (machine === null || machine.urls.length === 0);
+  const needsAddress =
+    !viaRelay && selected !== null && (machine === null || machine.urls.length === 0);
   // This client mints a code there when it is connected with a session that may
   // create pairing links, and only for its own addresses: anything can answer
   // as that machine at one typed in, so that one gets a code the user fetched.
   const canMint =
+    !viaRelay &&
     targetId !== null &&
     !needsAddress &&
     Option.isSome(connected) &&
@@ -348,8 +392,10 @@ export function LinkEnvironmentDialog({
   const linkBack = useLinkBackOffers(environmentId, targetId === null ? [] : [targetId], open);
   const backOffer = linkBack.offerFor(targetId);
   const ready =
+    (viaRelay && relayMachine.online) ||
     through !== null ||
-    (selected !== null &&
+    (!viaRelay &&
+      selected !== null &&
       (!needsAddress || address.trim().length > 0) &&
       (canMint || pairingCode.trim().length > 0));
   const handleOpenChange = (next: boolean) => {
@@ -405,7 +451,32 @@ export function LinkEnvironmentDialog({
     );
     return null;
   };
+  // Waits for the other computer's user, so it can take minutes and can be cancelled meanwhile.
+  const submitRelay = async (device: string, label: string) => {
+    if (inFlight.current || !ready) return;
+    inFlight.current = true;
+    setBusy(true);
+    const controller = new AbortController();
+    relayCancel.current = controller;
+    const result = await relayLink(
+      { environmentId, input: { deviceId: device, access } },
+      { signal: controller.signal },
+    );
+    relayCancel.current = null;
+    inFlight.current = false;
+    setBusy(false);
+    if (result._tag === "Success") {
+      toastManager.add({ type: "success", title: gt("Linked {label}", { label }) });
+      handleOpenChange(false);
+    } else if (!isAtomCommandInterrupted(result)) {
+      failureToast(
+        gt("Could not link {label}", { label }),
+        peerLinkFailureText(squashAtomCommandFailure(result)),
+      );
+    }
+  };
   const submit = async () => {
+    if (relayMachine !== null) return submitRelay(relayMachine.deviceId, relayMachine.name);
     const [url, ...alternateUrls] =
       machine === null || needsAddress ? [address.trim()] : machine.urls;
     if (inFlight.current || !ready || url === undefined) return;
@@ -516,9 +587,11 @@ export function LinkEnvironmentDialog({
               void submit();
             }}
           >
-            {machines.length > 0 && (through === null || through !== prefilledThrough) ? (
+            {(machines.length > 0 || relay.machines.length > 0) &&
+            (through === null || through !== prefilledThrough) ? (
               <LinkMachineSelect
                 machines={machines}
+                relayMachines={relay.machines}
                 value={selected}
                 disabled={busy}
                 onChange={(next) => {
@@ -572,7 +645,26 @@ export function LinkEnvironmentDialog({
             {needsAddress && through === null && address.trim() ? (
               <LinkAddressWarning address={address} />
             ) : null}
-            {selected === null || canMint || through !== null ? null : (
+            {viaRelay ? (
+              <p className="text-xs text-muted-foreground">
+                {gt(
+                  "{name} is on your Gustaf account, so no address or pairing code is needed. Someone there still has to allow this in Gustaf.",
+                  { name: relayMachine.name },
+                )}
+              </p>
+            ) : null}
+            {relay.problem !== null && relay.machines.length === 0 ? (
+              <p className="text-xs text-muted-foreground">
+                {relayProblemMessage(relay.problem, m)}
+              </p>
+            ) : null}
+            {viaRelay && busy ? (
+              <RelayLinkWaiting
+                name={relayMachine.name}
+                safetyCode={relayAttempt?.safetyCode ?? null}
+              />
+            ) : null}
+            {selected === null || canMint || through !== null || viaRelay ? null : (
               <label className="block space-y-1.5">
                 <span className="block text-xs font-medium text-foreground">
                   <T>Pairing code</T>
@@ -635,9 +727,15 @@ export function LinkEnvironmentDialog({
           </form>
         </DialogPanel>
         <DialogFooter variant="bare">
-          <DialogClose disabled={busy} render={<Button variant="outline" type="button" />}>
-            <T>Cancel</T>
-          </DialogClose>
+          {viaRelay && busy ? (
+            <Button variant="outline" type="button" onClick={() => relayCancel.current?.abort()}>
+              <T>Cancel</T>
+            </Button>
+          ) : (
+            <DialogClose disabled={busy} render={<Button variant="outline" type="button" />}>
+              <T>Cancel</T>
+            </DialogClose>
+          )}
           <Button form={formId} type="submit" disabled={busy || !ready}>
             {busy ? gt("Linking…") : gt("Link", { $context: "verb, links an environment" })}
           </Button>

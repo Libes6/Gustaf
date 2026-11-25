@@ -110,6 +110,8 @@
   "85b2c80d3832bd14": "无法在该机器上获取配对码",
   "c7b1524d9b492428": "无法关联",
   "b455e8f32a9d4c40": "一台机器",
+  "4c99fe00acba8f5e": "This computer is not signed in to the Gustaf relay, so it cannot list your account's other machines. Run gustaf relay login in a terminal on it, or sign in under Account.",
+  "7780cb1664c299b7": "The Gustaf relay did not answer, so your account's machines cannot be listed.",
   "4cded869dea19ab2": "正在等待原会话中的回答",
   "2b94dca2d528688f": "已关联一台机器",
   "929e93b30d895f49": "已关联 {target}",
@@ -4337,12 +4339,14 @@
   "1138f95b01382016": "关联机器",
   "ea745611e41bb8b5": "关联 {targetName}",
   "7fc043db70cdbe3f": "机器",
+  "58b7b0e79013a091": "已关联",
+  "e182f99f5c5c00ca": "Gustaf relay",
+  "4ba692b01a327ce3": "离线",
   "4474db19bf5700c9": "其他地址…",
   "5f94f772730a004b": "通过 https 或 Tailscale 地址关联此应用不认识的机器。",
   "57a631f659db8c6b": "粘贴配对码",
   "8b61f3e4b14d099b": "使用此关联",
   "b2a0c42daed47c36": "关联",
-  "58b7b0e79013a091": "已关联",
   "481373fbd4042755": "只有在这里拥有访问管理权限的连接才能处理此请求。",
   "a5df4321e1820773": "之后，此处的智能体可以在那里启动会话、发送消息并等待会话。它会显示在该机器“共享与访问”的“已授权客户端”下，可在那里撤销。",
   "9cab5bd6475291cf": "请核对此地址",
@@ -4365,6 +4369,14 @@
     },
     "。智能体可以直接使用该关联；请在“设置 → 环境”中更改其访问权限。"
   ],
+  "a665fa0f52a947ed": [
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " is on your Gustaf account, so no address or pairing code is needed. Someone there still has to allow this in Gustaf."
+  ],
   "e8235ebb43ad7228": "在某台机器上创建链接：设置 → 共享与访问 → 已授权的客户端 → 创建链接，然后在此处粘贴配对码。",
   "a974e6c3c613e452": [
     "在 ",
@@ -4376,6 +4388,24 @@
     " 上创建链接：设置 → 共享与访问 → 已授权的客户端 → 创建链接，然后在此处粘贴配对码。"
   ],
   "f4df93b2da86737f": "此处的智能体在那里获得的权限同样不会超过它在此处的模式。它在那里启动的会话无法更改该环境自身的会话、项目或设置。",
+  "d70736252324cc3c": [
+    "Reaching ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " through the Gustaf relay…"
+  ],
+  "bce910f7009f87a9": [
+    "Waiting for ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " to allow this. Open Gustaf there and check that it shows this code before allowing it:"
+  ],
   "9aa1f2dc2d32625a": "{term, select, mr {MR {number}，{title}} cr {change request {number}，{title}} other {PR {number}，{title}}}",
   "3a293ca2b7fb24c4": "正在等待主机状态",
   "dcccf73d0270243f": "与 {branch} 冲突",
@@ -4461,7 +4491,6 @@
   "292cccd1075abd6e": "提供方没有记录这次调用启动了哪些子智能体。",
   "9c1ae7fa9c9b2d0d": "更早的步骤未显示。",
   "19074843c7d134dc": "暂无记录。",
-  "4ba692b01a327ce3": "离线",
   "60f1e4428eca5eac": "隐藏 {title} 的连接详情",
   "400667ed9c6be7f1": "显示 {title} 的连接详情",
   "70a6342814614ba1": "立即重新连接",

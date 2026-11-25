@@ -8,6 +8,7 @@ import { shellAccount } from "../../shellAccount";
 import { usePrimaryEnvironmentId } from "../../state/environments";
 import { relayHostEnvironment } from "../../state/relayHost";
 import { useAtomCommand } from "../../state/use-atom-command";
+import { accessConfig } from "../auth/ConnectAgentSurface";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { QRCodeSvg } from "../ui/qr-code";
@@ -172,8 +173,23 @@ function RelayHostSettings({ environmentId }: { environmentId: EnvironmentId }) 
       {status.pending.map((pending) => (
         <SettingsRow
           key={pending.id}
-          title={gt("Allow “{name}”?", { name: pending.name })}
-          description={gt("Safety code {code}", { code: pending.safetyCode })}
+          title={
+            pending.peerLink
+              ? gt("Allow “{name}” to link its agents here?", { name: pending.name })
+              : gt("Allow “{name}”?", { name: pending.name })
+          }
+          description={
+            pending.peerLink
+              ? gt(
+                  "{access}. Safety code {code}: it must match the code shown on {name}. Only allow it if you just started this link.",
+                  {
+                    access: m(accessConfig[pending.peerLink.access].label),
+                    code: pending.safetyCode,
+                    name: pending.name,
+                  },
+                )
+              : gt("Safety code {code}", { code: pending.safetyCode })
+          }
           control={
             <span className="flex gap-2">
               <Button
@@ -197,7 +213,7 @@ function RelayHostSettings({ environmentId }: { environmentId: EnvironmentId }) 
                   )
                 }
               >
-                <T>Allow device</T>
+                {pending.peerLink ? <T>Allow link</T> : <T>Allow device</T>}
               </Button>
             </span>
           }

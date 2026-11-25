@@ -110,6 +110,8 @@
   "85b2c80d3832bd14": "Kunde inte hämta en parkopplingskod där",
   "c7b1524d9b492428": "Kunde inte länka",
   "b455e8f32a9d4c40": "en dator",
+  "4c99fe00acba8f5e": "This computer is not signed in to the Gustaf relay, so it cannot list your account's other machines. Run gustaf relay login in a terminal on it, or sign in under Account.",
+  "7780cb1664c299b7": "The Gustaf relay did not answer, so your account's machines cannot be listed.",
   "4cded869dea19ab2": "Väntar på svar i den ursprungliga tråden",
   "2b94dca2d528688f": "Länkade en dator",
   "929e93b30d895f49": "Länkade {target}",
@@ -4340,12 +4342,14 @@
   "1138f95b01382016": "Länka en dator",
   "ea745611e41bb8b5": "Länka {targetName}",
   "7fc043db70cdbe3f": "Dator",
+  "58b7b0e79013a091": "Länkad",
+  "e182f99f5c5c00ca": "Gustaf relay",
+  "4ba692b01a327ce3": "Offline",
   "4474db19bf5700c9": "En annan adress…",
   "5f94f772730a004b": "Länka en dator som appen inte känner till, via dess https- eller Tailscale-adress.",
   "57a631f659db8c6b": "Klistra in koden",
   "8b61f3e4b14d099b": "Använd den här länken",
   "b2a0c42daed47c36": "Länka",
-  "58b7b0e79013a091": "Länkad",
   "481373fbd4042755": "Bara en session som hanterar åtkomst här kan svara på det här.",
   "a5df4321e1820773": "Agenter här kan sedan starta, skicka meddelanden till och vänta på trådar där. Den visas under Auktoriserade klienter i datorns Delning och åtkomst, där den kan återkallas.",
   "9cab5bd6475291cf": "Kontrollera den här adressen",
@@ -4368,6 +4372,14 @@
     },
     ". Agenten kan använda den länken som den är; ändra dess åtkomst under Inställningar → Miljöer."
   ],
+  "a665fa0f52a947ed": [
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " is on your Gustaf account, so no address or pairing code is needed. Someone there still has to allow this in Gustaf."
+  ],
   "e8235ebb43ad7228": "Skapa en länk på en dator: Inställningar → Delning och åtkomst → Auktoriserade klienter → Skapa länk, och klistra sedan in koden här.",
   "a974e6c3c613e452": [
     "Skapa en länk på ",
@@ -4379,6 +4391,24 @@
     ": Inställningar → Delning och åtkomst → Auktoriserade klienter → Skapa länk och klistra sedan in dess kod här."
   ],
   "f4df93b2da86737f": "En agent här får aldrig mer där än sitt eget läge här heller. Trådar den startar där kan inte ändra den miljöns egna trådar, projekt eller inställningar.",
+  "d70736252324cc3c": [
+    "Reaching ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " through the Gustaf relay…"
+  ],
+  "bce910f7009f87a9": [
+    "Waiting for ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " to allow this. Open Gustaf there and check that it shows this code before allowing it:"
+  ],
   "9aa1f2dc2d32625a": "{term, select, mr {Merge request {number}, {title}} cr {Ändringsbegäran {number}, {title}} other {Pull request {number}, {title}}}",
   "3a293ca2b7fb24c4": "väntar på värdens tillstånd",
   "dcccf73d0270243f": "har konflikter med {branch}",
@@ -4466,7 +4496,6 @@
   "292cccd1075abd6e": "Leverantören har ingen uppgift om vilka subagenter det här anropet startade.",
   "9c1ae7fa9c9b2d0d": "Tidigare steg visas inte.",
   "19074843c7d134dc": "Ingen transkription än.",
-  "4ba692b01a327ce3": "Offline",
   "60f1e4428eca5eac": "Dölj anslutningsdetaljer för {title}",
   "400667ed9c6be7f1": "Visa anslutningsdetaljer för {title}",
   "70a6342814614ba1": "Återanslut nu",

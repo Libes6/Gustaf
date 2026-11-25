@@ -50,6 +50,22 @@ export function createPeerLinkEnvironmentAtoms<R, E>(
     tag: WS_METHODS.peerLinksNames,
     staleTimeMs: 10_000,
   });
+  // The account's other computers, as the relay lists them. Each read asks the relay.
+  const relayMachines = createEnvironmentRpcQueryAtomFamily(runtime, {
+    label: "environment-data:peer-links:relay-machines",
+    tag: WS_METHODS.peerLinksRelayMachines,
+    staleTimeMs: 5_000,
+    idleTtlMs: 0,
+  });
+  // The relay links waiting for their computer's user, with the safety code each shows. It is
+  // read only while a view waits on one, so the refresh interval costs nothing otherwise.
+  const relayAttempts = createEnvironmentRpcQueryAtomFamily(runtime, {
+    label: "environment-data:peer-links:relay-attempts",
+    tag: WS_METHODS.peerLinksRelayAttempts,
+    staleTimeMs: 0,
+    idleTtlMs: 0,
+    refreshIntervalMs: 1_500,
+  });
   const refreshLinks = (registry: AtomRegistry.AtomRegistry, environmentId: EnvironmentId) =>
     Effect.sync(() => {
       registry.refresh(list({ environmentId, input: {} }));
@@ -121,6 +137,21 @@ export function createPeerLinkEnvironmentAtoms<R, E>(
     link: createEnvironmentRpcCommand(runtime, {
       label: "environment-data:peer-links:link",
       tag: WS_METHODS.peerLinksLink,
+      onSuccess: ({ environmentId }, registry) => refreshLinks(registry, environmentId),
+    }),
+    relayMachines,
+    relayAttempts,
+    /**
+     * Links one of the account's computers through the relay. Answers once its user has allowed
+     * it there, which can take minutes, so the command is not retried or merged with another.
+     */
+    relayLink: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:peer-links:relay-link",
+      tag: WS_METHODS.peerLinksRelayLink,
+      concurrency: {
+        mode: "singleFlight",
+        key: ({ environmentId, input }) => JSON.stringify([environmentId, input.deviceId]),
+      },
       onSuccess: ({ environmentId }, registry) => refreshLinks(registry, environmentId),
     }),
     // Leaves the list alone: a batch refreshes it once, when it ends (`runLinkBatch`).

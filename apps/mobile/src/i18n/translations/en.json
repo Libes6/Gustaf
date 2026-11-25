@@ -110,6 +110,8 @@
   "85b2c80d3832bd14": "Could not get a pairing code there",
   "c7b1524d9b492428": "Could not link",
   "b455e8f32a9d4c40": "a machine",
+  "4c99fe00acba8f5e": "This computer is not signed in to the Gustaf relay, so it cannot list your account's other machines. Run gustaf relay login in a terminal on it, or sign in under Account.",
+  "7780cb1664c299b7": "The Gustaf relay did not answer, so your account's machines cannot be listed.",
   "4cded869dea19ab2": "Waiting for an answer in the original thread",
   "2b94dca2d528688f": "Linked a machine",
   "929e93b30d895f49": "Linked {target}",
@@ -4341,12 +4343,14 @@
   "1138f95b01382016": "Link a machine",
   "ea745611e41bb8b5": "Link {targetName}",
   "7fc043db70cdbe3f": "Machine",
+  "58b7b0e79013a091": "Linked",
+  "e182f99f5c5c00ca": "Gustaf relay",
+  "4ba692b01a327ce3": "Offline",
   "4474db19bf5700c9": "Another address…",
   "5f94f772730a004b": "Link a machine this app does not know, by its https or Tailscale address.",
   "57a631f659db8c6b": "Paste the code",
   "8b61f3e4b14d099b": "Use this link",
   "b2a0c42daed47c36": "Link",
-  "58b7b0e79013a091": "Linked",
   "481373fbd4042755": "Only a session that manages access here can answer this.",
   "a5df4321e1820773": "Agents here can then launch, message and wait on threads there. It appears under Authorized clients in that machine's Sharing & access, where it can be revoked.",
   "9cab5bd6475291cf": "Check this address",
@@ -4369,6 +4373,14 @@
     },
     ". The agent can use that link as it is; change its access in Settings → Environments."
   ],
+  "a665fa0f52a947ed": [
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " is on your Gustaf account, so no address or pairing code is needed. Someone there still has to allow this in Gustaf."
+  ],
   "e8235ebb43ad7228": "Create a link on a machine: Settings → Sharing & access → Authorized clients → Create link, then paste its code here.",
   "a974e6c3c613e452": [
     "Create a link on ",
@@ -4380,6 +4392,24 @@
     ": Settings → Sharing & access → Authorized clients → Create link, then paste its code here."
   ],
   "f4df93b2da86737f": "An agent here never gets more there than its own mode here either. Threads it starts there cannot change that environment's own threads, projects or settings.",
+  "d70736252324cc3c": [
+    "Reaching ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " through the Gustaf relay…"
+  ],
+  "bce910f7009f87a9": [
+    "Waiting for ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " to allow this. Open Gustaf there and check that it shows this code before allowing it:"
+  ],
   "9aa1f2dc2d32625a": "{term, select, mr {Merge request {number}, {title}} cr {Change request {number}, {title}} other {Pull request {number}, {title}}}",
   "3a293ca2b7fb24c4": "waiting for host state",
   "dcccf73d0270243f": "conflicts with {branch}",
@@ -4468,7 +4498,6 @@
   "292cccd1075abd6e": "The provider has no record of which subagents this call started.",
   "9c1ae7fa9c9b2d0d": "Earlier steps are not shown.",
   "19074843c7d134dc": "No transcript yet.",
-  "4ba692b01a327ce3": "Offline",
   "60f1e4428eca5eac": "Hide connection details for {title}",
   "400667ed9c6be7f1": "Show connection details for {title}",
   "70a6342814614ba1": "Reconnect now",

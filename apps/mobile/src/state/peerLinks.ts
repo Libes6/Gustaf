@@ -85,3 +85,31 @@ export function useLinkableMachines(environmentId: EnvironmentId, enabled: boole
     connect: discovery.environments,
   });
 }
+
+/**
+ * The account's other computers, for linking one through the Gustaf relay from `environmentId`,
+ * with no address and no pairing code. Asked only while `enabled`, and only where that
+ * environment supports relay links. `problem` says why the list is empty when it cannot be read.
+ */
+export function useRelayMachines(environmentId: EnvironmentId, enabled: boolean) {
+  const { environments } = useEnvironments();
+  const supported =
+    environments.find((environment) => environment.environmentId === environmentId)?.serverConfig
+      ?.environment.capabilities.relayPeerLinks === true;
+  const query = useEnvironmentQuery(
+    enabled && supported ? peerLinkEnvironment.relayMachines({ environmentId, input: {} }) : null,
+  );
+  return {
+    supported,
+    machines: query.data?.machines ?? [],
+    problem: query.data?.problem ?? null,
+  };
+}
+
+/** The relay links `environmentId` is waiting on, with the safety code each shows. */
+export function useRelayAttempts(environmentId: EnvironmentId, enabled: boolean) {
+  const query = useEnvironmentQuery(
+    enabled ? peerLinkEnvironment.relayAttempts({ environmentId, input: {} }) : null,
+  );
+  return query.data?.attempts ?? [];
+}

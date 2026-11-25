@@ -110,6 +110,8 @@
   "85b2c80d3832bd14": "无法在该机器上获取配对码",
   "c7b1524d9b492428": "无法关联",
   "b455e8f32a9d4c40": "一台机器",
+  "4c99fe00acba8f5e": "This computer is not signed in to the Gustaf relay, so it cannot list your account's other machines. Run gustaf relay login in a terminal on it, or sign in under Account.",
+  "7780cb1664c299b7": "The Gustaf relay did not answer, so your account's machines cannot be listed.",
   "4cded869dea19ab2": "正在等待原会话中的回答",
   "2b94dca2d528688f": "已关联一台机器",
   "929e93b30d895f49": "已关联 {target}",
@@ -3801,6 +3803,14 @@
       "v": "v"
     },
     " 地址。请输入其 https 或 Tailscale 地址。"
+  ],
+  "a665fa0f52a947ed": [
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " is on your Gustaf account, so no address or pairing code is needed. Someone there still has to allow this in Gustaf."
   ],
   "7ebb23e6bf9b19e8": "配对码",
   "e8235ebb43ad7228": "在某台机器上创建链接：设置 → 共享与访问 → 已授权的客户端 → 创建链接，然后在此处粘贴配对码。",
@@ -9136,6 +9146,7 @@
   "9cab5bd6475291cf": "请核对此地址",
   "03ce9bea5f88ddbd": "此应用无法确认它是你的机器之一。你粘贴的配对码会发送到那里。",
   "30b696434167411f": "已关联",
+  "4183f0ffbb8ccfb1": "Gustaf relay",
   "80bbda74ee500b82": "机器",
   "4e7b0a3ced2d0f97": "关联多个环境",
   "0f3a6d9b3350d800": "从 {source} 链接多台机器",
@@ -9166,11 +9177,13 @@
   "82a0120f80907e97": "{via} 无法从 {target} 获取配对码",
   "883abe5832a6732e": "请改为输入它的地址和从它获取的配对码。",
   "e1789f863205ad5a": "无法关联环境",
-  "836dde1b729e6f0a": "已双向关联 {source} 和 {target}",
   "40cde51afa218290": "已关联 {label}",
+  "96ff38efe824b902": "Could not link {label}",
+  "836dde1b729e6f0a": "已双向关联 {source} 和 {target}",
   "ca4e4015b89ed9a8": "无法将 {target} 反向关联到 {source}",
   "64ac3d1579ca9f5b": "将 {source} 关联到 {target}",
   "5f2e20c62a4fece3": "{via} 以完全访问权限链接到 {target}，因此由它获取配对码。无需粘贴配对码。",
+  "b8a7b3167266ccfc": "{name} is on your Gustaf account, so no address or pairing code is needed. Someone there still has to allow this in Gustaf.",
   "fb71127e5746a6bc": "从远端“共享与访问”页面或 t3 pair 获取",
   "1e3fee7084791773": "同时将 {target} 反向关联到 {source}",
   "ea34a190b0bd804c": "之后 {target} 上的智能体也能在 {source} 上工作。",
@@ -9883,16 +9896,37 @@
   "0af21bd13ea69a72": "Your phone or another computer with the Gustaf app connects through the Gustaf relay with end-to-end encryption. The relay sees only that two of your devices are talking, not what they say.",
   "22c720d1f6cd9ef0": "Scan with the Gustaf app",
   "9a75c2e105398f3f": "Scan this code in Gustaf on your phone, or paste the link in the desktop app on another computer under Settings → Environments → Add environment → Gustaf relay. It works once, for five minutes.",
+  "352476072485eef7": "Allow “{name}” to link its agents here?",
   "99984c945e3048ba": "Allow “{name}”?",
+  "f887d9dae99fa90d": "{access}. Safety code {code}: it must match the code shown on {name}. Only allow it if you just started this link.",
   "744d166b7667a318": "Safety code {code}",
   "3e1026bcc5f6c23f": "Allowed on {date}",
   "529a9ada6bc63841": "Each allowed phone shows the same safety code. Matching codes mean nobody sits between the two devices.",
   "c9cafb18c6b39e82": "Reach this computer from any network",
   "38c7b7528e2bd246": "Connect a device",
   "b8cdfff5c128f754": "Reject",
+  "cdc2ae4cc8024fdb": "Allow link",
   "feaf01813bde4430": "Allow device",
   "37bd2049c2ba2451": "Hide safety codes",
   "cdea16f63ddec538": "Show safety codes",
+  "d70736252324cc3c": [
+    "Reaching ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " through the Gustaf relay…"
+  ],
+  "bce910f7009f87a9": [
+    "Waiting for ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " to allow this. Open Gustaf there and check that it shows this code before allowing it:"
+  ],
   "d47e342629c6eb9b": "Pairing over the relay failed.",
   "c6f57dc06be3bb12": "Allow this computer on the other one to finish pairing. It shows the same safety code: {code}",
   "a61739e0ab8993ad": "This is not a Gustaf relay link. Copy it from Settings → Sharing & access on the other computer.",

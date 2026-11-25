@@ -8,9 +8,13 @@ import {
   linkRequestDisplay,
   linkRequestFailureMessage,
   linkRequestInitialMachine,
+  linkRequestInitialRelayMachine,
   type LinkRequestItem,
   linkRequestTarget,
   rankMachinesByHint,
+  rankRelayMachinesByHint,
+  relayChoice,
+  relayDeviceOfChoice,
 } from "@t3tools/client-runtime/link-request";
 import {
   isAtomCommandInterrupted,
@@ -33,7 +37,12 @@ import { SymbolView, type AppSymbolName } from "../../components/ui/AppSymbol";
 import { AppText as Text, AppTextInput as TextInput } from "../../components/ui/AppText";
 import { EnvironmentMachineSymbol } from "../../components/EnvironmentMachineSymbol";
 import type { MessageResolver } from "../../i18n/messages";
-import { peerLinkEnvironment, useLinkableMachines } from "../../state/peerLinks";
+import {
+  peerLinkEnvironment,
+  useLinkableMachines,
+  useRelayAttempts,
+  useRelayMachines,
+} from "../../state/peerLinks";
 import { mintPairingCodeOn } from "../../state/peerPairingCode";
 import { useEnvironmentScope, usePreparedConnection } from "../../state/session";
 import { useAtomCommand } from "../../state/use-atom-command";
@@ -206,6 +215,12 @@ function LinkRequestSheet(props: {
   const pickMachine = picksMachine(item);
   const listed = useLinkableMachines(props.environmentId, true);
   const machines = useMemo(() => rankMachinesByHint(listed, item.hint), [listed, item.hint]);
+  // The user's other computers on their Gustaf account, reached through the relay with no code.
+  const relay = useRelayMachines(props.environmentId, pickMachine);
+  const relayMachines = useMemo(
+    () => rankRelayMachinesByHint(relay.machines, item.hint),
+    [relay.machines, item.hint],
+  );
   const [choice, setChoice] = useState<string | null>(null);
   const [address, setAddress] = useState(item.url ?? "");
   const [access, setAccess] = useState<AuthMcpClientAccess>(() => linkRequestDefaultAccess(item));
@@ -221,10 +236,23 @@ function LinkRequestSheet(props: {
     reportFailure: false,
     reportDefect: false,
   });
-  const selected = choice ?? linkRequestInitialMachine(item, machines);
-  const target = linkRequestTarget(item, machines, selected, m);
-  const targetName =
-    target.kind === "machine"
+  const selected =
+    choice ??
+    linkRequestInitialMachine(item, machines) ??
+    linkRequestInitialRelayMachine(item, relayMachines);
+  const relayDevice = relayDeviceOfChoice(selected);
+  const relayMachine =
+    relayMachines.find((candidate) => candidate.deviceId === relayDevice) ?? null;
+  const viaRelay = relayMachine !== null;
+  const relayAttempts = useRelayAttempts(props.environmentId, busy && viaRelay);
+  const relayAttempt = relayAttempts.find((attempt) => attempt.deviceId === relayDevice);
+  const relayCancel = useRef<AbortController | null>(null);
+  const target = viaRelay
+    ? ({ kind: "none" } as const)
+    : linkRequestTarget(item, machines, selected, m);
+  const targetName = viaRelay
+    ? relayMachine.name
+    : target.kind === "machine"
       ? target.label
       : item.url === undefined
         ? null
@@ -243,13 +271,25 @@ function LinkRequestSheet(props: {
     Option.isSome(connected) &&
     mayMint &&
     !mintFailed.has(targetId);
-  const useExisting = target.kind === "machine" && target.linked;
-  const ready =
-    target.kind !== "none" &&
-    (useExisting ||
-      ((!needsAddress || address.trim().length > 0) && (canMint || pairingCode.trim().length > 0)));
+  const relayLinkedTo = relayMachine?.linkedEnvironmentId;
+  const useExisting = relayLinkedTo !== undefined || (target.kind === "machine" && target.linked);
+  const ready = viaRelay
+    ? relayMachine.online
+    : target.kind !== "none" &&
+      (useExisting ||
+        ((!needsAddress || address.trim().length > 0) &&
+          (canMint || pairingCode.trim().length > 0)));
 
   const prepareAnswer = async () => {
+    if (relayMachine !== null) {
+      return relayLinkedTo !== undefined
+        ? linkRequestAnswerInput(item, { type: "use-existing", environmentId: relayLinkedTo })
+        : linkRequestAnswerInput(item, {
+            type: "link-relay",
+            deviceId: relayMachine.deviceId,
+            access,
+          });
+    }
     if (target.kind === "none") return null;
     if (target.kind === "machine" && target.linked) {
       return linkRequestAnswerInput(item, {
@@ -276,13 +316,22 @@ function LinkRequestSheet(props: {
   };
 
   const submit = async () => {
-    if (inFlight.current || target.kind === "none") return;
+    if (inFlight.current || (target.kind === "none" && !viaRelay)) return;
     inFlight.current = true;
     setBusy(true);
     setError(null);
     const input = await prepareAnswer();
+    // A relay link waits for the other computer's user, so it can be cancelled meanwhile.
+    const controller = new AbortController();
+    relayCancel.current = controller;
     const result =
-      input === null ? null : await answer({ environmentId: props.environmentId, input });
+      input === null
+        ? null
+        : await answer(
+            { environmentId: props.environmentId, input },
+            { signal: controller.signal },
+          );
+    relayCancel.current = null;
     inFlight.current = false;
     setBusy(false);
     if (result === null) return;
@@ -360,13 +409,33 @@ function LinkRequestSheet(props: {
                 }}
               />
             ))}
+            {relayMachines.map((machine, index) => (
+              <SettingsChoiceRow
+                key={machine.deviceId}
+                label={machine.name}
+                description={
+                  machine.linkedEnvironmentId !== undefined
+                    ? gt("Linked")
+                    : machine.online
+                      ? gt("Gustaf relay")
+                      : gt("Offline")
+                }
+                selected={selected === relayChoice(machine.deviceId)}
+                separated={machines.length > 0 || index > 0}
+                disabled={busy || !machine.online}
+                onPress={() => {
+                  setChoice(relayChoice(machine.deviceId));
+                  setError(null);
+                }}
+              />
+            ))}
             <SettingsChoiceRow
               label={gt("Another address…")}
               description={gt(
                 "Link a machine this app does not know, by its https or Tailscale address.",
               )}
               selected={selected === ANOTHER_ADDRESS}
-              separated={machines.length > 0}
+              separated={machines.length > 0 || relayMachines.length > 0}
               disabled={busy}
               onPress={() => {
                 setChoice(ANOTHER_ADDRESS);
@@ -407,7 +476,15 @@ function LinkRequestSheet(props: {
           </Text>
         ) : target.kind === "none" ? null : (
           <>
-            {canMint ? null : (
+            {viaRelay ? (
+              <Text className="font-sans text-xs text-foreground-muted">
+                <T>
+                  <Var>{targetName}</Var> is on your Gustaf account, so no address or pairing code
+                  is needed. Someone there still has to allow this in Gustaf.
+                </T>
+              </Text>
+            ) : null}
+            {canMint || viaRelay ? null : (
               <View className="gap-2">
                 <TextInput
                   accessibilityLabel={gt("Pairing code")}
@@ -457,6 +534,32 @@ function LinkRequestSheet(props: {
             </Text>
           </>
         )}
+        {viaRelay && busy ? (
+          <View
+            accessibilityRole="alert"
+            className="gap-1 rounded-xl border border-border-subtle p-3"
+          >
+            {relayAttempt?.safetyCode == null ? (
+              <Text className="font-sans text-sm text-foreground-muted">
+                <T>
+                  Reaching <Var>{targetName}</Var> through the Gustaf relay…
+                </T>
+              </Text>
+            ) : (
+              <>
+                <Text className="font-sans text-sm text-foreground-muted">
+                  <T>
+                    Waiting for <Var>{targetName}</Var> to allow this. Open Gustaf there and check
+                    that it shows this code before allowing it:
+                  </T>
+                </Text>
+                <Text selectable className="font-t3-bold text-lg tracking-wider text-foreground">
+                  {relayAttempt.safetyCode}
+                </Text>
+              </>
+            )}
+          </View>
+        ) : null}
         {error !== null ? (
           <Text
             accessibilityRole="alert"
@@ -482,8 +585,8 @@ function LinkRequestSheet(props: {
         <Button
           label={gt("Cancel")}
           tone="secondary"
-          disabled={busy}
-          onPress={props.onClose}
+          disabled={busy && !viaRelay}
+          onPress={() => (busy ? relayCancel.current?.abort() : props.onClose())}
           fullWidth
         />
       </ScrollView>

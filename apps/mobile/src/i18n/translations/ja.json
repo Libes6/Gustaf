@@ -110,6 +110,8 @@
   "85b2c80d3832bd14": "そのマシンでペアリングコードを取得できませんでした",
   "c7b1524d9b492428": "リンクできませんでした",
   "b455e8f32a9d4c40": "マシン",
+  "4c99fe00acba8f5e": "This computer is not signed in to the Gustaf relay, so it cannot list your account's other machines. Run gustaf relay login in a terminal on it, or sign in under Account.",
+  "7780cb1664c299b7": "The Gustaf relay did not answer, so your account's machines cannot be listed.",
   "4cded869dea19ab2": "元のスレッドで回答を待っています",
   "2b94dca2d528688f": "マシンをリンクしました",
   "929e93b30d895f49": "{target} をリンクしました",
@@ -4330,12 +4332,14 @@
   "1138f95b01382016": "マシンをリンク",
   "ea745611e41bb8b5": "{targetName} をリンク",
   "7fc043db70cdbe3f": "マシン",
+  "58b7b0e79013a091": "リンク済み",
+  "e182f99f5c5c00ca": "Gustaf relay",
+  "4ba692b01a327ce3": "オフライン",
   "4474db19bf5700c9": "別のアドレス…",
   "5f94f772730a004b": "このアプリが認識していないマシンを、https または Tailscale のアドレスでリンクします。",
   "57a631f659db8c6b": "コードを貼り付け",
   "8b61f3e4b14d099b": "このリンクを使用",
   "b2a0c42daed47c36": "リンク",
-  "58b7b0e79013a091": "リンク済み",
   "481373fbd4042755": "これに応答できるのは、ここでアクセスを管理しているセッションだけです。",
   "a5df4321e1820773": "これで、ここのエージェントがそこでスレッドを起動し、メッセージを送り、完了を待てるようになります。リンクはそのマシンの「共有とアクセス」の「承認済みクライアント」に表示され、そこで取り消せます。",
   "9cab5bd6475291cf": "このアドレスを確認",
@@ -4358,6 +4362,14 @@
     },
     " にリンクされています。エージェントはそのリンクをそのまま使用できます。アクセス権は [設定] → [環境] で変更してください。"
   ],
+  "a665fa0f52a947ed": [
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " is on your Gustaf account, so no address or pairing code is needed. Someone there still has to allow this in Gustaf."
+  ],
   "e8235ebb43ad7228": "マシンでリンクを作成してください (設定 → 共有とアクセス → 認可済みクライアント → リンクを作成)。その後、コードをここに貼り付けてください。",
   "a974e6c3c613e452": [
     {
@@ -4368,6 +4380,24 @@
     " でリンクを作成し ([設定] → [共有とアクセス] → [承認済みクライアント] → [リンクを作成])、そのコードをここに貼り付けてください。"
   ],
   "f4df93b2da86737f": "ここのエージェントがリンク先で得られる権限も、ここでのモードを超えることはありません。そこで開始したスレッドは、その環境自体のスレッド、プロジェクト、設定を変更できません。",
+  "d70736252324cc3c": [
+    "Reaching ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " through the Gustaf relay…"
+  ],
+  "bce910f7009f87a9": [
+    "Waiting for ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " to allow this. Open Gustaf there and check that it shows this code before allowing it:"
+  ],
   "9aa1f2dc2d32625a": "{term, select, mr {マージリクエスト {number}、{title}} cr {変更リクエスト {number}、{title}} other {プルリクエスト {number}、{title}}}",
   "3a293ca2b7fb24c4": "ホストの状態を待っています",
   "dcccf73d0270243f": "{branch} と競合",
@@ -4452,7 +4482,6 @@
   "292cccd1075abd6e": "この呼び出しで開始されたサブエージェントの記録がプロバイダーにありません。",
   "9c1ae7fa9c9b2d0d": "以前のステップは表示されていません。",
   "19074843c7d134dc": "トランスクリプトはまだありません。",
-  "4ba692b01a327ce3": "オフライン",
   "60f1e4428eca5eac": "{title} の接続の詳細を非表示",
   "400667ed9c6be7f1": "{title} の接続の詳細を表示",
   "70a6342814614ba1": "今すぐ再接続",

@@ -110,6 +110,8 @@
   "85b2c80d3832bd14": "No se pudo obtener un código de emparejamiento allí",
   "c7b1524d9b492428": "No se pudo vincular",
   "b455e8f32a9d4c40": "una máquina",
+  "4c99fe00acba8f5e": "This computer is not signed in to the Gustaf relay, so it cannot list your account's other machines. Run gustaf relay login in a terminal on it, or sign in under Account.",
+  "7780cb1664c299b7": "The Gustaf relay did not answer, so your account's machines cannot be listed.",
   "4cded869dea19ab2": "Esperando una respuesta en el hilo original",
   "2b94dca2d528688f": "Se vinculó una máquina",
   "929e93b30d895f49": "Se vinculó {target}",
@@ -3796,6 +3798,14 @@
       "v": "v"
     },
     " a la que pueda acceder otra máquina. Introduce su dirección https o de Tailscale."
+  ],
+  "a665fa0f52a947ed": [
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " is on your Gustaf account, so no address or pairing code is needed. Someone there still has to allow this in Gustaf."
   ],
   "7ebb23e6bf9b19e8": "Código de emparejamiento",
   "e8235ebb43ad7228": "Crea un enlace en una máquina: Ajustes → Compartir y acceso → Clientes autorizados → Crear enlace, y pega aquí su código.",
@@ -9118,6 +9128,7 @@
   "9cab5bd6475291cf": "Comprobar esta dirección",
   "03ce9bea5f88ddbd": "Esta app no puede confirmar que sea una de tus máquinas. El código de emparejamiento que pegues se envía allí.",
   "30b696434167411f": "Vinculado",
+  "4183f0ffbb8ccfb1": "Gustaf relay",
   "80bbda74ee500b82": "Máquina",
   "4e7b0a3ced2d0f97": "Vincular varios entornos",
   "0f3a6d9b3350d800": "Vincular varias máquinas desde {source}",
@@ -9148,11 +9159,13 @@
   "82a0120f80907e97": "{via} no pudo obtener un código de emparejamiento de {target}",
   "883abe5832a6732e": "Introduce su dirección y un código de emparejamiento de esa máquina.",
   "e1789f863205ad5a": "No se pudo vincular el entorno",
-  "836dde1b729e6f0a": "{source} y {target} vinculados en ambos sentidos",
   "40cde51afa218290": "{label} vinculado",
+  "96ff38efe824b902": "Could not link {label}",
+  "836dde1b729e6f0a": "{source} y {target} vinculados en ambos sentidos",
   "ca4e4015b89ed9a8": "No se pudo vincular {target} de vuelta a {source}",
   "64ac3d1579ca9f5b": "Vincular {source} con {target}",
   "5f2e20c62a4fece3": "{via} está vinculado a {target} con acceso total, así que obtiene el código de emparejamiento. No hay que pegar ningún código.",
+  "b8a7b3167266ccfc": "{name} is on your Gustaf account, so no address or pairing code is needed. Someone there still has to allow this in Gustaf.",
   "fb71127e5746a6bc": "Desde Compartir y acceso allí, o t3 pair",
   "1e3fee7084791773": "Vincular también {target} de vuelta a {source}",
   "ea34a190b0bd804c": "Los agentes de {target} podrán trabajar también en {source}.",
@@ -9864,16 +9877,37 @@
   "0af21bd13ea69a72": "Your phone or another computer with the Gustaf app connects through the Gustaf relay with end-to-end encryption. The relay sees only that two of your devices are talking, not what they say.",
   "22c720d1f6cd9ef0": "Scan with the Gustaf app",
   "9a75c2e105398f3f": "Scan this code in Gustaf on your phone, or paste the link in the desktop app on another computer under Settings → Environments → Add environment → Gustaf relay. It works once, for five minutes.",
+  "352476072485eef7": "Allow “{name}” to link its agents here?",
   "99984c945e3048ba": "Allow “{name}”?",
+  "f887d9dae99fa90d": "{access}. Safety code {code}: it must match the code shown on {name}. Only allow it if you just started this link.",
   "744d166b7667a318": "Safety code {code}",
   "3e1026bcc5f6c23f": "Allowed on {date}",
   "529a9ada6bc63841": "Each allowed phone shows the same safety code. Matching codes mean nobody sits between the two devices.",
   "c9cafb18c6b39e82": "Reach this computer from any network",
   "38c7b7528e2bd246": "Connect a device",
   "b8cdfff5c128f754": "Reject",
+  "cdc2ae4cc8024fdb": "Allow link",
   "feaf01813bde4430": "Allow device",
   "37bd2049c2ba2451": "Hide safety codes",
   "cdea16f63ddec538": "Show safety codes",
+  "d70736252324cc3c": [
+    "Reaching ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " through the Gustaf relay…"
+  ],
+  "bce910f7009f87a9": [
+    "Waiting for ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " to allow this. Open Gustaf there and check that it shows this code before allowing it:"
+  ],
   "d47e342629c6eb9b": "Pairing over the relay failed.",
   "c6f57dc06be3bb12": "Allow this computer on the other one to finish pairing. It shows the same safety code: {code}",
   "a61739e0ab8993ad": "This is not a Gustaf relay link. Copy it from Settings → Sharing & access on the other computer.",

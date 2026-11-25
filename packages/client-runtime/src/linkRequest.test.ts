@@ -15,9 +15,13 @@ import {
   linkRequestDisplay,
   linkRequestFailureMessage,
   linkRequestInitialMachine,
+  linkRequestInitialRelayMachine,
   linkRequestTarget,
   linkRequestTargetName,
   rankMachinesByHint,
+  rankRelayMachinesByHint,
+  relayChoice,
+  relayDeviceOfChoice,
 } from "./linkRequest.ts";
 
 const item = {
@@ -411,6 +415,52 @@ describe("rankMachinesByHint", () => {
         listed,
       ),
     ).toBe("environment-x");
+  });
+});
+
+describe("the account's computers over the relay", () => {
+  const vps = { deviceId: "d-vps", name: "My VPS", online: true };
+  const nas = { deviceId: "d-nas", name: "NAS", online: true };
+  const asleep = { deviceId: "d-vps-old", name: "VPS (old)", online: false };
+
+  it("names a choice by device id, apart from environments and addresses", () => {
+    expect(relayDeviceOfChoice(relayChoice("d-vps"))).toBe("d-vps");
+    expect(relayDeviceOfChoice(ANOTHER_ADDRESS)).toBeNull();
+    expect(relayDeviceOfChoice("environment-1")).toBeNull();
+    expect(relayDeviceOfChoice(null)).toBeNull();
+  });
+
+  it("lists the hint's match first and the machines that are offline last", () => {
+    expect(rankRelayMachinesByHint([nas, asleep, vps], "vps").map((m) => m.deviceId)).toEqual([
+      "d-vps",
+      "d-nas",
+      "d-vps-old",
+    ]);
+    expect(rankRelayMachinesByHint([asleep, nas], undefined).map((m) => m.deviceId)).toEqual([
+      "d-nas",
+      "d-vps-old",
+    ]);
+  });
+
+  it("opens a card on the hint's computer only while it is online", () => {
+    expect(linkRequestInitialRelayMachine({ hint: "my vps" }, [nas, vps])).toBe(
+      relayChoice("d-vps"),
+    );
+    expect(
+      linkRequestInitialRelayMachine({ hint: "vps" }, [nas, { ...vps, online: false }]),
+    ).toBeNull();
+    expect(linkRequestInitialRelayMachine({ hint: "toaster" }, [nas, vps])).toBeNull();
+    expect(linkRequestInitialRelayMachine({}, [nas, vps])).toBeNull();
+  });
+
+  it("answers a card with the computer and the access, and nothing that could be a code", () => {
+    expect(
+      linkRequestAnswerInput(item, { type: "link-relay", deviceId: "d-vps", access: "auto" }),
+    ).toEqual({
+      threadId: item.threadId,
+      turnItemId: item.id,
+      answer: { type: "link-relay", deviceId: "d-vps", access: "auto" },
+    });
   });
 });
 

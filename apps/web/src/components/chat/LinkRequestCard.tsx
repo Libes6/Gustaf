@@ -8,10 +8,14 @@ import {
   linkRequestDisplay,
   linkRequestFailureMessage,
   linkRequestInitialMachine,
+  linkRequestInitialRelayMachine,
   type LinkRequestItem,
   linkRequestTarget,
   linkRequestTargetName,
   rankMachinesByHint,
+  rankRelayMachinesByHint,
+  relayChoice,
+  relayDeviceOfChoice,
 } from "@t3tools/client-runtime/link-request";
 import {
   isAtomCommandInterrupted,
@@ -22,6 +26,7 @@ import {
   type AuthMcpClientAccess,
   type EnvironmentId,
   type OrchestrationV2ProjectedTurnItem,
+  type PeerLinkRelayMachine,
 } from "@t3tools/contracts";
 import * as Option from "effect/Option";
 import * as Result from "effect/Result";
@@ -31,12 +36,23 @@ import { useId, useRef, useState } from "react";
 
 import { useEnvironmentScope, usePreparedConnection } from "../../state/session";
 import { mintPairingCodeOn } from "../../state/peerPairingCode";
-import { peerLinkEnvironment, useLinkableMachines } from "../../state/peerLinks";
+import {
+  peerLinkEnvironment,
+  useLinkableMachines,
+  useRelayAttempts,
+  useRelayMachines,
+} from "../../state/peerLinks";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { accessConfig } from "../auth/ConnectAgentSurface";
 import { EnvironmentMachineIcon } from "../EnvironmentMachineIcon";
 import { LinkAccessPicker } from "../settings/LinkAccessPicker";
-import { LinkAddressWarning, LinkMachineBadge } from "../settings/LinkMachineSelect";
+import {
+  LinkAddressWarning,
+  LinkMachineBadge,
+  RelayMachineBadge,
+  RelayMachineName,
+} from "../settings/LinkMachineSelect";
+import { RelayLinkWaiting } from "../settings/RelayLinkWaiting";
 import { Button } from "../ui/button";
 import { Dialog } from "../ui/dialog";
 import { Input } from "../ui/input";
@@ -187,6 +203,9 @@ function LinkRequestDialog(props: {
   const pickMachine = picksMachine(item);
   const listed = useLinkableMachines(props.environmentId, props.open);
   const machines = rankMachinesByHint(listed, item.hint);
+  // The user's other computers on their Gustaf account, reached through the relay with no code.
+  const relay = useRelayMachines(props.environmentId, props.open && pickMachine);
+  const relayMachines = rankRelayMachinesByHint(relay.machines, item.hint);
   // Null until the user picks; until then the hint's best match is picked.
   const [choice, setChoice] = useState<string | null>(null);
   const [address, setAddress] = useState(item.url ?? "");
@@ -199,18 +218,34 @@ function LinkRequestDialog(props: {
   const [mintFailed, setMintFailed] = useState<ReadonlySet<EnvironmentId>>(new Set());
   // Enter then a click can both run before a re-render; this guard is synchronous.
   const inFlight = useRef(false);
+  const relayCancel = useRef<AbortController | null>(null);
   const answer = useAtomCommand(peerLinkEnvironment.answerRequest, {
     label: "answer link request",
     // The failure cause holds the request, and with it the code; keep it out of the console.
     reportFailure: false,
     reportDefect: false,
   });
-  const selected = choice ?? linkRequestInitialMachine(item, machines);
-  const target = linkRequestTarget(item, machines, selected, messages);
-  const targetName =
-    target.kind === "machine" ? target.label : linkRequestTargetName(item, messages);
+  const selected =
+    choice ??
+    linkRequestInitialMachine(item, machines) ??
+    linkRequestInitialRelayMachine(item, relayMachines);
+  const relayDevice = relayDeviceOfChoice(selected);
+  const relayMachine =
+    relayMachines.find((candidate) => candidate.deviceId === relayDevice) ?? null;
+  const viaRelay = relayMachine !== null;
+  const relayAttempts = useRelayAttempts(props.environmentId, busy && viaRelay);
+  const relayAttempt = relayAttempts.find((attempt) => attempt.deviceId === relayDevice);
+  const target = viaRelay
+    ? ({ kind: "none" } as const)
+    : linkRequestTarget(item, machines, selected, messages);
+  const targetName = viaRelay
+    ? relayMachine.name
+    : target.kind === "machine"
+      ? target.label
+      : linkRequestTargetName(item, messages);
   // Without a catalog entry or an address, the name is the generic "a machine".
   const unnamed =
+    !viaRelay &&
     item.url === undefined &&
     !(
       target.kind === "machine" &&
@@ -232,14 +267,17 @@ function LinkRequestDialog(props: {
     !mintFailed.has(targetId);
   // An address the agent gave is already filled in; only one the user must type is asked for.
   const asksAddress = needsAddress && item.url === undefined;
-  const useExisting = target.kind === "machine" && target.linked;
+  const relayLinkedTo = relayMachine?.linkedEnvironmentId;
+  const useExisting = relayLinkedTo !== undefined || (target.kind === "machine" && target.linked);
   // A named machine with an address it answers at has nothing to choose before access.
   const steps: ReadonlyArray<LinkStep> =
     pickMachine || asksAddress ? ["machine", "access"] : ["access"];
   const current: LinkStep = steps.includes(step) ? step : "access";
-  const machineReady =
-    target.kind !== "none" && (useExisting || !needsAddress || address.trim().length > 0);
-  const ready = machineReady && (useExisting || canMint || pairingCode.trim().length > 0);
+  const machineReady = viaRelay
+    ? relayMachine.online
+    : target.kind !== "none" && (useExisting || !needsAddress || address.trim().length > 0);
+  const ready =
+    machineReady && (useExisting || viaRelay || canMint || pairingCode.trim().length > 0);
 
   const reset = () => {
     setChoice(null);
@@ -258,6 +296,15 @@ function LinkRequestDialog(props: {
 
   // Settles to the answer to send, an error to show, or nothing to do.
   const prepareAnswer = async () => {
+    if (relayMachine !== null) {
+      return relayLinkedTo !== undefined
+        ? linkRequestAnswerInput(item, { type: "use-existing", environmentId: relayLinkedTo })
+        : linkRequestAnswerInput(item, {
+            type: "link-relay",
+            deviceId: relayMachine.deviceId,
+            access,
+          });
+    }
     if (target.kind === "none") return null;
     if (target.kind === "machine" && target.linked) {
       return linkRequestAnswerInput(item, {
@@ -284,13 +331,22 @@ function LinkRequestDialog(props: {
   };
 
   const submit = async () => {
-    if (inFlight.current || target.kind === "none") return;
+    if (inFlight.current || (target.kind === "none" && !viaRelay)) return;
     inFlight.current = true;
     setBusy(true);
     setError(null);
     const input = await prepareAnswer();
+    // A relay link waits for the other computer's user, so it can be cancelled meanwhile.
+    const controller = new AbortController();
+    relayCancel.current = controller;
     const result =
-      input === null ? null : await answer({ environmentId: props.environmentId, input });
+      input === null
+        ? null
+        : await answer(
+            { environmentId: props.environmentId, input },
+            { signal: controller.signal },
+          );
+    relayCancel.current = null;
     inFlight.current = false;
     setBusy(false);
     if (result === null) return;
@@ -361,6 +417,7 @@ function LinkRequestDialog(props: {
                 {pickMachine ? (
                   <MachinePicker
                     machines={machines}
+                    relayMachines={relayMachines}
                     value={selected}
                     disabled={busy}
                     onChange={(next) => {
@@ -407,8 +464,16 @@ function LinkRequestDialog(props: {
                 ) : null}
                 {useExisting ? null : (
                   <>
+                    {viaRelay ? (
+                      <p className="text-xs text-muted-foreground">
+                        <T>
+                          <Var>{targetName}</Var> is on your Gustaf account, so no address or
+                          pairing code is needed. Someone there still has to allow this in Gustaf.
+                        </T>
+                      </p>
+                    ) : null}
                     {needsAddress ? <LinkAddressWarning address={address} /> : null}
-                    {canMint ? null : (
+                    {canMint || viaRelay ? null : (
                       <label className="block space-y-1.5">
                         <span className="block text-xs font-medium text-foreground">
                           <T>Pairing code</T>
@@ -450,6 +515,12 @@ function LinkRequestDialog(props: {
                 </T>
               </p>
             ) : null}
+            {viaRelay && busy ? (
+              <RelayLinkWaiting
+                name={relayMachine.name}
+                safetyCode={relayAttempt?.safetyCode ?? null}
+              />
+            ) : null}
             {error !== null ? (
               <p role="alert" className="text-xs text-destructive">
                 {error}
@@ -458,7 +529,11 @@ function LinkRequestDialog(props: {
           </form>
         </WizardPanel>
         <WizardFooter>
-          {current === "access" && steps.length > 1 ? (
+          {viaRelay && busy ? (
+            <Button variant="outline" type="button" onClick={() => relayCancel.current?.abort()}>
+              <T>Cancel</T>
+            </Button>
+          ) : current === "access" && steps.length > 1 ? (
             <Button
               variant="outline"
               type="button"
@@ -497,6 +572,7 @@ function LinkRequestDialog(props: {
 /** The user's other machines, best match for the agent's hint first, then an address. */
 function MachinePicker(props: {
   readonly machines: ReadonlyArray<LinkableMachine>;
+  readonly relayMachines: ReadonlyArray<PeerLinkRelayMachine>;
   readonly value: string | null;
   readonly disabled: boolean;
   readonly onChange: (value: string) => void;
@@ -526,6 +602,18 @@ function MachinePicker(props: {
             />
             <span className="min-w-0 flex-1 truncate font-medium">{machine.label}</span>
             <LinkMachineBadge machine={machine} />
+          </label>
+        ))}
+        {props.relayMachines.map((machine) => (
+          <label
+            key={machine.deviceId}
+            className="flex cursor-pointer items-center gap-2.5 rounded-lg border px-3 py-2 text-sm has-data-disabled:cursor-default has-data-disabled:opacity-60"
+          >
+            <Radio value={relayChoice(machine.deviceId)} disabled={!machine.online} />
+            <span className="min-w-0 flex-1 font-medium">
+              <RelayMachineName machine={machine} />
+            </span>
+            <RelayMachineBadge machine={machine} />
           </label>
         ))}
         <label className="flex cursor-pointer items-center gap-2.5 rounded-lg border px-3 py-2 text-sm">

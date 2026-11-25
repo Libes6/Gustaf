@@ -17,7 +17,7 @@ import { useContext, useEffect, useEffectEvent } from "react";
 import { useNowMinute } from "../hooks/useNowMinute";
 import { connectionAtomRuntime } from "../connection/runtime";
 import { environmentAtomList, environmentIdsKey } from "./environmentAtomList";
-import { useEnvironmentIdentities, useEnvironments } from "./environments";
+import { useEnvironment, useEnvironmentIdentities, useEnvironments } from "./environments";
 import { environmentPresentations } from "./presentation";
 import { relayEnvironmentDiscovery } from "./relay";
 import { useEnvironmentQuery } from "./query";
@@ -111,6 +111,33 @@ export function useLinkableMachines(environmentId: EnvironmentId, enabled: boole
     links: links.data?.links ?? [],
     connect: discovery.environments,
   });
+}
+
+/**
+ * The account's other computers, for linking one through the Gustaf relay from `environmentId`:
+ * no address and no pairing code. Asks that environment's relay only while `enabled`, and only
+ * where it supports relay links. `problem` says why the list is empty when it cannot be read.
+ */
+export function useRelayMachines(environmentId: EnvironmentId, enabled: boolean) {
+  const supported =
+    useEnvironment(environmentId)?.serverConfig?.environment.capabilities.relayPeerLinks === true;
+  const query = useEnvironmentQuery(
+    enabled && supported ? peerLinkEnvironment.relayMachines({ environmentId, input: {} }) : null,
+  );
+  return {
+    supported,
+    machines: query.data?.machines ?? [],
+    problem: query.data?.problem ?? null,
+    isPending: query.isPending,
+  };
+}
+
+/** The relay links `environmentId` is waiting on, with the safety code each shows. */
+export function useRelayAttempts(environmentId: EnvironmentId, enabled: boolean) {
+  const query = useEnvironmentQuery(
+    enabled ? peerLinkEnvironment.relayAttempts({ environmentId, input: {} }) : null,
+  );
+  return query.data?.attempts ?? [];
 }
 
 /**
