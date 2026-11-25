@@ -472,6 +472,9 @@ const config: ExpoConfig = {
       tracesToken: repoEnv.EXPO_PUBLIC_OTLP_TRACES_TOKEN ?? null,
     },
     eas: {
+      // expo-observe throws at startup without a project id, which leaves the app on its splash
+      // screen. This is a placeholder: reports go to the unresolvable endpoint below, not to Expo.
+      projectId: "67757374-6166-4000-8000-000000000001",
       observe: { endpointUrl: observeEndpointUrl },
     },
   },
