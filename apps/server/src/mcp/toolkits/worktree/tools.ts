@@ -18,6 +18,7 @@ import { McpSchema, Tool, Toolkit } from "effect/ai";
 
 import * as McpInvocationContext from "../../McpInvocationContext.ts";
 import * as WorktreeMcpService from "../../WorktreeMcpService.ts";
+import { hiddenFromSubagentsTool } from "../hiddenFromSubagentsTool.ts";
 
 const dependencies = [
   McpInvocationContext.McpInvocationContext,
@@ -108,6 +109,6 @@ const WorktreeInventoryTool = Tool.make("t3_worktree_inventory", {
 export const WorktreeToolkit = Toolkit.make(
   WorktreeHandoffTool,
   WorktreeStatusTool,
-  WorktreeListTool,
-  WorktreeInventoryTool,
+  hiddenFromSubagentsTool(WorktreeListTool),
+  hiddenFromSubagentsTool(WorktreeInventoryTool),
 );

@@ -1524,7 +1524,7 @@ export const layerPullRequestsToolkit = toolkitRegistration(
 
 const layerIssuesToolkit = toolkitRegistration(IssuesToolkit, IssuesHandlers.layer);
 
-const layerSubscriptionsToolkit = toolkitRegistration(
+export const layerSubscriptionsToolkit = toolkitRegistration(
   SubscriptionsToolkit,
   SubscriptionsHandlers.layer,
 );

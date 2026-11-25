@@ -91,7 +91,10 @@ it.effect("counts a working stdio server's tools across pages and its resources"
       {
         id: McpServerId.make("files"),
         status: "connected",
-        tools: [{ name: "read_file", readOnly: true }, { name: "write_file" }],
+        tools: [
+          { name: "read_file", readOnly: true, approxTokens: 10 },
+          { name: "write_file", approxTokens: 10 },
+        ],
         resourceCount: 1,
         approxTokens: 20,
       },
@@ -226,7 +229,7 @@ it.effect("asks for sign-in on HTTP 401, checks again on refresh, and after sign
         {
           id,
           status: "connected",
-          tools: [{ name: "get_issue" }],
+          tools: [{ name: "get_issue", approxTokens: 10 }],
           resourceCount: 0,
           approxTokens: 10,
           signedIn: true,

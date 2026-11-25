@@ -16,6 +16,7 @@ import * as ThreadCommandExecutor from "../../../orchestration-v2/ThreadCommandE
 import * as ThreadManagementService from "../../../orchestration-v2/ThreadManagementService.ts";
 import * as Settings from "../../../serverSettings.ts";
 import * as McpInvocationContext from "../../McpInvocationContext.ts";
+import { hiddenFromSubagentsTool } from "../hiddenFromSubagentsTool.ts";
 
 const PreferenceFields = {
   defaultThreadEnvMode: ServerSettings.fields.defaultThreadEnvMode,
@@ -107,7 +108,7 @@ const EnvironmentErrorsReadTool = Tool.make("t3_environment_errors_read", {
   .annotate(Tool.Readonly, true)
   .annotate(Tool.Destructive, false);
 export const EnvironmentToolkit = Toolkit.make(
-  EnvironmentReadTool,
-  EnvironmentPreferencesTool,
-  EnvironmentErrorsReadTool,
+  hiddenFromSubagentsTool(EnvironmentReadTool),
+  hiddenFromSubagentsTool(EnvironmentPreferencesTool),
+  hiddenFromSubagentsTool(EnvironmentErrorsReadTool),
 );

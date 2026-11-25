@@ -50,6 +50,7 @@ import * as RemoteDelegation from "../../../peer/RemoteDelegation.ts";
 import * as McpInvocationContext from "../../McpInvocationContext.ts";
 import * as OrchestratorMcpService from "../../OrchestratorMcpService.ts";
 import * as ThreadMetadataMcpService from "../../ThreadMetadataMcpService.ts";
+import { hiddenFromSubagentsTool } from "../hiddenFromSubagentsTool.ts";
 
 const dependencies = [
   McpInvocationContext.McpInvocationContext,
@@ -233,7 +234,7 @@ const CreateThreadsTool = Tool.make("create_threads", {
   .annotate(Tool.Title, "Create T3 threads")
   .annotate(Tool.Destructive, true)
   .annotate(Tool.OpenWorld, true)
-  .annotate(McpSchema.EnabledWhen, McpInvocationContext.hiddenFromOutsideClients);
+  .annotate(McpSchema.EnabledWhen, McpInvocationContext.hiddenFromOutsideClientsAndSubagents);
 
 const ThreadListTool = Tool.make("t3_thread_list", {
   description:
@@ -332,7 +333,7 @@ const EnvironmentLinksTool = Tool.make("t3_environment_links", {
   .annotate(Tool.Readonly, true)
   .annotate(Tool.Destructive, false)
   .annotate(Tool.Idempotent, true)
-  .annotate(McpSchema.EnabledWhen, McpInvocationContext.hiddenWhileLinksOff);
+  .annotate(McpSchema.EnabledWhen, McpInvocationContext.hiddenWhileLinksOffOrFromSubagents);
 
 const EnvironmentLinkTool = Tool.make("t3_environment_link", {
   description:
@@ -346,7 +347,7 @@ const EnvironmentLinkTool = Tool.make("t3_environment_link", {
   .annotate(Tool.Title, "Link another environment")
   .annotate(Tool.Destructive, false)
   .annotate(Tool.OpenWorld, true)
-  .annotate(McpSchema.EnabledWhen, McpInvocationContext.hiddenWhileLinksOff);
+  .annotate(McpSchema.EnabledWhen, McpInvocationContext.hiddenWhileLinksOffOrFromSubagents);
 
 const EnvironmentUnlinkTool = Tool.make("t3_environment_unlink", {
   description:
@@ -360,26 +361,26 @@ const EnvironmentUnlinkTool = Tool.make("t3_environment_unlink", {
   .annotate(Tool.Title, "Forget a linked environment")
   .annotate(Tool.Destructive, true)
   .annotate(Tool.Idempotent, true)
-  .annotate(McpSchema.EnabledWhen, McpInvocationContext.hiddenWhileLinksOff);
+  .annotate(McpSchema.EnabledWhen, McpInvocationContext.hiddenWhileLinksOffOrFromSubagents);
 
 export const OrchestratorToolkit = Toolkit.make(
   OrchestratorCapabilitiesTool,
   DelegateTaskTool,
   TaskStatusTool,
   TaskCancelTool,
-  WorkflowStopTool,
+  hiddenFromSubagentsTool(WorkflowStopTool),
   BackgroundWaitTool,
-  ScheduleTaskTool,
-  ListScheduledTasksTool,
-  DeleteScheduledTaskTool,
+  hiddenFromSubagentsTool(ScheduleTaskTool),
+  hiddenFromSubagentsTool(ListScheduledTasksTool),
+  hiddenFromSubagentsTool(DeleteScheduledTaskTool),
   RequestSecretTool,
   CreateThreadsTool,
-  ThreadListTool,
+  hiddenFromSubagentsTool(ThreadListTool),
   ThreadReadTool,
-  ThreadUpdateTool,
+  hiddenFromSubagentsTool(ThreadUpdateTool),
   ThreadSendTool,
   ThreadWaitTool,
-  ThreadInterruptTool,
+  hiddenFromSubagentsTool(ThreadInterruptTool),
   EnvironmentLinksTool,
   EnvironmentLinkTool,
   EnvironmentUnlinkTool,

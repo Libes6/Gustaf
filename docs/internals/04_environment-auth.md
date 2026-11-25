@@ -55,7 +55,7 @@ model.
   `mcp-client` sessions (except the read-only thread relay and client-pairing routes restricted to
   [peer links](./05_remote.md#peer-links)). Every MCP tool must statically declare its access level in
   [`McpToolAccess.ts`](../../apps/server/src/mcp/McpToolAccess.ts), and thread-only tools must still
-  refuse outside callers in handlers—hiding from tool listings is only discovery. A workflow run
+  refuse outside callers in handlers—hiding from tool listings is only discovery. A tool with an `EnabledWhen` predicate that hides it also answers its call "not found", which is how a delegated child (`hiddenFromSubagents`) neither lists nor can call setup tools such as scheduling or project management. A workflow run
   picks its own modes, so only a caller at the broadest mode a thread may run in here (full access,
   or an administrator's ceiling below it) can start or change runs, change what workflows store, or
   read webhook paths. Narrower callers can still read runs.

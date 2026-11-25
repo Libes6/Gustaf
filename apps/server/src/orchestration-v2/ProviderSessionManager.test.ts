@@ -2786,11 +2786,13 @@ it.effect(
 );
 
 it.effect.each([
-  { relationshipToParent: null, subagent: false },
-  { relationshipToParent: "subagent", subagent: true },
+  { relationshipToParent: null, delegatedFrom: false, subagent: false },
+  { relationshipToParent: "subagent", delegatedFrom: false, subagent: true },
+  // A task another environment's agent sent here has no parent thread in this one.
+  { relationshipToParent: null, delegatedFrom: true, subagent: true },
 ] as const)(
-  "ProviderSessionManagerV2 marks MCP credentials of delegated children ($relationshipToParent)",
-  ({ relationshipToParent, subagent }) =>
+  "ProviderSessionManagerV2 marks MCP credentials of delegated children ($relationshipToParent, delegated from a linked environment: $delegatedFrom)",
+  ({ relationshipToParent, delegatedFrom, subagent }) =>
     Effect.gen(function* () {
       const state = yield* Ref.make(emptyState);
       const mcpConfigs = yield* Ref.make<
@@ -2819,6 +2821,15 @@ it.effect.each([
                   relationshipToParent === null
                     ? created.payload.lineage
                     : { parentThreadId, relationshipToParent, rootThreadId: parentThreadId },
+                ...(delegatedFrom
+                  ? {
+                      delegatedFrom: {
+                        environmentId: EnvironmentId.make("environment-linked"),
+                        threadId: parentThreadId,
+                        title: "Parent",
+                      },
+                    }
+                  : {}),
               },
             },
           ],

@@ -52,6 +52,7 @@ import * as ComputerUseService from "../computerUse/ComputerUseService.ts";
 import * as GitManager from "../git/GitManager.ts";
 import * as PullRequestReviewGuideService from "../pullRequest/PullRequestReviewGuideService.ts";
 import * as PullRequestService from "../pullRequest/PullRequestService.ts";
+import * as SubscriptionService from "../subscriptions/SubscriptionService.ts";
 import * as ServerConfig from "../config.ts";
 import * as ServerHttp from "../http.ts";
 import * as ServerSettings from "../serverSettings.ts";
@@ -1887,7 +1888,7 @@ it.effect("offers agent feedback tools only while the setting is on, to every cl
 );
 
 it.effect(
-  "lists watch and Mac tools only to threads that are not delegated children, and forge tools only where the project has a forge",
+  "lists watch, setup and Mac tools only to threads that are not delegated children, and forge tools only where the project has a forge",
   () =>
     Effect.scoped(
       Effect.gen(function* () {
@@ -1916,6 +1917,7 @@ it.effect(
           Layer.mergeAll(
             McpHttpServer.layerPullRequestsToolkit,
             McpHttpServer.layerComputerUseToolkit,
+            McpHttpServer.layerSubscriptionsToolkit,
           ),
         ).pipe(
           Layer.provide(ServerSettings.layerTest()),
@@ -1933,6 +1935,7 @@ it.effect(
                 servesProject: (projectId) => Effect.succeed(projectId !== "project-noForgeToken"),
               }),
               Layer.mock(GitManager.GitManager)({}),
+              Layer.mock(SubscriptionService.SubscriptionService)({}),
               // The desktop gave this server its executor, so /mcp offers the Mac.
               Layer.mock(ComputerUseService.ComputerUseService)({ available: true }),
               Layer.mock(Orchestrator.OrchestratorV2)({}),
@@ -1951,7 +1954,7 @@ it.effect(
           Layer.build,
         );
         const httpClient = yield* HttpClient.HttpClient;
-        const listedTools = (token: string) =>
+        const rpc = (token: string, id: number, method: string, params: object) =>
           Effect.gen(function* () {
             const headers = {
               accept: "application/json, text/event-stream",
@@ -1964,22 +1967,29 @@ it.effect(
                 "application/json",
               ),
             });
-            const listed = yield* httpClient.post("/mcp", {
+            const response = yield* httpClient.post("/mcp", {
               headers: {
                 ...headers,
                 "mcp-session-id": initialize.headers["mcp-session-id"]!,
                 "mcp-protocol-version": "2025-06-18",
               },
               body: HttpBody.text(
-                `{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}`,
+                JSON.stringify({ jsonrpc: "2.0", id, method, params }),
                 "application/json",
               ),
             });
-            const body = (yield* listed.json) as {
-              readonly result: { readonly tools: ReadonlyArray<{ readonly name: string }> };
-            };
-            return body.result.tools.map((tool) => tool.name);
+            return yield* response.json;
           });
+        const listedTools = (token: string) =>
+          rpc(token, 2, "tools/list", {}).pipe(
+            Effect.map((body) =>
+              (
+                body as {
+                  readonly result: { readonly tools: ReadonlyArray<{ readonly name: string }> };
+                }
+              ).result.tools.map((tool) => tool.name),
+            ),
+          );
 
         const parentTools = yield* listedTools("parentToken");
         const childTools = yield* listedTools("childToken");
@@ -1995,6 +2005,14 @@ it.effect(
         expect(childTools).not.toContain("watch_pull_request");
         expect(childTools.filter((name) => name.startsWith("computer_"))).toEqual([]);
         expect(childTools).not.toContain("unwatch_pull_request");
+        // Setup tools stay out of a child's context, and a call to one is refused like an unknown tool.
+        expect(parentTools).toContain("t3_subscriptions_list");
+        expect(childTools).not.toContain("t3_subscriptions_list");
+        const refused = yield* rpc("childToken", 3, "tools/call", {
+          name: "t3_subscriptions_list",
+          arguments: {},
+        });
+        expect(JSON.stringify(refused)).toContain("Tool 't3_subscriptions_list' not found");
         expect(parentTools).toEqual(
           expect.arrayContaining([
             "pull_request_read",

@@ -18,6 +18,7 @@ import * as ServerConfig from "../../../config.ts";
 import * as DocumentText from "../../../provider/DocumentText.ts";
 import * as ThreadManagementService from "../../../orchestration-v2/ThreadManagementService.ts";
 import * as McpInvocationContext from "../../McpInvocationContext.ts";
+import { hiddenFromSubagentsTool } from "../hiddenFromSubagentsTool.ts";
 
 const shared = {
   failure: OrchestratorMcpFailure,
@@ -70,7 +71,7 @@ const AttachmentSendTool = Tool.make("t3_thread_send_attachments", {
   .annotate(Tool.Destructive, true)
   .annotate(Tool.OpenWorld, true);
 export const AttachmentToolkit = Toolkit.make(
-  AttachmentUploadTool,
-  AttachmentDiscardTool,
-  AttachmentSendTool,
+  hiddenFromSubagentsTool(AttachmentUploadTool),
+  hiddenFromSubagentsTool(AttachmentDiscardTool),
+  hiddenFromSubagentsTool(AttachmentSendTool),
 );

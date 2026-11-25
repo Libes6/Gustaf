@@ -274,6 +274,8 @@ export const McpServerToolSummary = Schema.Struct({
   name: Schema.String,
   /** The tool's `annotations.readOnlyHint`, when it declares one. */
   readOnly: Schema.optionalKey(Schema.Boolean),
+  /** This tool's share of the server's `approxTokens`, so a client can leave out the switched-off ones. */
+  approxTokens: Schema.optionalKey(Schema.Number),
 });
 export type McpServerToolSummary = typeof McpServerToolSummary.Type;
 

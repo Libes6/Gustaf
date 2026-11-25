@@ -186,11 +186,13 @@ const inspect = Effect.fn("McpServerChecks.inspect")(function* (rpc: JsonRpc) {
   const resources =
     capabilities?.resources === undefined ? [] : yield* listAll("resources/list", "resources");
   return {
-    tools: tools.map((tool) =>
-      tool.annotations?.readOnlyHint === undefined
-        ? { name: tool.name }
-        : { name: tool.name, readOnly: tool.annotations.readOnlyHint },
-    ),
+    tools: tools.map((tool) => ({
+      name: tool.name,
+      ...(tool.annotations?.readOnlyHint === undefined
+        ? {}
+        : { readOnly: tool.annotations.readOnlyHint }),
+      approxTokens: approximateToolTokens([tool]),
+    })),
     resourceCount: resources.length,
     ...(tools.length === 0 ? {} : { approxTokens: approximateToolTokens(tools) }),
   };
