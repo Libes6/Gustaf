@@ -251,7 +251,7 @@ it.effect(
       expect(belowCeiling.result).toMatchObject({
         projectId: belowCeiling.projectId,
         modelSelection: belowCeiling.modelSelection,
-        link: `[Fix](t3-thread://v2/environment/${belowCeiling.launched[0]?.threadId})`,
+        link: `gustaf://threads/environment/${encodeURIComponent(belowCeiling.launched[0]?.threadId ?? "")}`,
       });
       expect(belowCeiling.launched[0]?.runtimeMode).toBe("approval-required");
       expect(belowCeiling.launched[0]?.initialMessage?.senderThreadId).toBeUndefined();

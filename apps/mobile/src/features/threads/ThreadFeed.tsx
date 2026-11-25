@@ -86,7 +86,7 @@ import type { ToolCallVisibility } from "@t3tools/contracts/settings";
 import { encodeComposerContextFragment } from "@t3tools/shared/composerContextClipboard";
 import {
   hasThreadLinks,
-  hostedThreadLink,
+  shareThreadLink,
   parseThreadLinkHref,
   threadLinkRefs,
 } from "@t3tools/shared/threadLinks";
@@ -3527,7 +3527,7 @@ export const ThreadFeed = memo(function ThreadFeed(props: ThreadFeedProps) {
       const thread = resolveLinkedThread(href);
       if (thread) {
         if (actionId === "open-thread") onMarkdownLinkPress(href);
-        else if (actionId === "copy-thread-link") copyTextWithHaptic(hostedThreadLink(thread));
+        else if (actionId === "copy-thread-link") copyTextWithHaptic(shareThreadLink(thread));
         return;
       }
       const deviceUrl = deviceLoopbackUrl(href);

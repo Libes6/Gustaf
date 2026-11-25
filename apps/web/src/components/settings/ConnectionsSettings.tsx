@@ -1502,7 +1502,8 @@ function ConnectionsSettingsContent({
               </ScrollArea>
             </FoldedSettingsSection>
           ) : null}
-          {canReadAccess &&
+          {hasCloudPublicConfig() &&
+          canReadAccess &&
           connectDevices !== null &&
           (connectDeviceRequests.length > 0 || connectDevices.length > 0) ? (
             <ConnectDeviceApprovalSettings

@@ -50,19 +50,7 @@ const configuredDesktopUpdateRepository =
   process.env.T3CODE_DESKTOP_UPDATE_REPOSITORY?.trim() ||
   process.env.GITHUB_REPOSITORY?.trim() ||
   "";
-const configuredHostedAppUrl = (() => {
-  const explicitHostedAppUrl = process.env.VITE_HOSTED_APP_URL?.trim();
-  if (explicitHostedAppUrl) {
-    return explicitHostedAppUrl;
-  }
-  if (process.env.VERCEL_ENV === "production" && process.env.VERCEL_PROJECT_PRODUCTION_URL) {
-    return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`;
-  }
-  if (process.env.VERCEL_URL) {
-    return `https://${process.env.VERCEL_URL}`;
-  }
-  return undefined;
-})();
+const configuredHostedAppUrl = process.env.VITE_HOSTED_APP_URL?.trim() || undefined;
 const sourcemapEnv = process.env.T3CODE_WEB_SOURCEMAP?.trim().toLowerCase();
 
 // `vp run dev --share --built` rebuilds on every change. The license manifest

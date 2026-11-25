@@ -44,10 +44,15 @@ side lists and revokes it in Sharing & access like any other session, and owns i
 
 ## Hosted web is a client
 
-The hosted web app stores its connection catalog in the browser and connects directly to each
-environment without proxying traffic. A [hosted pairing URL](../../apps/web/src/hostedPairing.ts)
-puts the backend target in the query and the pairing secret in the URL fragment so the secret never
-reaches the hosted origin, then strips it from history.
+Gustaf ships no hosted web app. A build that serves one sets `VITE_HOSTED_APP_URL` (web) or
+`T3CODE_HOSTED_APP_URL` (server); with neither, copied thread and prompt links use the `gustaf://`
+scheme and no hosted pairing link is offered.
+
+Where one is set, the hosted web app stores its connection catalog in the browser and connects
+directly to each environment without proxying traffic. A
+[hosted pairing URL](../../apps/web/src/hostedPairing.ts) puts the backend target in the query and
+the pairing secret in the URL fragment so the secret never reaches the hosted origin, then strips it
+from history.
 
 ## Desktop previews tunnel loopback
 

@@ -222,16 +222,14 @@ tailscale serve --https=443 --set-path=/ off
 If that port is already in use, choose another with
 `--tailscale-serve-port`. See `t3 pair --help` for other pairing options.
 
-### Hosted web app
+### Browsers
 
-The hosted web app needs an HTTPS endpoint. It connects directly
-to your server; a hosted pairing link does not make an unreachable backend
-reachable or convert HTTP to HTTPS. Opening a hosted pairing link shows the
-server address and asks you to confirm before adding it.
+Gustaf has no hosted web app. To pair a browser, open the direct pairing URL that your server
+shows, in a browser that can reach it.
 
-For a plain HTTP LAN endpoint, use the direct pairing URL in a browser that can
-open it, or pair from the desktop app. On mobile, an IP address entered without a
-scheme uses HTTP, so include `https://` when your server uses HTTPS.
+A plain HTTP LAN endpoint works in a browser that can open it, or pair from the desktop app. On
+mobile, an IP address entered without a scheme uses HTTP, so include `https://` when your server
+uses HTTPS.
 
 ## Desktop-managed SSH
 

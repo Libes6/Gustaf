@@ -1,12 +1,14 @@
 import { assert, it } from "@effect/vitest";
 import * as ConfigProvider from "effect/ConfigProvider";
 import * as Effect from "effect/Effect";
+import * as Option from "effect/Option";
 import * as Result from "effect/Result";
 
 import {
   hostedAppUrlConfig,
   makeCloudCliOAuthConfig,
   makeRelayUrlConfig,
+  optionalHostedAppUrlConfig,
   resolveRelayClientTracingConfig,
 } from "./publicConfig.ts";
 
@@ -34,6 +36,16 @@ it.effect("rejects malformed or insecure hosted app URLs", () =>
       );
       assert.isTrue(Result.isFailure(result), value);
     }
+  }),
+);
+
+it.effect("has no hosted app URL unless one is configured", () =>
+  Effect.gen(function* () {
+    assert.isTrue(Option.isNone(yield* optionalHostedAppUrlConfig.pipe(provideEnv({}))));
+    const configured = yield* optionalHostedAppUrlConfig.pipe(
+      provideEnv({ T3CODE_HOSTED_APP_URL: "https://hosted.example.test" }),
+    );
+    assert.deepEqual(configured, Option.some("https://hosted.example.test"));
   }),
 );
 

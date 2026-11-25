@@ -2,14 +2,13 @@ import { EnvironmentId, ThreadId, type ScopedThreadRef } from "@t3tools/contract
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 
-import { DEFAULT_HOSTED_APP_URL } from "./connectAuth.ts";
-
 export const THREAD_LINK_PROTOCOL = "t3-thread";
 const V1_PREFIX = `${THREAD_LINK_PROTOCOL}://v1/`;
 const V2_PREFIX = `${THREAD_LINK_PROTOCOL}://v2/`;
-const HOSTED_PREFIX = `${DEFAULT_HOSTED_APP_URL}/threads/`;
-const HOSTED_SEGMENT = "[A-Za-z0-9_%-]+";
-const HOSTED_LINK = `${HOSTED_PREFIX.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&")}${HOSTED_SEGMENT}/${HOSTED_SEGMENT}`;
+// Copied links open the desktop or mobile app; dev and preview builds add a scheme suffix.
+const APP_LINK_PREFIX = /^(?:t3code|gustaf)(?:-[a-z]+)?:\/\/threads\//;
+const LINK_SEGMENT = "[A-Za-z0-9_%-]+";
+const APP_LINK = String.raw`(?:t3code|gustaf)(?:-[a-z]+)?:\/\/threads\/${LINK_SEGMENT}\/${LINK_SEGMENT}`;
 const THREAD_HREF = String.raw`t3-thread:\/\/v[12]\/`;
 // A label stops at any bracket, so a run of unclosed brackets is scanned once, not once per bracket.
 const LABEL = String.raw`[^[\]\n]*`;
@@ -21,11 +20,11 @@ const THREAD_LINK_OUTSIDE_CODE = new RegExp(
     String.raw`(?<fence>(\`{3,}|~{3,})[\s\S]*?(?:\2|$))`,
     String.raw`(?<span>(\`+)[^\n]*?\4)`,
     // A labeled link's destination may be angle-bracketed, as CommonMark allows: [label](<href>).
-    String.raw`\[(?<label>${LABEL})\]\((?:<(?<angleHref>${THREAD_HREF}[^\s<>]+|${HOSTED_LINK})>|(?<href>${THREAD_HREF}[^\s>)]+|${HOSTED_LINK}))\)`,
+    String.raw`\[(?<label>${LABEL})\]\((?:<(?<angleHref>${THREAD_HREF}[^\s<>]+|${APP_LINK})>|(?<href>${THREAD_HREF}[^\s>)]+|${APP_LINK}))\)`,
     String.raw`\[${LABEL}\]\((?:<[^<>\n]*>|[^\s()]*(?:\([^\s()]*\)[^\s()]*)*)(?:[ \t]+(?:"[^"\n]*"|'[^'\n]*'))?\)`,
-    String.raw`<(?<autolink>${THREAD_HREF}[^\s<>]+|${HOSTED_LINK})>`,
-    // After a URL character the hosted link is part of a longer URL, such as a redirect target.
-    String.raw`(?<![A-Za-z0-9%/?#=&@+-])(?<bare>${HOSTED_LINK})(?![\w%/?#-])`,
+    String.raw`<(?<autolink>${THREAD_HREF}[^\s<>]+|${APP_LINK})>`,
+    // After a URL character the app link is part of a longer URL, such as a redirect target.
+    String.raw`(?<![A-Za-z0-9%/?#=&@+-])(?<bare>${APP_LINK})(?![\w%/?#-])`,
   ].join("|"),
   "g",
 );
@@ -40,22 +39,25 @@ export interface ThreadLink {
 }
 
 // Escapes even URL-safe punctuation, so a sentence's closing period never reads as part of an id.
-const hostedSegment = (id: string) =>
+const linkSegment = (id: string) =>
   encodeURIComponent(id).replace(
     /[.!~*'()]/g,
     (character) => `%${character.charCodeAt(0).toString(16).toUpperCase()}`,
   );
 
-/** Opens the thread from anywhere: the hosted app offers the desktop app, the mobile app, or itself. */
-export function hostedThreadLink(ref: ScopedThreadRef, origin = DEFAULT_HOSTED_APP_URL): string {
-  const path = `/threads/${hostedSegment(ref.environmentId)}/${hostedSegment(ref.threadId)}`;
-  return new URL(path, origin).toString();
+/**
+ * A link that opens the thread in the desktop or mobile app. A configured hosted origin, if there
+ * is one, serves the same path as a web link instead.
+ */
+export function shareThreadLink(ref: ScopedThreadRef, origin?: string | undefined): string {
+  const path = `threads/${linkSegment(ref.environmentId)}/${linkSegment(ref.threadId)}`;
+  return origin === undefined ? `gustaf://${path}` : new URL(`/${path}`, origin).toString();
 }
 
-const HOSTED_PATH = new RegExp(`^(${HOSTED_SEGMENT})/(${HOSTED_SEGMENT})$`);
+const APP_LINK_PATH = new RegExp(`^(${LINK_SEGMENT})/(${LINK_SEGMENT})$`);
 
-function parseHostedThreadLink(href: string): ThreadLink | null {
-  const match = HOSTED_PATH.exec(href.slice(HOSTED_PREFIX.length));
+function parseAppThreadLink(href: string): ThreadLink | null {
+  const match = APP_LINK_PATH.exec(href.replace(APP_LINK_PREFIX, ""));
   if (!match) return null;
   try {
     const environmentId = Option.getOrNull(decodeEnvironmentId(decodeURIComponent(match[1]!)));
@@ -68,10 +70,10 @@ function parseHostedThreadLink(href: string): ThreadLink | null {
 
 /**
  * The ids as written. Thread ids can hold percent escapes of their own, so they are not decoded,
- * except in a hosted link, which escapes them itself.
+ * except in an app link, which escapes them itself.
  */
 export function parseThreadLinkHref(href: string): ThreadLink | null {
-  if (href.startsWith(HOSTED_PREFIX)) return parseHostedThreadLink(href);
+  if (APP_LINK_PREFIX.test(href)) return parseAppThreadLink(href);
   if (href.startsWith(V1_PREFIX)) {
     const threadId = Option.getOrNull(decodeThreadId(href.slice(V1_PREFIX.length)));
     return threadId === null ? null : { environmentId: null, threadId };
@@ -144,19 +146,19 @@ export function formatThreadLink(ref: ThreadLink, label?: string): string {
   return cleaned ? `[${cleaned}](${destination})` : `<${href}>`;
 }
 
-/** What a person copies out of T3 Code: a Markdown link that opens the thread anywhere. */
-export function formatHostedThreadLink(
+/** What a person copies out of Gustaf: a Markdown link that opens the thread in the app. */
+export function formatShareThreadLink(
   ref: ScopedThreadRef,
   label: string,
-  origin?: string,
+  origin?: string | undefined,
 ): string {
-  const href = hostedThreadLink(ref, origin);
+  const href = shareThreadLink(ref, origin);
   const cleaned = linkLabel(label);
   return cleaned ? `[${cleaned}](${href})` : href;
 }
 
 export function hasThreadLinks(markdown: string): boolean {
-  return markdown.includes(`${THREAD_LINK_PROTOCOL}://v`) || markdown.includes(HOSTED_PREFIX);
+  return markdown.includes(`${THREAD_LINK_PROTOCOL}://v`) || markdown.includes("://threads/");
 }
 
 /** Every thread the markdown's links can name, so their titles are keyed reads. */

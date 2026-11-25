@@ -32,7 +32,6 @@
     "src",
     "vite",
     "vite.config.ts",
-    "vercel.ts",
     "gt.config.json",
     "test",
     "scripts/verify-built-boot.ts",
