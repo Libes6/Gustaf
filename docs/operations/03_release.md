@@ -2,6 +2,10 @@
 
 Gustaf ships from `Libes6/Gustaf` through one workflow, [`gustaf-release.yml`](../../.github/workflows/gustaf-release.yml) (it calls [`gustaf-release-desktop.yml`](../../.github/workflows/gustaf-release-desktop.yml) once per desktop platform). Pushing a `vX.Y.Z` tag builds and publishes everything; there are no nightly, preview or npm channels.
 
+## CI
+
+[`ci.yml`](../../.github/workflows/ci.yml) runs on pull requests and on pushes to `main`, `dev` and `feat/**`, on GitHub-hosted runners only (`ubuntu-24.04`; `macos-26` for the Swift/Kotlin lint). A `changes` job skips what a change cannot affect; pushes to `main` and `dev` run every job. The last job, `Check`, passes only when all others passed or were legitimately skipped, so require that one in branch protection. [`agent-context-budget.yml`](../../.github/workflows/agent-context-budget.yml) is a separate pull request check. No secrets are used.
+
 ## Cut a release
 
 1. On `main`, set the version everywhere it lives and commit it: `node .github/scripts/set-release-version.cjs X.Y.Z` (server, desktop, web and contracts packages). Optionally add `docs/release-notes/X.Y.Z.md`; it is used verbatim as the release notes and the update card. Otherwise the notes are `feat` pull request titles since the previous tag (up to seven bullets) and a `Plus N bug fixes and improvements.` line for `fix` and `perf`.
@@ -53,4 +57,4 @@ Delete the release and its tag (`gh release delete vX.Y.Z --cleanup-tag`). `rele
 ## Known gaps
 
 - The in-app update path has not been exercised on a real installed app on every platform; the first release after a change here should be installed and updated once by hand per platform.
-- `ci.yml` and a few scripts (`release-smoke.ts`, `resolve-nightly-release.ts`, `build-npm-launcher.ts`) still describe T3's nightly and npm pipeline; nothing in the Gustaf release uses them.
+- A few scripts (`release-smoke.ts`, `resolve-nightly-release.ts`, `build-npm-launcher.ts`) still describe T3's nightly and npm pipeline; nothing in the Gustaf release uses them. `ci.yml` runs `release-smoke.ts` anyway.

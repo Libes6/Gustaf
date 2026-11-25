@@ -128,7 +128,7 @@ comment text but do not write to GitHub. Keep the eligibility finding separate f
   (`gh variable get PR_LIMITS_ENFORCE -R pingdotgg/t3code`). When it prints `true`, apply
   `triage:closing` as the last thing you do to the PR, verify that the explanation and the label
   are present, and do not close the PR yourself:
-  [pr-limits.yml](../../../.github/workflows/pr-limits.yml) closes it 72 hours after the label. Any
+  `pr-limits.yml` (T3 upstream; not part of Gustaf) closes it 72 hours after the label. Any
   activity on the PR after the label, including a further comment or label from you, removes the
   label; treat an author's reply or push as new evidence, reassess, and apply the label again only
   if the finding still holds. When the command prints any other value, or fails saying the variable
