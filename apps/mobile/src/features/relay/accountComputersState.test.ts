@@ -3,9 +3,8 @@ import { describe, expect, it } from "vite-plus/test";
 
 import { accountComputersView, canListAccountComputers } from "./accountComputersState";
 
-const laptop = { deviceId: "laptop", name: "Laptop", online: true };
-const desktop = { deviceId: "desktop", name: "Desktop", online: false };
 const done = (result: RelayComputersResult) => ({ status: "done" as const, result });
+const laptop = { deviceId: "laptop", name: "Laptop", online: true };
 const signedIn = { status: "signedIn", phoneDeviceId: "phone" } as const;
 const nothingConnected = new Set<string>();
 
@@ -30,31 +29,7 @@ describe("My computers", () => {
     expect(canListAccountComputers(signedIn)).toBe(true);
   });
 
-  it("lists online computers first and leaves out those already connected", () => {
-    const load = done({
-      computers: [desktop, laptop, { deviceId: "vps", name: "VPS", online: true }],
-    });
-    expect(accountComputersView({ account: signedIn, load, connected: new Set(["vps"]) })).toEqual({
-      kind: "list",
-      computers: [laptop, desktop],
-    });
-    expect(
-      accountComputersView({
-        account: signedIn,
-        load,
-        connected: new Set(["vps", "laptop", "desktop"]),
-      }),
-    ).toEqual({ kind: "empty" });
-  });
-
-  it("tells a relay that did not answer from a credential it turned down", () => {
-    expect(
-      accountComputersView({
-        account: signedIn,
-        load: done({ computers: [], problem: "unavailable" }),
-        connected: nothingConnected,
-      }),
-    ).toEqual({ kind: "unavailable" });
+  it("asks a phone the relay turned away to register again, and lists otherwise", () => {
     expect(
       accountComputersView({
         account: signedIn,
@@ -65,9 +40,9 @@ describe("My computers", () => {
     expect(
       accountComputersView({
         account: signedIn,
-        load: { status: "loading" },
+        load: done({ computers: [laptop] }),
         connected: nothingConnected,
       }),
-    ).toEqual({ kind: "loading" });
+    ).toEqual({ kind: "list", computers: [laptop] });
   });
 });

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { type AccountComputersLoad } from "./accountComputersState";
+import type { AccountComputersLoad } from "./accountComputersState";
 import { gustafRelay } from "./relayPool";
 
 const LOADING: AccountComputersLoad = { status: "loading" };

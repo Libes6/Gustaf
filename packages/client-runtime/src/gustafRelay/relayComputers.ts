@@ -56,6 +56,30 @@ export async function fetchRelayComputers(input: {
   }
 }
 
+export type RelayComputersLoad =
+  | { readonly status: "loading" }
+  | { readonly status: "done"; readonly result: RelayComputersResult };
+
+/** What a list of the account's computers shows: its state, or the computers to pick from. */
+export type RelayComputersView =
+  | { readonly kind: "loading" }
+  /** The relay turned this device's credential down, or it has none. */
+  | { readonly kind: "signedOut" }
+  | { readonly kind: "unavailable" }
+  | { readonly kind: "empty" }
+  | { readonly kind: "list"; readonly computers: ReadonlyArray<RelayComputer> };
+
+export function relayComputersView(
+  load: RelayComputersLoad,
+  connected: ReadonlySet<string>,
+): RelayComputersView {
+  if (load.status === "loading") return { kind: "loading" };
+  if (load.result.problem === "signed_out") return { kind: "signedOut" };
+  if (load.result.problem === "unavailable") return { kind: "unavailable" };
+  const computers = pickableRelayComputers(load.result.computers, connected);
+  return computers.length === 0 ? { kind: "empty" } : { kind: "list", computers };
+}
+
 /** The computers a saved environment already reaches through the Gustaf relay. */
 export function relayComputersOfEnvironments(
   entries: ReadonlyArray<ConnectionCatalogEntry>,

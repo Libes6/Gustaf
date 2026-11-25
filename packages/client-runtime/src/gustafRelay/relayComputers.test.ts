@@ -10,6 +10,7 @@ import {
   pairWithRelayComputer,
   pickableRelayComputers,
   relayComputersOfEnvironments,
+  relayComputersView,
   relayPairingFailureMessage,
   startRelayComputerPairing,
   type RelayPairingProgress,
@@ -104,6 +105,35 @@ describe("account computers", () => {
         connected,
       ).map((computer) => computer.deviceId),
     ).toEqual(["laptop", "alpha", "zed"]);
+  });
+});
+
+describe("the list of account computers", () => {
+  const laptop = { deviceId: "laptop", name: "Laptop", online: true };
+  const desktop = { deviceId: "desktop", name: "Desktop", online: false };
+  const done = (result: Parameters<typeof relayComputersView>[0] & { status: "done" }) => result;
+  it("shows the state of the read, and the computers not yet connected, online ones first", () => {
+    const none = new Set<string>();
+    expect(relayComputersView({ status: "loading" }, none)).toEqual({ kind: "loading" });
+    expect(
+      relayComputersView(
+        done({ status: "done", result: { computers: [], problem: "signed_out" } }),
+        none,
+      ),
+    ).toEqual({ kind: "signedOut" });
+    expect(
+      relayComputersView(
+        done({ status: "done", result: { computers: [], problem: "unavailable" } }),
+        none,
+      ),
+    ).toEqual({ kind: "unavailable" });
+    const all = { status: "done", result: { computers: [desktop, laptop] } } as const;
+    expect(relayComputersView(all, none)).toEqual({ kind: "list", computers: [laptop, desktop] });
+    expect(relayComputersView(all, new Set(["laptop"]))).toEqual({
+      kind: "list",
+      computers: [desktop],
+    });
+    expect(relayComputersView(all, new Set(["laptop", "desktop"]))).toEqual({ kind: "empty" });
   });
 });
 
