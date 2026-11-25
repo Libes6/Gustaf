@@ -228,7 +228,7 @@ const probeFailure = (
   }
   return new PeerLinkError({
     reason: "not_a_t3_environment",
-    message: `${origin} answered, but not as a T3 Code environment this version understands.`,
+    message: `${origin} answered, but not as a Gustaf environment this version understands.`,
   });
 };
 
@@ -554,7 +554,7 @@ const make = Effect.gen(function* () {
     if (!linkLimitsHold(peer)) {
       return yield* new PeerLinkError({
         reason: "incompatible",
-        message: `${peer.label} runs a T3 Code version that cannot keep a linked agent's limits. Update it, then link again.`,
+        message: `${peer.label} runs a Gustaf version that cannot keep a linked agent's limits. Update it, then link again.`,
       });
     }
     const issued = yield* signIn(primary, input, `${LINK_CLIENT_NAME_PREFIX}${self.label}`);
@@ -777,7 +777,7 @@ const make = Effect.gen(function* () {
       if (!linkLimitsHold(peer)) {
         return yield* new PeerLinkError({
           reason: "incompatible",
-          message: `${link.label} runs a T3 Code version that cannot keep a linked agent's limits. Update it, then link again.`,
+          message: `${link.label} runs a Gustaf version that cannot keep a linked agent's limits. Update it, then link again.`,
         });
       }
       return {
