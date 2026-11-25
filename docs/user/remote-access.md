@@ -241,7 +241,11 @@ credentials, and agent work stay on the remote machine.
 The remote host must be Linux or an Apple Silicon Mac with `curl` or `wget`,
 `tar`, `sha256sum` or `shasum`, and [provider setup](./install.md#providers).
 The first launch downloads Gustaf's server to `~/.t3/runtime` on the host, so
-it takes longer than later ones.
+it takes longer than later ones. While it works, a progress log under the form
+lists each step, such as connecting, downloading and starting the server, with
+the time a slow one takes. If a step fails, the log stays open with the error on
+that step so you can retry, and **Copy log** puts it on the clipboard for a bug
+report. The log never includes passwords, tokens or key file paths.
 Provider CLIs must be on the `PATH` of a non-interactive login shell there;
 check with:
 
