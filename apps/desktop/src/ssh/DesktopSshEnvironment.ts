@@ -29,6 +29,7 @@ import * as Schema from "effect/Schema";
 import * as HttpClient from "effect/http/HttpClient";
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
 import * as Option from "effect/Option";
+import desktopPackageJson from "../../package.json" with { type: "json" };
 import serverPackageJson from "../../../server/package.json" with { type: "json" };
 
 import type * as DesktopEnvironment from "../app/DesktopEnvironment.ts";
@@ -92,7 +93,8 @@ export const resolveDesktopSshCliRunner = (
   }
   const releaseBaseUrl = env[CLI_RELEASE_BASE_URL_ENV]?.trim() || undefined;
   return {
-    archiveVersion: environment.appVersion,
+    // An unpackaged dev run reports Electron's own version, which no release carries.
+    archiveVersion: environment.isDevelopment ? desktopPackageJson.version : environment.appVersion,
     ...(releaseBaseUrl === undefined ? {} : { releaseBaseUrl }),
   };
 };
