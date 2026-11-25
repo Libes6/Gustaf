@@ -8,7 +8,7 @@ import {
 } from "@t3tools/contracts";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
-import { McpSchema, type Tool, type Toolkit } from "effect/ai";
+import { McpSchema, type Tool } from "effect/ai";
 
 import * as McpInvocationContext from "../McpInvocationContext.ts";
 import { DeviceToolkit } from "./device/tools.ts";
@@ -35,8 +35,8 @@ const scopeWith = (
 });
 
 // What /mcp does for each tool in tools/list: the predicate reads the request's scope.
-const listed = <Tools extends Record<string, Tool.Any>>(
-  toolkit: Toolkit.Toolkit<Tools>,
+const listed = (
+  toolkit: { readonly tools: Record<string, Tool.Any> },
   scope: McpInvocationContext.McpInvocationScope,
 ) =>
   Effect.sync(() =>
@@ -48,8 +48,7 @@ const listed = <Tools extends Record<string, Tool.Any>>(
       .map((tool) => tool.name),
   ).pipe(Effect.provideService(McpInvocationContext.McpInvocationContext, scope));
 
-const names = <Tools extends Record<string, Tool.Any>>(toolkit: Toolkit.Toolkit<Tools>) =>
-  Object.keys(toolkit.tools);
+const names = (toolkit: { readonly tools: Record<string, Tool.Any> }) => Object.keys(toolkit.tools);
 
 it.effect("lists the browser tools only to a thread with the preview capability", () =>
   Effect.gen(function* () {
