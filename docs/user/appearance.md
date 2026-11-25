@@ -106,7 +106,7 @@ in Full access. Ask the agent to set a built-in theme to undo it.
 Environment themes and defaults come from the server serving your web app or the desktop app's
 main local environment. With the desktop app's local environment off, they come from the
 [background service](./background-service.md) on the same machine while the app is connected to
-it. app.t3.codes and other connections do not use them.
+it. Other connections do not use them.
 
 Select a published theme in **Settings → Appearance** to follow its palette as the server updates
 it. **Duplicate** makes an independent copy you can edit. A saved custom theme with the same ID

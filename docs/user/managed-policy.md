@@ -219,7 +219,7 @@ The limit decides which modes Gustaf asks the provider for. It is not a sandbox;
 
 - `desktop`: as the desktop app's own server.
 - `local-browser`: as a server only browsers on this machine reach, such as `npx t3`.
-- `remote`: reachable from phones, other computers, and app.t3.codes over the network.
+- `remote`: reachable from phones and other computers over the network.
 
 `remote` is the line that matters. A server reachable from the network also accepts browsers on
 this machine, and the two local kinds differ only in how Gustaf was started. On machines with the
@@ -257,8 +257,7 @@ so restart Gustaf after that.
   unavailable. This wins over the user's
   [Preview tunnel setting](./remote-access.md#browser-on-a-remote-environment).
 - `telemetry: false`: the server and desktop app send no [product usage data](./telemetry.md) or
-  relay connection traces. A policy cannot turn them on. A browser that opens the server, such as
-  app.t3.codes, still sends its own relay traces.
+  relay connection traces. A policy cannot turn them on.
 
 ### Providers
 

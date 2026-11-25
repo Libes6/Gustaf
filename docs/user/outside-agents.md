@@ -86,7 +86,7 @@ policy. Approving without a code starts at **Read only**:
 
 ## What outside agents can call
 
-Some tools only work for an agent running inside a T3 thread, because they act
+Some tools only work for an agent running inside a Gustaf thread, because they act
 as that thread: subagents, secret requests, rendered HTML, the browser preview,
 devices, and worktree handoff. They still appear in an outside agent's tool
 list, but calling one returns an error saying it needs an agent running inside

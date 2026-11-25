@@ -8,7 +8,8 @@ until you send or dismiss it.
 
 Guest links are a beta. Turn on **Settings → Labs → Guest links** for the machine that runs the
 thread. They also need [T3 Connect](./remote-access.md): sign in and link that machine, because the
-link points at its T3 Connect address. The machine must stay online while the guest uses it.
+link points at its T3 Connect address. Gustaf builds do not include T3 Connect, so guest links are
+not available there. The machine must stay online while the guest uses it.
 While the setting is off, every guest link on that machine stops working; links that have not
 expired work again when you turn it back on.
 

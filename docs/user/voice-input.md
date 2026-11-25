@@ -47,7 +47,7 @@ on the environment.
 speech-to-text catalog when you enable it, or later under **Manage OpenRouter**.
 The model choice is yours alone and needs no settings access, so anyone with
 dictation access can pick a different model without touching the saved key.
-OpenRouter chooses who runs the model. T3 requests zero data retention; your
+OpenRouter chooses who runs the model. Gustaf requests zero data retention; your
 OpenRouter account can also allow safety retention. If no endpoint qualifies,
 dictation fails instead of switching models.
 Vocabulary hints are not sent to OpenRouter; dictionary spellings are applied
