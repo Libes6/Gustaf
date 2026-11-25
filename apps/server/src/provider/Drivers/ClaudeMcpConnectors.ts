@@ -44,6 +44,8 @@ export function claudeMcpConnector(
   authorizing: boolean,
 ): McpConnector | undefined {
   if (status.source === "sdk" || status.source === "dynamic") return undefined;
+  // Account-synced plugins bundle servers the user never chose; list one only once it works.
+  if (status.source === "plugin" && status.status !== "connected") return undefined;
   const type = status.config?.type;
   const auth =
     type === "claudeai-proxy" || status.source === "claudeai" || status.scope === "claudeai"

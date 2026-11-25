@@ -66,3 +66,11 @@ it("keeps the default version and no versionCode outside a release build", async
   const config = await loadConfig("production");
   expect(config.android?.versionCode).toBeUndefined();
 });
+
+it("gives expo-observe a project id, since it throws at startup without one", async () => {
+  const config = await loadConfig("production");
+  const projectId = config.extra?.eas?.projectId;
+  expect(typeof projectId === "string" && projectId.length > 0).toBe(true);
+  expect(projectId).not.toBe("d763fcb8-d37c-41ea-a773-b54a0ab4a454");
+  expect(config.extra?.eas?.observe?.endpointUrl).toBe("https://observe.invalid");
+});
