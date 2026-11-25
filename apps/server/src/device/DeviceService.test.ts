@@ -2013,7 +2013,7 @@ it.effect.each(["exit", "missing"] as const)(
       expect(error.message).toBe(
         failure === "exit"
           ? "Device update device tool failed: The device command failed (exit code 243)."
-          : "Device update device tool failed: Device support needs npm, which is not on the T3 server's PATH. Install npm (it comes with Node.js from nodejs.org), restart Gustaf, then retry.",
+          : "Device update device tool failed: Device support needs npm, which is not on the Gustaf server's PATH. Install npm (it comes with Node.js from nodejs.org), restart Gustaf, then retry.",
       );
     }).pipe(
       Effect.provide(

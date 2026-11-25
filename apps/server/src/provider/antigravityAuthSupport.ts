@@ -434,7 +434,7 @@ export const prepareAntigravityProfile = Effect.fn("prepareAntigravityProfile")(
     helperExecutable.includes("%s")
   ) {
     return yield* authSupportError(
-      "The T3 runtime path cannot be used to suppress Antigravity browser launches.",
+      "The Gustaf runtime path cannot be used to suppress Antigravity browser launches.",
     );
   }
 

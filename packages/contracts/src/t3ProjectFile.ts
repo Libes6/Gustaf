@@ -48,7 +48,7 @@ export const T3ProjectFileScript = Schema.Struct({
   stopOnSettle: Schema.optionalKey(
     Schema.Boolean.annotate({
       description:
-        "When true, T3 stops this action's terminal and child processes when its thread settles.",
+        "When true, Gustaf stops this action's terminal and child processes when its thread settles.",
     }),
   ),
   async: Schema.optionalKey(
@@ -147,7 +147,7 @@ export const T3ProjectFile = Schema.Struct({
       .check(Schema.isMaxLength(T3_PROJECT_FILE_MAX_SCRIPTS)),
   ),
 }).annotate({
-  title: "T3 project file",
+  title: "Gustaf project file",
   description: "Checked-in project configuration for Gustaf (t3.json at the repository root).",
 });
 export type T3ProjectFile = typeof T3ProjectFile.Type;

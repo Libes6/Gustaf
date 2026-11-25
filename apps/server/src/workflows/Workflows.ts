@@ -168,7 +168,7 @@ export class Workflows extends Context.Service<
 const refuse = Effect.fn("Workflows.disabled")(function* () {
   return yield* new WorkflowInputError({
     problem:
-      "This server defines no workflows yet. Add a file to the workflows folder of its T3 home.",
+      "This server defines no workflows yet. Add a file to the workflows folder of its Gustaf data folder.",
   });
 });
 
@@ -206,7 +206,7 @@ export const disabled = Workflows.of({
 export const layerDisabled = Layer.succeed(Workflows, disabled);
 
 export const OFF =
-  'Workflows are off on this server. Turn them on in its Settings → Labs → Workflows, or without a desktop, set "workflowsEnabled": true in userdata/settings.json in its T3 home (~/.t3 by default).';
+  'Workflows are off on this server. Turn them on in its Settings → Labs → Workflows, or without a desktop, set "workflowsEnabled": true in userdata/settings.json in its Gustaf data folder (~/.t3 by default).';
 
 const refuseOff = Effect.fn("Workflows.off")(function* () {
   return yield* new WorkflowInputError({ problem: OFF });
