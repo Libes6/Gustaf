@@ -37,6 +37,21 @@ it.effect.each(["gustaf://app", "gustaf-dev://app"])("echoes the %s renderer ori
   Effect.map(allowedOriginFor(origin), (allowed) => assert.equal(allowed, origin)),
 );
 
+it.effect("lets the desktop renderer send the relay trust PUT", () =>
+  Effect.gen(function* () {
+    const request = HttpServerRequest.fromWeb(
+      new Request("http://127.0.0.1:3773/api/relay-host/trust", {
+        method: "OPTIONS",
+        headers: { origin: "gustaf://app", "access-control-request-method": "PUT" },
+      }),
+    );
+    const response = yield* cors(Effect.succeed(HttpServerResponse.empty())).pipe(
+      Effect.provideService(HttpServerRequest.HttpServerRequest, request),
+    );
+    assert.include(response.headers["access-control-allow-methods"], "PUT");
+  }),
+);
+
 it.effect("does not echo the retired T3 renderer origins", () =>
   Effect.gen(function* () {
     for (const origin of ["t3code://app", "t3code-dev://app"]) {
