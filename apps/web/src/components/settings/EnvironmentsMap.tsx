@@ -44,6 +44,7 @@ import {
   useContext,
   useEffect,
   useEffectEvent,
+  useId,
   useRef,
   useState,
 } from "react";
@@ -1387,6 +1388,7 @@ const FleetScene = memo(function FleetScene({
   /** The other link of the two-way link `edge` is drawn for. */
   const backOf = (edge: FleetLinkEdge) => pairs.get(edge.id)?.back;
   const routeEdges = graph.edges.filter(isRouteEdge);
+  const pillMaskId = useId();
   const focusRects = fleetFocusRects(layout);
   const tabStop = focusRects.has(roving) ? roving : FLEET_CLIENT_NODE_ID;
   const titles = COLUMN_TITLES(gt);
@@ -1597,21 +1599,40 @@ const FleetScene = memo(function FleetScene({
         fill="none"
         strokeLinecap="round"
       >
-        {routePaintOrder.map((edge) => {
-          const geometry = layout.routes.get(edge.id);
-          if (geometry === undefined) return null;
-          const style = ROUTE_STYLES[edge.state];
-          return (
-            <path
-              key={edge.id}
-              d={geometry.d}
-              stroke="currentColor"
-              strokeWidth={style.width}
-              strokeDasharray={style.dash}
-              className={cn(style.wire, fadeLine(!routeLit(edge)))}
-            />
-          );
-        })}
+        {/* A theme's background can be translucent, so wires are cut out under their names. */}
+        <mask
+          id={pillMaskId}
+          maskUnits="userSpaceOnUse"
+          x={0}
+          y={0}
+          width={layout.width}
+          height={layout.height}
+        >
+          <rect width={layout.width} height={layout.height} className="fill-white" />
+          {routeEdges.map((edge) => {
+            const pill = layout.routes.get(edge.id)?.pill;
+            return pill ? (
+              <rect key={edge.id} {...pill} rx={pill.height / 2} className="fill-black" />
+            ) : null;
+          })}
+        </mask>
+        <g mask={`url(#${pillMaskId})`}>
+          {routePaintOrder.map((edge) => {
+            const geometry = layout.routes.get(edge.id);
+            if (geometry === undefined) return null;
+            const style = ROUTE_STYLES[edge.state];
+            return (
+              <path
+                key={edge.id}
+                d={geometry.d}
+                stroke="currentColor"
+                strokeWidth={style.width}
+                strokeDasharray={style.dash}
+                className={cn(style.wire, fadeLine(!routeLit(edge)))}
+              />
+            );
+          })}
+        </g>
         {stacks.map((stack) => {
           const geometry = layout.stacks.get(stack.id);
           if (geometry === undefined) return null;
