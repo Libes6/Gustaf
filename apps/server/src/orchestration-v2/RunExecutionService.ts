@@ -677,6 +677,7 @@ export interface RunExecutionServiceV2StartRootRunInput {
     nodeIds: ReadonlyArray<NodeId>,
   ) => Effect.Effect<UnsettledWork, ProjectionStoreV2Error>;
   readonly message: ProviderAdapter.ProviderAdapterV2TurnMessage;
+  readonly inlineContextLength?: number;
   readonly modelSelection: ModelSelection;
   readonly runtimePolicy: ProviderAdapter.ProviderAdapterV2RuntimePolicy;
 }
@@ -2294,6 +2295,9 @@ export const layer: Layer.Layer<
           rootNodeId: input.rootNode.id,
           providerThread: input.providerThread,
           message: input.message,
+          ...(input.inlineContextLength === undefined
+            ? {}
+            : { inlineContextLength: input.inlineContextLength }),
           modelSelection: input.modelSelection,
           runtimePolicy: input.runtimePolicy,
           ...(appContext.length === 0 ? {} : { appContext }),

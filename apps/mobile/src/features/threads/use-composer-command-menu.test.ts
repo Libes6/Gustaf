@@ -13,6 +13,7 @@ vi.mock("../../state/use-composer-drafts", () => ({
   useComposerDraftSelection: vi.fn(),
 }));
 vi.mock("../../lib/uuid", () => ({ uuidv4: () => "context-id" }));
+vi.mock("../../state/skills", () => ({ useSharedSkills: () => undefined }));
 vi.mock("../../state/server", () => ({
   serverEnvironment: {
     providersValueAtom: vi.fn(),

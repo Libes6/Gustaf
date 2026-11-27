@@ -89,6 +89,7 @@ import * as PullRequestService from "../pullRequest/PullRequestService.ts";
 import * as ProjectStore from "./ProjectStore.ts";
 import * as ProviderSessionManager from "./ProviderSessionManager.ts";
 import { layerNoTaskFolders } from "./ProviderTurnStartService.testkit.ts";
+import * as ProviderRegistry from "../provider/ProviderRegistry.ts";
 import * as RuntimeLayer from "./runtimeLayer.ts";
 import { shellStreamItemFromThreadShell } from "./ShellStream.ts";
 import { CodexProviderCapabilitiesV2 } from "./Adapters/CodexAdapterV2.ts";
@@ -218,7 +219,9 @@ const antigravityProviderInstance = {
   },
 } satisfies ProviderInstance;
 
-const layerTestProviderInstanceRegistry = Layer.merge(
+const layerTestProviderInstanceRegistry = Layer.mergeAll(
+  // Shared skills ask which of them a provider already runs.
+  Layer.mock(ProviderRegistry.ProviderRegistry)({}),
   ModelManifest.layerTest,
   Layer.succeed(ProviderInstanceRegistry.ProviderInstanceRegistry, {
     getInstance: (instanceId) =>

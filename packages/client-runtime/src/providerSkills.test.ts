@@ -13,6 +13,7 @@ import {
   getProviderSkillsForSlashMenu,
   hasCompleteProviderWorkspaceSnapshot,
   isProviderWorkspaceSnapshotScanning,
+  mergeSharedSkills,
   resolveProviderSkillsForCwd,
   resolveProviderSlashCommandsForCwd,
   resolveProvidersForCwd,
@@ -82,6 +83,41 @@ describe("getProviderSkillsForSlashMenu", () => {
     ];
 
     expect(getProviderSkillsForSlashMenu(skills, true)).toEqual([enabledSkill]);
+  });
+});
+
+describe("mergeSharedSkills", () => {
+  const shared = (location: "project" | "global", name: string, path = `/${location}/${name}`) => ({
+    location,
+    name,
+    path,
+    revision: "1",
+    enabled: true,
+    invocable: true,
+    issues: [],
+  });
+
+  it("qualifies a taken name and lists a file the provider already has only once", () => {
+    const merged = mergeSharedSkills(
+      [
+        { name: "deploy", path: "/native/deploy", enabled: true },
+        { name: "lint", path: "/project/lint", enabled: true },
+      ],
+      [
+        shared("global", "docs"),
+        shared("project", "docs"),
+        shared("project", "deploy"),
+        shared("project", "lint"),
+        { ...shared("project", "off"), enabled: false },
+      ],
+    );
+    expect(merged.map((skill) => skill.name)).toEqual([
+      "deploy",
+      "lint",
+      "docs",
+      "project:deploy",
+      "global:docs",
+    ]);
   });
 });
 

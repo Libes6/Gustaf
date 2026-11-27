@@ -322,6 +322,8 @@ const SKILL_SOURCE_ICON_BY_KIND: Record<ProviderSkillSourceKind, LucideIcon> = {
   project: FolderIcon,
   personal: UserRoundIcon,
   system: SettingsIcon,
+  "shared-project": FolderIcon,
+  "shared-global": UserRoundIcon,
   other: PackageIcon,
 };
 
@@ -348,6 +350,14 @@ const SKILL_SOURCE_LABEL_BY_KIND: Record<
   system: {
     label: msg("System", { $context: "skill source badge" }),
     skillLabel: msg("System Skill"),
+  },
+  "shared-project": {
+    label: msg("Shared · project", { $context: "skill source badge" }),
+    skillLabel: msg("Shared Project Skill"),
+  },
+  "shared-global": {
+    label: msg("Shared · global", { $context: "skill source badge" }),
+    skillLabel: msg("Shared Global Skill"),
   },
   other: {
     label: msg("Provider", { $context: "skill source badge" }),

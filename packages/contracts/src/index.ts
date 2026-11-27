@@ -62,6 +62,7 @@ export * from "./assets.ts";
 export * from "./review.ts";
 export * from "./mcpApps.ts";
 export * from "./mcpServer.ts";
+export * from "./skills.ts";
 export * from "./browserImport.ts";
 export * from "./browserProfile.ts";
 export * from "./computerUse.ts";

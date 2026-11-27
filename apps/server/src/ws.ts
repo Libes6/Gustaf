@@ -234,6 +234,7 @@ import * as WorkspaceEntries from "./workspace/WorkspaceEntries.ts";
 import * as WorkspaceFolders from "./workspace/WorkspaceFolders.ts";
 import * as TaskFolders from "./workspace/TaskFolders.ts";
 import * as KnownWorkspaces from "./workspace/KnownWorkspaces.ts";
+import * as SharedSkills from "./skills/SharedSkills.ts";
 import * as WorkspaceFileSystem from "./workspace/WorkspaceFileSystem.ts";
 import { readWorkflowScript } from "./orchestration-v2/workflowScriptQuery.ts";
 import * as WorkspacePaths from "./workspace/WorkspacePaths.ts";
@@ -1612,6 +1613,7 @@ export const layerWsRpc = (
       const workspaceFolders = yield* WorkspaceFolders.WorkspaceFolders;
       const taskFolders = yield* TaskFolders.TaskFolders;
       const workspaceFileSystem = yield* WorkspaceFileSystem.WorkspaceFileSystem;
+      const sharedSkills = yield* SharedSkills.SharedSkills;
       const serverEnvironment = yield* ServerEnvironment.ServerEnvironment;
       const backgroundPolicy = yield* BackgroundPolicy.BackgroundPolicy;
       const rpcClientIds = yield* Ref.make(new Set<RpcClientId>());
@@ -1970,6 +1972,7 @@ export const layerWsRpc = (
           threadSnapshotPagination: true,
           threadFind: true,
           threadFindProgressive: true,
+          sharedSkills: true,
           secretProviderSettings: true,
           secretReferences: true,
           secretRequestReferences: true,
@@ -3178,6 +3181,12 @@ export const layerWsRpc = (
                 }),
             ),
           ),
+        [WS_METHODS.skillsList]: (input) => sharedSkills.list(input),
+        [WS_METHODS.skillsRead]: (input) => sharedSkills.read(input),
+        [WS_METHODS.skillsSetEnabled]: (input) =>
+          sharedSkills.setEnabled(input).pipe(Effect.as({})),
+        [WS_METHODS.skillsRemove]: (input) => sharedSkills.remove(input).pipe(Effect.as({})),
+        [WS_METHODS.skillsImport]: (input) => sharedSkills.importSkill(input).pipe(Effect.as({})),
         [WS_METHODS.projectsMutate]: (mutation) =>
           startup.enqueueCommand(mutateProject(mutation)).pipe(
             Effect.mapError(

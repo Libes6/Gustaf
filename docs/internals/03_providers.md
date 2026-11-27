@@ -77,6 +77,14 @@ clients read declared capabilities, never provider names.
   The agent connects on the first prompt and one server that cannot start refuses every prompt, so a
   server that failed its check is left out of the session instead of being sent.
 
+## Shared skills
+
+[`SharedSkills`](../../apps/server/src/skills/SharedSkills.ts) runs `.agents/skills` and
+userdata skills for every provider by adding `SKILL.md` to the turn's text on the host. Nothing is
+linked or mirrored into a provider's home, so no adapter needs its own support. A mention is left
+to the provider only when its snapshot reports a skill of that exact name. The added text counts as
+`inlineContextLength`, so an adapter that parses mentions or commands out of the prompt must skip it.
+
 ## Model manifest
 
 The bundled [`model-manifest.json`](../../apps/server/src/provider/model-manifest.json) enables

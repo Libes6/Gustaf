@@ -7,16 +7,69 @@ import {
   type ServerProvider,
   type ServerProviderSkill,
   type ServerProviderSlashCommand,
+  type SharedSkill,
 } from "@t3tools/contracts";
 import { Atom } from "effect/reactivity";
 
 import { deadlineStore } from "./clock.ts";
 import { type AtomCommand, runAtomCommand } from "./state/runtime.ts";
 
-export type ProviderSkillSourceKind = "app" | "repo" | "project" | "personal" | "system" | "other";
+export type ProviderSkillSourceKind =
+  | "app"
+  | "repo"
+  | "project"
+  | "personal"
+  | "system"
+  | "shared-project"
+  | "shared-global"
+  | "other";
 
 function normalizePathSeparators(pathValue: string): string {
   return pathValue.replaceAll("\\", "/");
+}
+
+const SHARED_SKILL_SCOPES = { project: "gustaf-project", global: "gustaf-global" } as const;
+
+const NO_SHARED_SKILLS: ReadonlyArray<SharedSkill> = [];
+
+/**
+ * The skills a composer offers: the provider's own, then the shared ones, which every provider
+ * runs. A shared skill the provider already lists from the same file appears once, as the
+ * provider's. One whose name is taken is offered as `project:name` or `global:name`, which the
+ * server resolves to that copy.
+ */
+export function mergeSharedSkills(
+  providerSkills: ServerProvider["skills"],
+  sharedSkills: ReadonlyArray<SharedSkill> = NO_SHARED_SKILLS,
+): ServerProvider["skills"] {
+  if (sharedSkills.length === 0) return providerSkills;
+  const invocable = providerSkills.filter(isProviderSkillUserInvocable);
+  const takenNames = new Set(invocable.map((skill) => skill.name));
+  const nativePaths = new Set(invocable.map((skill) => normalizePathSeparators(skill.path)));
+  const added: ServerProviderSkill[] = [];
+  // Project skills first, so they keep the bare name over global ones.
+  for (const source of ["project", "global"] as const) {
+    for (const skill of sharedSkills) {
+      if (skill.location !== source || !skill.enabled || !skill.invocable) continue;
+      if (
+        nativePaths.has(normalizePathSeparators(skill.path)) ||
+        (skill.realPath !== undefined && nativePaths.has(normalizePathSeparators(skill.realPath)))
+      ) {
+        continue;
+      }
+      const name = takenNames.has(skill.name) ? `${source}:${skill.name}` : skill.name;
+      takenNames.add(name);
+      added.push({
+        name,
+        path: skill.path,
+        scope: SHARED_SKILL_SCOPES[source],
+        enabled: true,
+        // Menus fall back to naming the scope, which here is an internal id.
+        description: skill.description ?? skill.path,
+      });
+    }
+  }
+  return added.length === 0 ? providerSkills : [...providerSkills, ...added];
 }
 
 export function dedupeProviderSkillsByName(
@@ -56,7 +109,12 @@ export function getProviderSlashCommandsForSlashMenu(
   slashCommands: ReadonlyArray<ServerProviderSlashCommand>,
   visibleSkills: ReadonlyArray<ServerProviderSkill>,
 ): ServerProviderSlashCommand[] {
-  const skillNames = new Set(visibleSkills.map((skill) => skill.name.trim().toLowerCase()));
+  // A shared skill is run with `$name`, so it does not replace a command of that name.
+  const skillNames = new Set(
+    visibleSkills
+      .filter((skill) => !resolveProviderSkillSourceKind(skill).startsWith("shared-"))
+      .map((skill) => skill.name.trim().toLowerCase()),
+  );
   return slashCommands.filter((command) => !skillNames.has(command.name.trim().toLowerCase()));
 }
 
@@ -82,6 +140,10 @@ export function resolveProviderSkillSourceKind(
       return "personal";
     case "system":
       return "system";
+    case SHARED_SKILL_SCOPES.project:
+      return "shared-project";
+    case SHARED_SKILL_SCOPES.global:
+      return "shared-global";
     case undefined:
     case "":
       return "other";

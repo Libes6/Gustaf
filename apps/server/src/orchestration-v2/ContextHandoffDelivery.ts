@@ -25,6 +25,21 @@ export const isSlashCommandMessage = (message: {
 export const withInlineContext = (context: string, userText: string): string =>
   context === "" ? userText : `${context}\n\nUser message:\n${userText}`;
 
+/**
+ * A turn's text with the shared skills it runs ahead of the request, and how much of it is not
+ * the user's words. A native command must open the prompt, so its skills follow it.
+ */
+export const withSkillContext = (
+  skillContext: string,
+  userText: string,
+  slashCommand: boolean,
+): { readonly text: string; readonly inlineContextLength: number } => {
+  if (skillContext === "") return { text: userText, inlineContextLength: 0 };
+  if (slashCommand) return { text: `${userText}\n\n${skillContext}`, inlineContextLength: 0 };
+  const text = withInlineContext(skillContext, userText);
+  return { text, inlineContextLength: text.length - userText.length };
+};
+
 /** Persist around injection; ambiguous delivery requires a fresh native thread. Call unsent if refused before prompt consumption. */
 export const deliverContextHandoffs = Effect.fn("orchestrationV2.deliverContextHandoffs")(
   function* <InjectError = never, PersistError = never, BudgetError = never>(input: {
