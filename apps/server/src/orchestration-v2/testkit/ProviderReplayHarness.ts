@@ -170,6 +170,7 @@ export function makeReplayServerConfig(
       environmentIdPath: path.join(stateDir, "environment-id"),
       serverRuntimeStatePath: path.join(stateDir, "server-runtime.json"),
       secretsDir: path.join(stateDir, "secrets"),
+      memoryDir: path.join(stateDir, "memory"),
     };
   });
 }

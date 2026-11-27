@@ -307,6 +307,8 @@ describe("relay tunnel", () => {
         const secretStore = yield* ServerSecretStore.ServerSecretStore;
         const pairing = yield* serverAuth.createPairingLink({ label: "Pixel" });
         const nowMs = yield* Clock.currentTimeMillis;
+        // oxlint-disable-next-line t3code/no-manual-effect-runtime-in-tests -- Node http.Server upgrade event callback bridges into Effect.
+        const runPromise = Effect.runPromiseWith(yield* Effect.context<never>());
         yield* Effect.promise(async () => {
           const layerRoutes = HttpApiBuilder.layer(AuthTestApi).pipe(
             Layer.provide(AuthHttp.layer),
@@ -329,7 +331,7 @@ describe("relay tunnel", () => {
             try {
               const chunks: Array<Buffer> = [];
               for await (const chunk of req) chunks.push(chunk as Buffer);
-              const body = chunks.length > 0 ? Buffer.concat(chunks) : undefined;
+              const body = chunks.length > 0 ? Buffer.concat(chunks) : null;
               const headers = new Headers();
               for (const [key, value] of Object.entries(req.headers)) {
                 if (typeof value === "string") headers.set(key, value);
@@ -361,10 +363,7 @@ describe("relay tunnel", () => {
             const upgradeRequest = HttpServerRequest.fromWeb(
               new Request(`http://${req.headers.host ?? "127.0.0.1"}${req.url ?? "/"}`),
             ).modify({ headers: HttpHeaders.fromInput(upgradeHeaders) });
-            // oxlint-disable-next-line t3code/no-manual-effect-runtime-in-tests -- Node http.Server upgrade event callback bridges into Effect.
-            void Effect.runPromise(
-              serverAuth.authenticateWebSocketUpgrade(upgradeRequest, "rpc"),
-            ).then(
+            void runPromise(serverAuth.authenticateWebSocketUpgrade(upgradeRequest, "rpc")).then(
               (session) => {
                 wss.handleUpgrade(req, socket, head, (ws) => {
                   ws.on("message", (data) =>

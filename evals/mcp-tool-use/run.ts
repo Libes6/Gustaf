@@ -567,10 +567,19 @@ export const savesPastedSecrets = t3Tools.some(
 /** A request_secret call that hands T3 a pasted secret, on a ref that takes one. */
 const pastedSecret = (name: string, input: Readonly<Record<string, unknown>>) =>
   savesPastedSecrets && name === "request_secret" && typeof input.value === "string";
+const linksOffAndFromSubagents = enabledWhen(
+  McpInvocationContext.hiddenWhileLinksOffOrFromSubagents,
+);
 // T3 does not offer these to a delegated child, so its harness never lists them.
-const hiddenFromSubagents = enabledWhen(McpInvocationContext.hiddenFromSubagents);
+const hiddenFromSubagents = new Set([
+  ...enabledWhen(McpInvocationContext.hiddenFromSubagents),
+  ...linksOffAndFromSubagents,
+]);
 // The Linked environments beta starts off, and T3 lists its tools only while it is on.
-const hiddenWhileLinksOff = enabledWhen(McpInvocationContext.hiddenWhileLinksOff);
+const hiddenWhileLinksOff = new Set([
+  ...enabledWhen(McpInvocationContext.hiddenWhileLinksOff),
+  ...linksOffAndFromSubagents,
+]);
 // Agent feedback starts off, and T3 lists its tools only while it is on.
 const hiddenWhileFeedbackOff = enabledWhen(McpInvocationContext.hiddenWhileFeedbackOff);
 // T3 lists PR and CI tools only to a thread whose project is on a forge it reads.

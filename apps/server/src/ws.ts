@@ -3945,8 +3945,12 @@ export const layer = Layer.unwrap(
                   reviewGuides,
                 ),
               ),
-              Layer.provide(Layer.succeed(SubscriptionService.SubscriptionService, subscriptions)),
-              Layer.provide(Layer.succeed(MemoryService.MemoryService, memory)),
+              Layer.provide(
+                Layer.mergeAll(
+                  Layer.succeed(SubscriptionService.SubscriptionService, subscriptions),
+                  Layer.succeed(MemoryService.MemoryService, memory),
+                ),
+              ),
               Layer.provide(Layer.succeed(PeerLinks.PeerLinks, peerLinks)),
               Layer.provide(Layer.succeed(PeerLinkRequests.PeerLinkRequests, peerLinkRequests)),
               Layer.provide(Layer.succeed(PeerThreadRelay.PeerThreadRelay, peerThreadRelay)),

@@ -135,15 +135,11 @@ internal data class KeepConnectionContent(
     private const val EXTRA_CHANNEL_NAME = "expo.modules.t3keepconnection.CHANNEL_NAME"
 
     fun from(intent: Intent): KeepConnectionContent? {
-      val title = intent.getStringExtra(EXTRA_TITLE)
-      val text = intent.getStringExtra(EXTRA_TEXT)
-      val stopLabel = intent.getStringExtra(EXTRA_STOP_LABEL)
-      val channelName = intent.getStringExtra(EXTRA_CHANNEL_NAME)
-      return if (title != null && text != null && stopLabel != null && channelName != null) {
-        KeepConnectionContent(title, text, stopLabel, channelName)
-      } else {
-        null
-      }
+      val values = listOf(EXTRA_TITLE, EXTRA_TEXT, EXTRA_STOP_LABEL, EXTRA_CHANNEL_NAME)
+        .map { intent.getStringExtra(it) }
+      if (values.any { it == null }) return null
+      val present = values.requireNoNulls()
+      return KeepConnectionContent(present[0], present[1], present[2], present[3])
     }
   }
 }

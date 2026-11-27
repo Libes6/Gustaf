@@ -983,10 +983,8 @@ const layerMakeRoutes = Layer.mergeAll(
   Layer.provide(
     PullRequestReviewGuideService.layer.pipe(Layer.provide(PullRequestReviewGuides.layer)),
   ),
-  // Settings (WebSocket) and agents (/mcp) read the same list.
-  Layer.provide(SubscriptionService.layer),
-  // Settings (WebSocket), turns (inline delivery), and agents (/mcp) share memory notes.
-  Layer.provide(MemoryService.layer),
+  // Settings (WebSocket) and agents (/mcp) read the same subscription list and memory notes.
+  Layer.provide(Layer.mergeAll(SubscriptionService.layer, MemoryService.layer)),
   // delegate_task to a linked environment, from /mcp and the follower above.
   Layer.provide(RemoteDelegation.layer.pipe(Layer.provide(ProjectionStoreV2.layer))),
   // Links agents ask for: shown in a thread from /mcp, answered over WebSocket.

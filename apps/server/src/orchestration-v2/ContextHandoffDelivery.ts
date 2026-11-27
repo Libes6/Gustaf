@@ -203,7 +203,7 @@ const MEMORY_TRUNCATION_SUFFIX = "\n…(truncated to fit context budget)";
 export function buildMemoryInlineContext(input: {
   readonly global: Pick<MemoryNote, "content" | "revision">;
   readonly project: Pick<MemoryNote, "content" | "revision"> | null;
-  readonly delivered?: MemoryDeliveryState;
+  readonly delivered?: MemoryDeliveryState | undefined;
   readonly budgetTokens?: number;
   readonly deferInline?: boolean;
 }): MemoryInlineDeliveryResult {
