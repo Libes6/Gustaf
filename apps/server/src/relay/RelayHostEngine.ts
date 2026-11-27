@@ -1,5 +1,5 @@
 // @effect-diagnostics globalTimers:off globalFetch:off globalRandom:off globalDate:off -- A plain socket engine outside the Effect runtime; RelayHost owns its lifecycle.
-import { WebSocket as UndiciWebSocket } from "undici";
+import WsWebSocket from "ws";
 import {
   type NoiseCipherState,
   NoiseHandshake,
@@ -103,7 +103,7 @@ interface HttpStream {
 
 interface WsStream {
   readonly kind: "ws";
-  readonly socket: UndiciWebSocket;
+  readonly socket: WsWebSocket;
   readonly pending: Array<string | Uint8Array>;
   readonly fragments: Array<Uint8Array>;
   fragmentText: boolean;
@@ -451,10 +451,9 @@ export class RelayHostEngine {
   #openWebSocket(channel: Channel, id: number, open: Extract<TunnelOpen, { kind: "ws" }>) {
     const url = new URL(open.path, this.#options.localOrigin);
     url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
-    let socket: UndiciWebSocket;
+    let socket: WsWebSocket;
     try {
-      socket = new UndiciWebSocket(url, {
-        ...(open.protocols.length > 0 ? { protocols: [...open.protocols] } : {}),
+      socket = new WsWebSocket(url, [...open.protocols], {
         headers: this.#forwardedHeaders(),
       });
     } catch (error) {

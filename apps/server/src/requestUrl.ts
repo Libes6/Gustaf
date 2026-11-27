@@ -1,5 +1,5 @@
 import * as Option from "effect/Option";
-import { Headers, HttpServerRequest } from "effect/http";
+import { HttpServerRequest } from "effect/http";
 
 const firstHeaderValue = (value: string | undefined): string | undefined => {
   const first = value?.split(",")[0]?.trim();
@@ -28,10 +28,14 @@ const isValidForwardedHost = (host: string): boolean => {
  * proxies and the Gustaf relay host rely on them for OAuth, DPoP and pairing URLs.
  */
 export const requestUrl = (request: HttpServerRequest.HttpServerRequest): Option.Option<URL> => {
+  const base = HttpServerRequest.toURL(request);
+  if (Option.isNone(base)) {
+    return base;
+  }
   const forwardedProto =
     firstHeaderValue(request.headers["x-forwarded-proto"])?.toLowerCase() === "https" &&
-    request.protocol !== "https"
-      ? ("https" as const)
+    base.value.protocol !== "https:"
+      ? "https:"
       : undefined;
   const rawForwardedHost = firstHeaderValue(request.headers["x-forwarded-host"]);
   const forwardedHost =
@@ -39,14 +43,15 @@ export const requestUrl = (request: HttpServerRequest.HttpServerRequest): Option
       ? rawForwardedHost
       : undefined;
   if (forwardedProto === undefined && forwardedHost === undefined) {
-    return HttpServerRequest.toURL(request);
+    return base;
   }
-  return HttpServerRequest.toURL(
-    request.modify({
-      ...(forwardedProto !== undefined ? { protocol: forwardedProto } : {}),
-      ...(forwardedHost !== undefined
-        ? { headers: Headers.set(request.headers, "host", forwardedHost) }
-        : {}),
-    }),
-  );
+  const resolved = new URL(base.value.href);
+  if (forwardedProto !== undefined) {
+    resolved.protocol = forwardedProto;
+  }
+  if (forwardedHost !== undefined) {
+    resolved.port = "";
+    resolved.host = forwardedHost;
+  }
+  return Option.some(resolved);
 };

@@ -43,9 +43,12 @@ class KeepConnectionService : Service() {
       if (KeepConnection.runningSinceMs == 0L) {
         KeepConnection.runningSinceMs = System.currentTimeMillis()
       }
-    } catch (error: RuntimeException) {
-      // ForegroundServiceStartNotAllowedException and friends: the app retries on next open.
+    } catch (error: IllegalStateException) {
+      // ForegroundServiceStartNotAllowedException extends IllegalStateException; retry on next open.
       Log.w(TAG, "Could not keep the connection in the foreground", error)
+      stopSelf()
+    } catch (error: SecurityException) {
+      Log.w(TAG, "Missing permission to keep the connection in the foreground", error)
       stopSelf()
     }
     return START_NOT_STICKY
@@ -132,12 +135,15 @@ internal data class KeepConnectionContent(
     private const val EXTRA_CHANNEL_NAME = "expo.modules.t3keepconnection.CHANNEL_NAME"
 
     fun from(intent: Intent): KeepConnectionContent? {
-      return KeepConnectionContent(
-        title = intent.getStringExtra(EXTRA_TITLE) ?: return null,
-        text = intent.getStringExtra(EXTRA_TEXT) ?: return null,
-        stopLabel = intent.getStringExtra(EXTRA_STOP_LABEL) ?: return null,
-        channelName = intent.getStringExtra(EXTRA_CHANNEL_NAME) ?: return null
-      )
+      val title = intent.getStringExtra(EXTRA_TITLE)
+      val text = intent.getStringExtra(EXTRA_TEXT)
+      val stopLabel = intent.getStringExtra(EXTRA_STOP_LABEL)
+      val channelName = intent.getStringExtra(EXTRA_CHANNEL_NAME)
+      return if (title != null && text != null && stopLabel != null && channelName != null) {
+        KeepConnectionContent(title, text, stopLabel, channelName)
+      } else {
+        null
+      }
     }
   }
 }
@@ -160,9 +166,12 @@ internal object KeepConnection {
       context.startService(intent)
     }
     true
-  } catch (error: RuntimeException) {
+  } catch (error: IllegalStateException) {
     // Android 12+ refuses a foreground start from the background; the app only starts while active.
     Log.w("T3KeepConnection", "Could not start the keep-connection service", error)
+    false
+  } catch (error: SecurityException) {
+    Log.w("T3KeepConnection", "Missing permission to start the keep-connection service", error)
     false
   }
 

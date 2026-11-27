@@ -33,9 +33,7 @@ const setup = Effect.gen(function* () {
     });
   /** Native skill names the running provider reports for this workspace. */
   const native: Array<string> = [];
-  const service = yield* Effect.gen(function* () {
-    return yield* SharedSkills.SharedSkills;
-  }).pipe(
+  const service = yield* SharedSkills.SharedSkills.pipe(
     Effect.provide(
       SharedSkills.layer.pipe(
         Layer.provide(
