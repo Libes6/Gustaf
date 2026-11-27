@@ -231,6 +231,25 @@ A plain HTTP LAN endpoint works in a browser that can open it, or pair from the 
 mobile, an IP address entered without a scheme uses HTTP, so include `https://` when your server
 uses HTTPS.
 
+## Keep the phone connected in the background
+
+When you switch away from the mobile app, the phone pauses it, and coming back
+reconnects to your computer first. On Android you can skip that wait: turn on
+**Settings → Environments → Keep connection in background**. Gustaf then keeps
+running while it is in the background and shows a permanent notification naming
+the connected computer. It works the same over the local network, Tailscale, and
+the Gustaf relay.
+
+- It is off by default and uses more battery while on.
+- Android asks to allow notifications first. Without them the option stays off.
+- Tap **Turn off** in the notification to stop it; this also turns the option off.
+- Swiping Gustaf away from recent apps stops it until you open the app again.
+- Some phones stop background apps aggressively. If the notification disappears
+  on its own, allow Gustaf unrestricted battery use in the system settings.
+
+iOS does not let apps keep a connection open in the background, so the option is
+not offered there.
+
 ## Desktop-managed SSH
 
 In the desktop app, open **Settings → Environments → Add environment**, choose

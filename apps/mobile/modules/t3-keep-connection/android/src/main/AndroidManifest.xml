@@ -1,0 +1,17 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+  <application>
+    <!-- stopWithTask: swiping the app away ends the service and its notification with it. -->
+    <service
+      android:name=".KeepConnectionService"
+      android:exported="false"
+      android:foregroundServiceType="specialUse"
+      android:stopWithTask="true">
+      <property
+        android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+        android:value="Keeps the user-started connection to their own Gustaf computer open while the app is in the background." />
+    </service>
+    <receiver android:name=".KeepConnectionStopReceiver" android:exported="false" />
+  </application>
+</manifest>

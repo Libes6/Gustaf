@@ -12,6 +12,7 @@ import { SettingsScreen } from "./components/SettingsScreen";
 import { CloudEnvironmentRows } from "../connection/CloudEnvironmentRows";
 import { LocalEnvironmentList } from "../connection/LocalEnvironmentList";
 import { PullRequestRoutingSettings } from "../connection/PullRequestRoutingSettings";
+import { KeepConnectionSetting } from "../keep-connection/KeepConnectionSetting";
 import { splitEnvironmentSections } from "../connection/environmentSections";
 import { useUniwindTheme } from "../../lib/useUniwindTheme";
 import { useRemoteConnections } from "../../state/use-remote-environment-registry";
@@ -154,6 +155,7 @@ export function SettingsEnvironmentsRouteScreen() {
               }
             : {})}
         />
+        <KeepConnectionSetting />
         <PullRequestRoutingSettings />
       </ScrollView>
     </SettingsScreen>

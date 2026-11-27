@@ -113,6 +113,7 @@ import { installAppUpdateChecks } from "./features/updates/app-updates";
 import { ClientConfigBanners } from "./features/client-config/ClientConfigBanners";
 import { installClientConfig } from "./features/client-config/clientConfig";
 import { installAccountHeartbeat } from "./features/account/useAccount";
+import { installKeepConnection } from "./features/keep-connection/installKeepConnection";
 
 import "../global.css";
 
@@ -224,6 +225,7 @@ const appServiceDisposers = [
   installAppUpdateChecks(),
   installClientConfig(),
   installAccountHeartbeat(),
+  installKeepConnection(),
   installShowcaseCapture(rootPathnameFromState),
 ];
 disposeOnFoundationReplace(typeof module === "undefined" ? undefined : module.hot, () => {

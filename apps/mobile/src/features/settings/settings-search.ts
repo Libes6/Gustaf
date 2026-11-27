@@ -36,6 +36,9 @@ const SETTINGS_SEARCH_TERMS = {
     msg("add environment", { $context: "settings search keyword" }),
     msg("remote", { $context: "settings search keyword" }),
     "tailscale",
+    "keep connection",
+    "background",
+    "battery",
   ],
   SettingsNotifications: [
     msg("push", { $context: "settings search keyword" }),
