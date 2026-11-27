@@ -1,11 +1,13 @@
+import { runAtomCommand } from "@t3tools/client-runtime/state/runtime";
 import * as Notifications from "expo-notifications";
 import { AsyncResult } from "effect/reactivity";
+import { msg } from "gt-react-native";
 import { AppState } from "react-native";
 
 import { environmentCatalog } from "../../connection/catalog";
-import { t } from "../../i18n";
+import { m } from "../../i18n/messages";
 import { appAtomRegistry } from "../../state/atom-registry";
-import { mobilePreferencesAtom, updateMobilePreferencesAtom } from "../../state/preferences";
+import { mobilePreferencesAtom, saveMobilePreferences } from "../../state/preferences";
 import { keepConnectionState } from "./keepConnection.logic";
 import {
   keepConnectionRunningSince,
@@ -35,7 +37,9 @@ export function installKeepConnection(): () => void {
 
   const reconcile = (recheck: boolean) => {
     if (takeKeepConnectionTurnedOff()) {
-      appAtomRegistry.set(updateMobilePreferencesAtom, { keepConnectionInBackground: false });
+      void runAtomCommand(appAtomRegistry, saveMobilePreferences, {
+        keepConnectionInBackground: false,
+      });
       release();
       return;
     }
@@ -74,13 +78,13 @@ export function installKeepConnection(): () => void {
           return;
         }
         if (AppState.currentState !== "active") return;
-        const title = t("Connection to {names} is active").replace("{names}", labels.join(", "));
+        const title = m(msg("Connection to {names} is active"), { names: labels.join(", ") });
         if (title === shownTitle && keepConnectionRunningSince() !== null) return;
         const started = startKeepConnection({
           title,
-          text: t("Gustaf stays connected in the background. Tap to open."),
-          stopLabel: t("Turn off"),
-          channelName: t("Background connection"),
+          text: m(msg("Gustaf stays connected in the background. Tap to open.")),
+          stopLabel: m(msg("Turn off")),
+          channelName: m(msg("Background connection")),
         });
         shownTitle = started ? title : null;
       });

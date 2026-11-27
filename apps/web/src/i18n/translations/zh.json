@@ -281,6 +281,8 @@
   "3280d45703154eb4": "{count, plural, other {尝试渲染 {count} 个 HTML 页面}}",
   "898770cae17df8d2": "{count, plural, other {已发送 {count} 条消息}}",
   "e63f6b002f96e1e0": "{count, plural, other {尝试发送 {count} 条消息}}",
+  "40bd7e42e5d342a8": "{count, plural, one {Saved {count} memory note} other {Saved {count} memory notes}}",
+  "7951c1a22edd1d89": "{count, plural, one {Tried to save {count} memory note} other {Tried to save {count} memory notes}}",
   "fad31ec7ecac436d": "{count, plural, other {已列出会话 {count} 次}}",
   "42b96626eb49fc73": "{count, plural, other {尝试列出会话 {count} 次}}",
   "28d3809da9e7feb9": "{count, plural, other {已检查任务状态 {count} 次}}",
@@ -3937,6 +3939,23 @@
   "2d951e0612bc14d6": "复制链接",
   "880d3e6e7ff86899": "浏览器打开的页面地址",
   "e52585cdfcf317cf": "完成登录",
+  "c7271e3b222d5b51": "Memory restored",
+  "efa4b3011d654c48": "Could not undo memory update",
+  "d9bf6002a1bb694a": "Saved to project memory",
+  "2230a497c30ff3d6": "Saved to global memory",
+  "f3be6c3191bd25e8": "Replaced",
+  "3d50fd344fdeadfa": "Appended",
+  "18125122c20c5a92": [
+    "rev ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "eb2762ced90b31fa": "Undone",
+  "f510356291976f4f": "Undo",
+  "f5b66c481aa3e4df": "编辑",
   "9cc6288e83305ca3": "无法渲染图表。",
   "74d986aed0381cb0": "图表渲染器加载失败。",
   "d694484d6fea351e": "放大图表",
@@ -8560,7 +8579,6 @@
   "0c99fa183ed512e8": "{platform} 在部分环境可用",
   "e6886a7f77b73a8e": "{platform} 不可用",
   "b0b7610d9860d18d": "此机器尚未配置。",
-  "f5b66c481aa3e4df": "编辑",
   "b35256ca61016104": "添加来源",
   "3b20ef0670ae4b0b": "通过 SSH 连接的机器",
   "121ccffacb6b8c6d": "Expo 模拟器",
@@ -9372,6 +9390,70 @@
   "7e7e33152d5176f9": "Advanced settings",
   "fb48e97c98bb6e06": "Id",
   "253ac50e2b70307b": "Working directory (thread or absolute path)",
+  "d99f72f9adae3158": "Connect an environment to manage memory notes.",
+  "50d9683c8b6c152d": "Global memory",
+  "1bf2cec4ae444733": "Personal preferences and conventions shared across all projects in this environment.",
+  "c6aaa396f0ed7ab6": "Add personal preferences, preferred tools, or conventions to share across providers...",
+  "f4a5247454425eb4": "Project memory",
+  "212b3d2e6b623994": "Add project decisions, test commands, or pitfalls that every provider should know...",
+  "5c95782da4ac869a": "Memory saved",
+  "5b69d2ed450f0099": "Could not save memory",
+  "e588b5799d474125": "Memory cleared",
+  "b88bf1574779e1e7": "Could not clear memory",
+  "ad39a0807757d23c": "Imported memory from Claude Code",
+  "528a4534d89423b0": "Could not import memory from Claude Code",
+  "6e8915d6db1ee13c": "Append to note",
+  "af2b6a224cd5ff76": "Replace note",
+  "38fdedc06880ca46": "Memory notes travel across every provider in this environment (Claude, Codex, Antigravity, Cursor). Clearing a note stops future delivery; an already-open native session may still retain earlier text until a new session starts.",
+  "1ddc323c25b24f19": "Add a project to this environment to store project-specific memory.",
+  "9d9dd34c7f56e516": [
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " / ",
+    {
+      "i": 2,
+      "k": "_gt_value_2",
+      "v": "v"
+    },
+    " chars"
+  ],
+  "6ca656cedd4e275b": "Import from Claude Code",
+  "4f113bb0bc732b3d": "Clear",
+  "4c9130c76b6efd5e": [
+    "Imported entries: ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "97585565390197f6": "放弃",
+  "f6bcf141cfcdbb68": "Import memory from Claude Code",
+  "7dad46e39cdb78c3": "Select Claude Code memory files to copy into this project note.",
+  "a33b8ea89c6f4f9f": "Select Claude Code memory files to copy into your global memory note.",
+  "5e562550484212ee": "Scanning Claude Code memory files...",
+  "4f4378b888fdfc47": "No Claude Code memory files were found in this environment.",
+  "b06a481e2d075e48": "Import mode",
+  "9734be567772038c": [
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " chars"
+  ],
+  "3a37a5acd84c48d2": [
+    "Import (",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    ")"
+  ],
   "b8c82ba62b34f0e4": "麦克风，优先使用排在前面的设备",
   "9fe08946d6dbd618": "已保存的麦克风",
   "8101bb8e3c7427bf": "上移 {name}",
@@ -11731,7 +11813,6 @@
       }
     }
   ],
-  "97585565390197f6": "放弃",
   "c0fce4a3555c5c17": "连接",
   "0d1eba54ff075d77": "使用",
   "035dc7d3b0f3e526": "会话标题和其他生成的文本",
@@ -12510,6 +12591,7 @@
   "5c9dc9970db79fe2": "刷新 可用性 版本 认证状态 模型 后台 探测 秒 关闭",
   "04729b3b2b488df9": "mcp servers import tools stdio http marketplace connectors",
   "021637aad74bf6f9": "技能 SKILL.md 代理 导入 Claude Code",
+  "6493b4a1a09ce7f5": "memory notes global project claude import remember",
   "5082475d419407c4": "computer use agent screen mouse keyboard desktop macos permissions screen recording accessibility",
   "fce5e12dfded8e3e": "billing payments renewal charge price cost money monthly yearly claude chatgpt cursor spotify telegram",
   "056ba6a180d114b5": "允许 禁用 启用 打开 操控 预览 工具 智能体会话 项目 覆盖",
@@ -13361,89 +13443,5 @@
   "27d76249d09eb69f": "审查导览已就绪",
   "faa3bb26abb39c93": "审查导览生成失败",
   "b7df38b7d8792d78": "打开导览",
-  "9e91e9a77b664e4e": "无法开始生成审查导览",
-  "40bd7e42e5d342a8": "{count, plural, one {Saved {count} memory note} other {Saved {count} memory notes}}",
-  "7951c1a22edd1d89": "{count, plural, one {Tried to save {count} memory note} other {Tried to save {count} memory notes}}",
-  "c7271e3b222d5b51": "Memory restored",
-  "efa4b3011d654c48": "Could not undo memory update",
-  "d9bf6002a1bb694a": "Saved to project memory",
-  "2230a497c30ff3d6": "Saved to global memory",
-  "f3be6c3191bd25e8": "Replaced",
-  "3d50fd344fdeadfa": "Appended",
-  "18125122c20c5a92": [
-    "rev ",
-    {
-      "i": 1,
-      "k": "_gt_value_1",
-      "v": "v"
-    }
-  ],
-  "eb2762ced90b31fa": "Undone",
-  "f510356291976f4f": "Undo",
-  "341c5c730ba00bd5": "≈ {tokens} tokens if the provider does not defer loading; ≈ {all} for {names}, which cannot switch off tools",
-  "894f0c2cfbda47be": "{names} cannot switch off single tools and will get all of them.",
-  "d99f72f9adae3158": "Connect an environment to manage memory notes.",
-  "50d9683c8b6c152d": "Global memory",
-  "1bf2cec4ae444733": "Personal preferences and conventions shared across all projects in this environment.",
-  "c6aaa396f0ed7ab6": "Add personal preferences, preferred tools, or conventions to share across providers...",
-  "f4a5247454425eb4": "Project memory",
-  "212b3d2e6b623994": "Add project decisions, test commands, or pitfalls that every provider should know...",
-  "5c95782da4ac869a": "Memory saved",
-  "5b69d2ed450f0099": "Could not save memory",
-  "e588b5799d474125": "Memory cleared",
-  "b88bf1574779e1e7": "Could not clear memory",
-  "ad39a0807757d23c": "Imported memory from Claude Code",
-  "528a4534d89423b0": "Could not import memory from Claude Code",
-  "6e8915d6db1ee13c": "Append to note",
-  "af2b6a224cd5ff76": "Replace note",
-  "38fdedc06880ca46": "Memory notes travel across every provider in this environment (Claude, Codex, Antigravity, Cursor). Clearing a note stops future delivery; an already-open native session may still retain earlier text until a new session starts.",
-  "1ddc323c25b24f19": "Add a project to this environment to store project-specific memory.",
-  "9d9dd34c7f56e516": [
-    {
-      "i": 1,
-      "k": "_gt_value_1",
-      "v": "v"
-    },
-    " / ",
-    {
-      "i": 2,
-      "k": "_gt_value_2",
-      "v": "v"
-    },
-    " chars"
-  ],
-  "6ca656cedd4e275b": "Import from Claude Code",
-  "4f113bb0bc732b3d": "Clear",
-  "4c9130c76b6efd5e": [
-    "Imported entries: ",
-    {
-      "i": 1,
-      "k": "_gt_value_1",
-      "v": "v"
-    }
-  ],
-  "f6bcf141cfcdbb68": "Import memory from Claude Code",
-  "7dad46e39cdb78c3": "Select Claude Code memory files to copy into this project note.",
-  "a33b8ea89c6f4f9f": "Select Claude Code memory files to copy into your global memory note.",
-  "5e562550484212ee": "Scanning Claude Code memory files...",
-  "4f4378b888fdfc47": "No Claude Code memory files were found in this environment.",
-  "b06a481e2d075e48": "Import mode",
-  "9734be567772038c": [
-    {
-      "i": 1,
-      "k": "_gt_value_1",
-      "v": "v"
-    },
-    " chars"
-  ],
-  "3a37a5acd84c48d2": [
-    "Import (",
-    {
-      "i": 1,
-      "k": "_gt_value_1",
-      "v": "v"
-    },
-    ")"
-  ],
-  "6493b4a1a09ce7f5": "memory notes global project claude import remember"
+  "9e91e9a77b664e4e": "无法开始生成审查导览"
 }

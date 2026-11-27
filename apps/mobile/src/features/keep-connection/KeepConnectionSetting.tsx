@@ -1,16 +1,17 @@
 import { useAtomSet, useAtomValue } from "@effect/atom-react";
-import * as Exit from "effect/Exit";
 import { AsyncResult } from "effect/reactivity";
 import * as Notifications from "expo-notifications";
+import { msg, useGT } from "gt-react-native";
 import { useState } from "react";
 import { Linking, View } from "react-native";
 
 import * as Dialog from "../../components/ui/Dialog";
 import { AppText as Text } from "../../components/ui/AppText";
 import { environmentCatalog } from "../../connection/catalog";
-import { t } from "../../i18n";
+import { m } from "../../i18n/messages";
 import { makePermissionStatusAtom } from "../../lib/permissionStatusAtom";
-import { mobilePreferencesAtom, updateMobilePreferencesAtom } from "../../state/preferences";
+import { mobilePreferencesAtom, saveMobilePreferences } from "../../state/preferences";
+import { useAtomCommand } from "../../state/use-atom-command";
 import { SettingsRow } from "../settings/components/SettingsRow";
 import { SettingsSection } from "../settings/components/SettingsSection";
 import { SettingsSwitchRow } from "../settings/components/SettingsSwitchRow";
@@ -39,13 +40,15 @@ async function requestNotifications(): Promise<boolean> {
 
 function alertNotificationsNeeded() {
   Dialog.alert(
-    t("Notification permission needed"),
-    t(
-      "Android shows a notification while Gustaf keeps the connection. Allow notifications in system Settings to turn this on.",
+    m(msg("Notification permission needed")),
+    m(
+      msg(
+        "Android shows a notification while Gustaf keeps the connection. Allow notifications in system Settings to turn this on.",
+      ),
     ),
     [
-      { text: t("Cancel"), style: "cancel" },
-      { text: t("Open Settings"), onPress: () => void Linking.openSettings() },
+      { text: m(msg("Cancel")), style: "cancel" },
+      { text: m(msg("Open Settings")), onPress: () => void Linking.openSettings() },
     ],
   );
 }
@@ -56,8 +59,9 @@ export function KeepConnectionSetting() {
 }
 
 function KeepConnectionRows() {
+  const gt = useGT();
   const preferences = useAtomValue(mobilePreferencesAtom);
-  const savePreferences = useAtomSet(updateMobilePreferencesAtom, { mode: "promiseExit" });
+  const savePreferences = useAtomCommand(saveMobilePreferences);
   const catalog = useAtomValue(environmentCatalog.catalogValueAtom);
   const notificationsAllowed = useAtomValue(notificationsAllowedAtom);
   const setNotificationsAllowed = useAtomSet(notificationsAllowedAtom);
@@ -83,19 +87,19 @@ function KeepConnectionRows() {
         return;
       }
     }
-    const exit = await savePreferences({ keepConnectionInBackground: value });
-    if (Exit.isFailure(exit)) {
-      console.warn("[keep-connection] could not save the setting", exit.cause);
+    const result = await savePreferences({ keepConnectionInBackground: value });
+    if (result._tag === "Failure") {
+      console.warn("[keep-connection] could not save the setting", result.cause);
     }
     setSaving(false);
   };
 
   return (
     <View className="mt-5 gap-3">
-      <SettingsSection title={t("Background connection")}>
+      <SettingsSection title={gt("Background connection")}>
         <SettingsSwitchRow
           icon="bolt.horizontal.circle"
-          label={t("Keep connection in background")}
+          label={gt("Keep connection in background")}
           disabled={!ready || saving}
           value={enabled}
           onValueChange={(value) => void change(value)}
@@ -103,16 +107,16 @@ function KeepConnectionRows() {
         {state === "needs-permission" ? (
           <SettingsRow
             icon="bell.badge"
-            label={t("Allow notifications")}
-            value={t("Notifications are off, so the connection is not kept.")}
+            label={gt("Allow notifications")}
+            value={gt("Notifications are off, so the connection is not kept.")}
             onPress={() => void Linking.openSettings()}
           />
         ) : null}
       </SettingsSection>
       <Text className="px-2 text-sm leading-normal text-foreground-muted">
         {state === "idle"
-          ? t("Starts once an environment is enabled.")
-          : t(
+          ? gt("Starts once an environment is enabled.")
+          : gt(
               "Gustaf keeps running with a permanent notification, so returning to the app does not wait for a reconnect. Uses more battery.",
             )}
       </Text>
