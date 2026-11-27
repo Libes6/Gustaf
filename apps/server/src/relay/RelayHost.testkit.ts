@@ -168,6 +168,8 @@ export async function startLocalServer() {
           url: request.url,
           authorization: request.headers.authorization ?? null,
           relay: request.headers["x-gustaf-relay"] ?? null,
+          forwardedHost: request.headers["x-forwarded-host"] ?? null,
+          forwardedProto: request.headers["x-forwarded-proto"] ?? null,
           body: Buffer.concat(chunks).toString(),
         }),
       );

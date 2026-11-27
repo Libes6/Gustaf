@@ -1,4 +1,5 @@
 // @effect-diagnostics globalTimers:off globalFetch:off globalRandom:off globalDate:off -- A plain socket engine outside the Effect runtime; RelayHost owns its lifecycle.
+import { WebSocket as UndiciWebSocket } from "undici";
 import {
   type NoiseCipherState,
   NoiseHandshake,
@@ -25,6 +26,7 @@ import {
   toBase64Url,
   tunnelFragments,
 } from "@t3tools/shared/relayTunnel";
+import { relayVirtualBaseUrl } from "@t3tools/shared/relayTunnelClient";
 
 /** What the host decides about a client whose handshake finished. */
 export type RelayAdmission =
@@ -68,7 +70,7 @@ const REPLACED_RETRY_MS = 2 * 60_000;
 const KEEPALIVE_MS = 25_000;
 const SILENCE_LIMIT_MS = 60_000;
 const MAX_REQUEST_BODY = 64 * 1024 * 1024;
-// Hop-by-hop headers and ones fetch computes itself.
+// Hop-by-hop headers, ones fetch computes itself, and forwarded/marker headers owned by this host.
 const DROPPED_REQUEST_HEADERS = new Set([
   "connection",
   "keep-alive",
@@ -78,6 +80,8 @@ const DROPPED_REQUEST_HEADERS = new Set([
   "content-length",
   "proxy-authorization",
   "te",
+  "x-forwarded-host",
+  "x-forwarded-proto",
   RELAY_TUNNEL_HEADER,
 ]);
 // fetch already decoded the body, so the encoding and length no longer describe it.
@@ -99,7 +103,7 @@ interface HttpStream {
 
 interface WsStream {
   readonly kind: "ws";
-  readonly socket: WebSocket;
+  readonly socket: UndiciWebSocket;
   readonly pending: Array<string | Uint8Array>;
   readonly fragments: Array<Uint8Array>;
   fragmentText: boolean;
@@ -378,13 +382,27 @@ export class RelayHostEngine {
     }
   }
 
+  #forwardedHeaders(): Record<string, string> {
+    const headers: Record<string, string> = {
+      [RELAY_TUNNEL_HEADER]: "1",
+    };
+    if (this.#deviceId) {
+      const origin = new URL(relayVirtualBaseUrl(this.#deviceId));
+      headers["x-forwarded-proto"] = origin.protocol.slice(0, -1);
+      headers["x-forwarded-host"] = origin.host;
+    }
+    return headers;
+  }
+
   async #runHttp(channel: Channel, id: number, stream: HttpStream) {
     const { open } = stream;
     const headers = new Headers();
     for (const [name, value] of open.headers) {
       if (!DROPPED_REQUEST_HEADERS.has(name.toLowerCase())) headers.append(name, value);
     }
-    headers.set(RELAY_TUNNEL_HEADER, "1");
+    for (const [name, value] of Object.entries(this.#forwardedHeaders())) {
+      headers.set(name, value);
+    }
     try {
       const response = await fetch(new URL(open.path, this.#options.localOrigin), {
         method: open.method,
@@ -433,9 +451,12 @@ export class RelayHostEngine {
   #openWebSocket(channel: Channel, id: number, open: Extract<TunnelOpen, { kind: "ws" }>) {
     const url = new URL(open.path, this.#options.localOrigin);
     url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
-    let socket: WebSocket;
+    let socket: UndiciWebSocket;
     try {
-      socket = new WebSocket(url, [...open.protocols]);
+      socket = new UndiciWebSocket(url, {
+        ...(open.protocols.length > 0 ? { protocols: [...open.protocols] } : {}),
+        headers: this.#forwardedHeaders(),
+      });
     } catch (error) {
       this.#resetStream(channel, id, String(error));
       return;
