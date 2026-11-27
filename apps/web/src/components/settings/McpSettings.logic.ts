@@ -16,13 +16,12 @@ export const isHeavyMcpServer = (status: Pick<McpServerStatus, "approxTokens">):
 
 /**
  * The tokens a server's tools take once the switched-off ones are left out, which is what agents
- * that filter tools load; `unfiltered` is what the others still load, set only when it is larger.
+ * that filter tools load. Other providers skip servers with disabled tools.
  */
 export function mcpServerWeight(
   status: Pick<McpServerStatus, "approxTokens" | "tools">,
   config: McpServerConfig | undefined,
-  unsupported: ReadonlyArray<ProviderDriverKind>,
-): { readonly tokens: number; readonly unfiltered?: number } | undefined {
+): { readonly tokens: number } | undefined {
   const total = status.approxTokens;
   if (total === undefined) return undefined;
   const off = new Set(config?.disabledTools);
@@ -33,7 +32,7 @@ export function mcpServerWeight(
     off.size === 0 || !priced
       ? total
       : kept.reduce((sum, tool) => sum + (tool.approxTokens ?? 0), 0);
-  return unsupported.length > 0 && tokens < total ? { tokens, unfiltered: total } : { tokens };
+  return { tokens };
 }
 
 /** Which config changes ask for a new status check; switching tools does not. */

@@ -95,7 +95,6 @@ describe("MCP server weight", () => {
 });
 
 describe("MCP server weight with switched-off tools", () => {
-  const cursor = ProviderDriverKind.make("cursor");
   const status = {
     approxTokens: 100,
     tools: [
@@ -105,20 +104,17 @@ describe("MCP server weight with switched-off tools", () => {
   };
 
   it("leaves out switched-off tools and keeps the total for agents that cannot", () => {
-    expect(mcpServerWeight(status, config, [])).toEqual({ tokens: 100 });
+    expect(mcpServerWeight(status, config)).toEqual({ tokens: 100 });
     const off = withDisabledTools(config, ["delete_file"]);
-    expect(mcpServerWeight(status, off, [])).toEqual({ tokens: 60 });
-    expect(mcpServerWeight(status, off, [cursor])).toEqual({ tokens: 60, unfiltered: 100 });
-    // A server that was never switched down has nothing the other agents load beyond it.
-    expect(mcpServerWeight(status, config, [cursor])).toEqual({ tokens: 100 });
+    expect(mcpServerWeight(status, off)).toEqual({ tokens: 60 });
   });
 
   it("shows the total while a status has no per-tool sizes", () => {
     const off = withDisabledTools(config, ["delete_file"]);
-    expect(
-      mcpServerWeight({ approxTokens: 100, tools: [{ name: "delete_file" }] }, off, []),
-    ).toEqual({ tokens: 100 });
-    expect(mcpServerWeight({ tools: status.tools }, off, [])).toBeUndefined();
+    expect(mcpServerWeight({ approxTokens: 100, tools: [{ name: "delete_file" }] }, off)).toEqual({
+      tokens: 100,
+    });
+    expect(mcpServerWeight({ tools: status.tools }, off)).toBeUndefined();
   });
 });
 

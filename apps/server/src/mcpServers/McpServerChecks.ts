@@ -59,6 +59,7 @@ export class McpServerChecks extends Context.Service<
      * Reads the cache only; it never starts a check.
      */
     readonly knownUnusable: Effect.Effect<ReadonlyMap<McpServerId, string>>;
+    readonly cachedStatuses: Effect.Effect<ReadonlyArray<McpServerStatus>>;
     /**
      * Records a server an agent could not start as failed, or as needing sign-in when an http
      * server refused it, without checking it, so the next session leaves it out and the section
@@ -566,7 +567,22 @@ const make = Effect.gen(function* () {
     checks.set(id, { fingerprint, result, fromSession: true });
   });
 
-  return McpServerChecks.of({ list, knownUnusable, markFailed });
+  const cachedStatuses = Effect.gen(function* () {
+    const current = yield* settings.getSettings.pipe(Effect.option);
+    if (Option.isNone(current)) return [];
+    const statuses: McpServerStatus[] = [];
+    for (const [id, cached] of checks) {
+      const server = current.value.mcpServers[id];
+      if (server === undefined || cached.fingerprint !== (yield* fingerprintOf(id, server)))
+        continue;
+      const done = yield* Deferred.poll(cached.result);
+      if (Option.isNone(done)) continue;
+      const status = yield* done.value.pipe(Effect.option);
+      if (Option.isSome(status)) statuses.push(status.value);
+    }
+    return statuses;
+  }).pipe(Effect.withSpan("McpServerChecks.cachedStatuses"));
+  return McpServerChecks.of({ list, knownUnusable, markFailed, cachedStatuses });
 });
 
 export const layer = Layer.effect(McpServerChecks, make);

@@ -68,7 +68,9 @@ clients read declared capabilities, never provider names.
   or a url and headers, with no field for tools, and `_meta` is agent-specific. The Cursor SDK's and
   OpenCode's server configs have none either. Set `filtersMcpTools` on an adapter only after its
   agent's documented option is wired and tested; the web client reads
-  `MCP_TOOL_FILTER_DRIVERS` to say which agents still load every tool.
+  `MCP_TOOL_FILTER_DRIVERS` to identify unsupported agents. A user server with disabled tools is
+  skipped for adapters without filtering, so an unsupported agent cannot receive the forbidden tools
+  through Gustaf's injected configuration. Native provider configurations still load independently.
 - **Antigravity merges MCP servers from two places.** The agent combines the servers in `session/new`
   with `$GEMINI_HOME/config/mcp_config.json`, and a client server replaces a config server of the
   same name. The profile must not hold that file, or its servers load beside the user's list unseen.

@@ -45,6 +45,10 @@ export const serverEnvironment = {
     label: "environment-data:server:mcp-list",
     tag: WS_METHODS.mcpServersListImportable,
   }),
+  mcpPreview: createEnvironmentRpcCommand(connectionAtomRuntime, {
+    label: "environment-data:server:mcp-preview",
+    tag: WS_METHODS.mcpServersPreview,
+  }),
   importMcpServers: createEnvironmentRpcCommand(connectionAtomRuntime, {
     label: "mcp:import",
     tag: WS_METHODS.mcpServersImport,

@@ -11,8 +11,16 @@ export type NativeMcpCandidate = Pick<NativeMcpServer, "name"> &
         readonly transport: "stdio";
         readonly command: string;
         readonly args: ReadonlyArray<string>;
+        readonly cwd?: string;
+        readonly env?: Readonly<Record<string, unknown>>;
       }
-    | { readonly transport: "http"; readonly url: string }
+    | {
+        readonly transport: "http";
+        readonly url: string;
+        readonly headers?: Readonly<Record<string, unknown>>;
+        readonly bearerTokenEnvVar?: string;
+        readonly requiresSignIn?: boolean;
+      }
   );
 
 const normalizeCommand = (command: string) => {
@@ -52,6 +60,16 @@ export const toMcpServerName = (name: string) =>
     .replace(/^-+|-+$/g, "")
     .slice(0, 32);
 
+const sameValues = (
+  left: Readonly<Record<string, unknown>>,
+  right: Readonly<Record<string, unknown>>,
+) =>
+  Object.keys(left).length === Object.keys(right).length &&
+  Object.entries(left).every(([key, value]) => typeof value === "string" && right[key] === value);
+
+const lowerHeaders = (headers: Readonly<Record<string, unknown>>) =>
+  Object.fromEntries(Object.entries(headers).map(([key, value]) => [key.toLowerCase(), value]));
+
 export const findNativeDuplicate = (
   candidate: NativeMcpCandidate,
   nativeList: ReadonlyArray<NativeMcpServer>,
@@ -60,14 +78,25 @@ export const findNativeDuplicate = (
     if (native.name !== candidate.name) return false;
     if (native.transport === "stdio" && candidate.transport === "stdio") {
       return (
+        (native.cwd === undefined
+          ? candidate.cwd === undefined || candidate.cwd === native.projectDir
+          : candidate.cwd !== undefined &&
+            normalizeCommand(native.cwd) === normalizeCommand(candidate.cwd)) &&
         normalizeCommand(native.command) === normalizeCommand(candidate.command) &&
         native.args.length === candidate.args.length &&
-        native.args.every((arg, index) => arg === candidate.args[index])
+        native.args.every((arg, index) => arg === candidate.args[index]) &&
+        sameValues(native.env, candidate.env ?? {})
       );
     }
     if (native.transport === "http" && candidate.transport === "http") {
       const normalized = normalizeUrl(candidate.url);
-      return normalized !== undefined && normalizeUrl(native.url) === normalized;
+      return (
+        normalized !== undefined &&
+        normalizeUrl(native.url) === normalized &&
+        native.bearerTokenEnvVar === candidate.bearerTokenEnvVar &&
+        (native.requiresSignIn === true) === (candidate.requiresSignIn === true) &&
+        sameValues(lowerHeaders(native.headers), lowerHeaders(candidate.headers ?? {}))
+      );
     }
     return false;
   });

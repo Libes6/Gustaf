@@ -129,6 +129,7 @@ import * as ThreadViewers from "./orchestration-v2/ThreadViewers.ts";
 import * as CommandOutputHub from "./orchestration-v2/CommandOutputHub.ts";
 import * as McpAppRequests from "./mcpApps/McpAppRequests.ts";
 import * as McpSignIn from "./mcpApps/McpSignIn.ts";
+import * as McpServerPreview from "./mcpServers/McpServerPreview.ts";
 import * as McpServerImport from "./mcpServers/McpServerImport.ts";
 import * as McpRegistry from "./mcpServers/McpRegistry.ts";
 import * as McpConnectors from "./mcpServers/McpConnectors.ts";
@@ -1488,6 +1489,7 @@ export const layerWsRpc = (
       const providerSessionsV2 = yield* ProviderSessionManager.ProviderSessionManagerV2;
       const mcpAppRequests = yield* McpAppRequests.McpAppRequests;
       const mcpSignIn = yield* McpSignIn.McpSignIn;
+      const mcpServerPreview = yield* McpServerPreview.McpServerPreview;
       const mcpServerImport = yield* McpServerImport.McpServerImport;
       const mcpRegistry = yield* McpRegistry.McpRegistry;
       const mcpConnectors = yield* McpConnectors.McpConnectors;
@@ -2693,6 +2695,7 @@ export const layerWsRpc = (
         [WS_METHODS.providerMcpSignInStart]: (input) => mcpSignIn.start(input),
         [WS_METHODS.providerMcpSignInComplete]: (input) => mcpSignIn.complete(input),
         [WS_METHODS.mcpServersListImportable]: (input) => mcpServerImport.list(input),
+        [WS_METHODS.mcpServersPreview]: (input) => mcpServerPreview.preview(input),
         [WS_METHODS.mcpServersImport]: (input) => mcpServerImport.importServers(input),
         [WS_METHODS.mcpServersSearchRegistry]: (input) => mcpRegistry.search(input),
         [WS_METHODS.mcpServersStatus]: (input) => mcpServerChecks.list(input),
@@ -3805,6 +3808,7 @@ export const WS_RPC_SERVER_OPTIONS = {
 
 export const layer = Layer.unwrap(
   Effect.gen(function* () {
+    const mcpServerPreview = yield* McpServerPreview.McpServerPreview;
     const serverBrowser = yield* ServerBrowser.ServerBrowser;
     const serverSelfUpdate = yield* ServerSelfUpdate.ServerSelfUpdate;
     const providerMaintenanceRunner = yield* ProviderMaintenanceRunner.ProviderMaintenanceRunner;
@@ -3895,6 +3899,7 @@ export const layer = Layer.unwrap(
               reportProfiles,
               readSettingsClient(url.value),
             ).pipe(
+              Layer.provide(Layer.succeed(McpServerPreview.McpServerPreview, mcpServerPreview)),
               Layer.provideMerge(RpcSerialization.layerJson),
               // Handler-context reporters see only request defects, not server-wide defects.
               Layer.provide(DefectReporter.layer),

@@ -5,6 +5,7 @@ import {
   ProviderDriverKind,
   ServerSettings as ServerSettingsSchema,
 } from "@t3tools/contracts";
+import * as SecretResolver from "@t3tools/secret-provider-core/server/SecretResolver";
 import * as HostProcess from "@t3tools/shared/HostProcess";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -70,6 +71,9 @@ const run = <A, E>(
         Layer.provideMerge(ServerSettings.layerTest(decodeSettings(options.settings ?? {}))),
         Layer.provide([
           ManagedPolicy.layerTest(options.policy),
+          Layer.mock(SecretResolver.SecretResolver)({
+            read: (refs) => Effect.succeed(refs.map(() => undefined)),
+          }),
           Layer.succeed(NativeMcpConfigs, {
             list: (locations) =>
               Effect.sync(() => {
@@ -81,7 +85,10 @@ const run = <A, E>(
       ),
     ),
     Effect.provideService(HostProcess.HomeDirectory, "/home/me"),
-    Effect.provideService(HostProcess.Environment, { CODEX_HOME: "/home/me/codex-alt" }),
+    Effect.provideService(HostProcess.Environment, {
+      CODEX_HOME: "/home/me/codex-alt",
+      MCP_TOKEN: "private-bearer",
+    }),
   );
 
 it.effect("lists importable servers with key names only, never env or header values", () =>
@@ -114,7 +121,7 @@ it.effect("lists importable servers with key names only, never env or header val
           args: ["-y", "figma-mcp"],
           envKeys: ["FIGMA_TOKEN"],
         },
-        alreadyInGustaf: true,
+        alreadyInGustaf: false,
       },
       {
         source: "claude",
@@ -128,6 +135,7 @@ it.effect("lists importable servers with key names only, never env or header val
           url: "https://mcp.linear.test/mcp",
           headerKeys: ["Authorization"],
         },
+        authStatus: "credentials-available",
         alreadyInGustaf: false,
       },
     ]);
@@ -246,4 +254,52 @@ it.effect("refuses imports that would overwrite, miss, or change an entry", () =
       "local-servers-disallowed",
     );
   }),
+);
+
+it.effect(
+  "preserves bearer environment references and reports credentials on the target environment",
+  () =>
+    Effect.gen(function* () {
+      const natives: ReadonlyArray<NativeMcpServer> = [
+        { ...projectDocs, name: "missing", transport: "http", bearerTokenEnvVar: "MISSING_TOKEN" },
+        { ...projectDocs, name: "available", transport: "http", bearerTokenEnvVar: "MCP_TOKEN" },
+        { ...projectDocs, name: "oauth", transport: "http", requiresSignIn: true },
+      ];
+      const { result, settings } = yield* run(
+        (service) =>
+          Effect.gen(function* () {
+            const listed = yield* service.list({});
+            yield* service.importServers({
+              entries: natives.map((server) => ({
+                source: server.source,
+                name: server.name,
+                projectDir: "/work/app",
+                id: McpServerId.make(server.name),
+                transport: "http" as const,
+              })) as [
+                Parameters<typeof service.importServers>[0]["entries"][number],
+                ...Parameters<typeof service.importServers>[0]["entries"][number][],
+              ],
+            });
+            return listed;
+          }),
+        { natives },
+      );
+      assert.deepEqual(
+        result.servers.map((server) => server.authStatus),
+        ["missing-environment-variable", "credentials-available", "sign-in-required"],
+      );
+      assert.notInclude(JSON.stringify(result), "private-bearer");
+      assert.deepEqual(settings.mcpServers[McpServerId.make("missing")]?.transport, {
+        type: "http",
+        url: projectDocs.url,
+        headers: {},
+        bearerTokenEnvVar: "MISSING_TOKEN",
+      });
+      assert.propertyVal(
+        settings.mcpServers[McpServerId.make("oauth")]?.transport,
+        "requiresSignIn",
+        true,
+      );
+    }),
 );

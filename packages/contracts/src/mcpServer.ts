@@ -1,7 +1,7 @@
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 
-import { TrimmedNonEmptyString } from "./baseSchemas.ts";
+import { TrimmedNonEmptyString, ProjectId } from "./baseSchemas.ts";
 import {
   ProviderDriverKind,
   ProviderInstanceEnvironmentVariableName,
@@ -57,6 +57,8 @@ export const McpHttpTransport = Schema.Struct({
   type: Schema.Literal("http"),
   url: HttpUrl,
   /** Values are credentials, like stdio `env`. */
+  bearerTokenEnvVar: Schema.optionalKey(ProviderInstanceEnvironmentVariableName),
+  requiresSignIn: Schema.optionalKey(Schema.Boolean),
   headers: Schema.Record(HttpHeaderName, SettingsSecretValue).pipe(
     Schema.withDecodingDefaultKey(Effect.succeed({})),
   ),
@@ -78,7 +80,7 @@ export const McpServerConfig = Schema.Struct({
 });
 export type McpServerConfig = typeof McpServerConfig.Type;
 
-/** Drivers whose sessions honor `disabledTools`; the others get every tool of the server. */
+/** Drivers whose sessions honor `disabledTools`; others skip filtered servers. */
 export const MCP_TOOL_FILTER_DRIVERS: ReadonlyArray<ProviderDriverKind> = [
   ProviderDriverKind.make("claudeAgent"),
   ProviderDriverKind.make("codex"),
@@ -125,11 +127,19 @@ export const McpImportableServer = Schema.Struct({
       type: Schema.Literal("http"),
       url: Schema.String,
       headerKeys: Schema.Array(Schema.String),
-      /** Codex reads the bearer token from this variable; importing does not carry it over. */
+      /** Read on the target environment when the server starts. */
       bearerTokenEnvVar: Schema.optionalKey(Schema.String),
     }),
   ]),
   /** A Gustaf server already runs the same command and arguments, or the same URL. */
+  authStatus: Schema.optionalKey(
+    Schema.Literals([
+      "unknown",
+      "credentials-available",
+      "missing-environment-variable",
+      "sign-in-required",
+    ]),
+  ),
   alreadyInGustaf: Schema.Boolean,
 });
 export type McpImportableServer = typeof McpImportableServer.Type;
@@ -409,3 +419,22 @@ export class McpRegistryError extends Schema.TaggedError<McpRegistryError>()("Mc
     }
   }
 }
+
+export const McpPreviewInput = Schema.Struct({
+  projectId: ProjectId,
+  providerInstanceId: ProviderInstanceId,
+});
+export type McpPreviewInput = typeof McpPreviewInput.Type;
+
+export const McpPreviewResult = Schema.Struct({
+  servers: Schema.Array(
+    Schema.Struct({
+      id: Schema.String,
+      source: Schema.String,
+      disposition: Schema.Literals(["passed", "skipped", "native"]),
+      reason: Schema.optionalKey(Schema.String),
+      status: Schema.optionalKey(McpServerStatus),
+    }),
+  ),
+});
+export type McpPreviewResult = typeof McpPreviewResult.Type;

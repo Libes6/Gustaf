@@ -44,6 +44,7 @@ import { Switch } from "../ui/switch";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { SecretInput } from "./SecretInput";
 import { useSettingsScope } from "./SettingsScopeContext";
+import { McpEffectivePreview } from "./McpEffectivePreview";
 import { McpConnectorsSection } from "./McpConnectorsSection";
 import { McpMarketplaceDialog } from "./McpMarketplaceDialog";
 import {
@@ -308,11 +309,8 @@ function McpEnvironmentSettings({
         <McpStatusLine dot="bg-muted-foreground/40" text={gt("Checking…")} />
       );
     }
-    const unsupported = mcpToolFilterUnsupported(
-      settings.mcpServers[id]?.providers,
-      installedDrivers,
-    );
-    const weight = mcpServerWeight(status, settings.mcpServers[id], unsupported);
+
+    const weight = mcpServerWeight(status, settings.mcpServers[id]);
     const offCount = settings.mcpServers[id]?.disabledTools?.length ?? 0;
     const off = offCount ? gt(" ({count} off)", { count: offCount }) : "";
     switch (status.status) {
@@ -336,22 +334,13 @@ function McpEnvironmentSettings({
                 <TooltipTrigger
                   render={
                     <span
-                      className={`mt-0.5 block pl-3 ${isHeavyMcpServer({ approxTokens: weight.unfiltered ?? weight.tokens }) ? "text-warning" : ""}`}
+                      className={`mt-0.5 block pl-3 ${isHeavyMcpServer({ approxTokens: weight.tokens }) ? "text-warning" : ""}`}
                     />
                   }
                 >
-                  {weight.unfiltered === undefined
-                    ? gt("≈ {tokens} tokens if the provider does not defer loading", {
-                        tokens: weight.tokens.toLocaleString(),
-                      })
-                    : gt(
-                        "≈ {tokens} tokens if the provider does not defer loading; ≈ {all} for {names}, which cannot switch off tools",
-                        {
-                          tokens: weight.tokens.toLocaleString(),
-                          all: weight.unfiltered.toLocaleString(),
-                          names: unsupported.map(driverName).join(", "),
-                        },
-                      )}
+                  {gt("≈ {tokens} tokens if the provider does not defer loading", {
+                    tokens: weight.tokens.toLocaleString(),
+                  })}
                 </TooltipTrigger>
                 <TooltipPopup>
                   {gt(
@@ -392,6 +381,7 @@ function McpEnvironmentSettings({
   } | null>(null);
   const [marketplaceOpen, setMarketplaceOpen] = useState(false);
   const [paste, setPaste] = useState<string | null>(null);
+  const [importedIds, setImportedIds] = useState<readonly McpServerId[]>([]);
   const [imports, setImports] = useState<readonly McpImportableServer[] | null>(null);
   const [toolsFor, setToolsFor] = useState<McpServerId | null>(null);
   const installedDrivers = (useEnvironmentProviders().get(environmentId) ?? [])
@@ -640,6 +630,11 @@ function McpEnvironmentSettings({
           ),
         )}
       </SettingsSection>
+      <McpEffectivePreview
+        environmentId={environmentId}
+        projectIds={projectIds}
+        settingsKey={JSON.stringify([settings.mcpServers, settings.projectSettingsOverrides])}
+      />
       <McpConnectorsSection environmentId={environmentId} projectDir={projectDir} />
       {toolsFor !== null && settings.mcpServers[toolsFor] !== undefined && (
         <McpToolsDialog
@@ -701,6 +696,19 @@ function McpEnvironmentSettings({
                           ? JSON.stringify([entry.transport.command, ...entry.transport.args])
                           : entry.transport.url}
                       </span>
+                      {entry.authStatus && (
+                        <span className="block">
+                          {entry.authStatus === "credentials-available"
+                            ? gt("Credentials available on this environment")
+                            : entry.authStatus === "missing-environment-variable"
+                              ? gt(
+                                  "Bearer token environment variable is unavailable on this environment",
+                                )
+                              : entry.authStatus === "sign-in-required"
+                                ? gt("Sign-in may be required after import")
+                                : null}
+                        </span>
+                      )}
                       <span className="block">
                         {entry.transport.type === "stdio"
                           ? entry.transport.envKeys.join(", ")
@@ -709,36 +717,63 @@ function McpEnvironmentSettings({
                     </span>
                   }
                   control={
-                    <Button
-                      disabled={
-                        busy ||
-                        entry.alreadyInGustaf ||
-                        !isMcpId(entry.suggestedId) ||
-                        (entry.transport.type === "stdio" && !localAllowed)
-                      }
-                      onClick={async () => {
-                        setBusy(true);
-                        const result = await importServers({
-                          environmentId,
-                          input: {
-                            ...(projectDir ? { projectDir } : {}),
-                            entries: [
-                              {
-                                source: entry.source,
-                                name: entry.name,
-                                ...(entry.projectDir ? { projectDir: entry.projectDir } : {}),
-                                id: decodeMcpId(entry.suggestedId),
-                                transport: entry.transport.type,
-                              },
-                            ],
-                          },
-                        });
-                        setBusy(false);
-                        if (result._tag === "Success") await loadImports();
-                      }}
-                    >
-                      {entry.alreadyInGustaf ? gt("Already in Gustaf") : gt("Import disabled")}
-                    </Button>
+                    importedIds.includes(entry.suggestedId as McpServerId) &&
+                    settings.mcpServers[entry.suggestedId as McpServerId]?.providers !==
+                      undefined ? (
+                      <Button
+                        disabled={!canEdit || busy}
+                        onClick={async () => {
+                          const id = decodeMcpId(entry.suggestedId);
+                          const config = settings.mcpServers[id];
+                          if (config === undefined) return;
+                          const { providers: _providers, ...rest } = config;
+                          // A toggle-only patch preserves restrictions for older clients, so clear them before enabling.
+                          if (!(await save({ mcpServers: { [id]: rest } }))) return;
+                          if (!rest.enabled)
+                            await save({ mcpServers: { [id]: { ...rest, enabled: true } } });
+                        }}
+                      >
+                        {gt("Enable for all providers")}
+                      </Button>
+                    ) : (
+                      <Button
+                        disabled={
+                          busy ||
+                          entry.alreadyInGustaf ||
+                          importedIds.includes(entry.suggestedId as McpServerId) ||
+                          !isMcpId(entry.suggestedId) ||
+                          (entry.transport.type === "stdio" && !localAllowed)
+                        }
+                        onClick={async () => {
+                          setBusy(true);
+                          const result = await importServers({
+                            environmentId,
+                            input: {
+                              ...(projectDir ? { projectDir } : {}),
+                              entries: [
+                                {
+                                  source: entry.source,
+                                  name: entry.name,
+                                  ...(entry.projectDir ? { projectDir: entry.projectDir } : {}),
+                                  id: decodeMcpId(entry.suggestedId),
+                                  transport: entry.transport.type,
+                                },
+                              ],
+                            },
+                          });
+                          setBusy(false);
+                          if (result._tag === "Success") {
+                            setImportedIds((previous) => [...previous, ...result.value.imported]);
+                            await loadImports();
+                          }
+                        }}
+                      >
+                        {entry.alreadyInGustaf ||
+                        importedIds.includes(entry.suggestedId as McpServerId)
+                          ? gt("Already in Gustaf")
+                          : gt("Import disabled")}
+                      </Button>
+                    )
                   }
                 />
               ))}
@@ -1009,9 +1044,12 @@ function McpToolsDialog({
           <div className="grid gap-3">
             {unsupported.length > 0 && (
               <p role="note" className="text-sm text-muted-foreground">
-                {gt("{names} cannot switch off single tools and will get all of them.", {
-                  names: unsupported.map(driverName).join(", "),
-                })}
+                {gt(
+                  "{names} cannot switch off single tools and will skip this server while tools are disabled.",
+                  {
+                    names: unsupported.map(driverName).join(", "),
+                  },
+                )}
               </p>
             )}
             {tools !== undefined && names.length === 0 && (
@@ -1145,7 +1183,12 @@ function McpEditor({
         transport:
           type === "stdio"
             ? { type, command: address, args: JSON.parse(args), cwd, env: secrets }
-            : { type, url: address, headers: secrets },
+            : {
+                ...(editing.config?.transport.type === "http" ? editing.config.transport : {}),
+                type,
+                url: address,
+                headers: secrets,
+              },
       });
     } catch {
       setError(

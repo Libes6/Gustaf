@@ -100,6 +100,7 @@ import * as ProviderHostPathWatcher from "./provider/ProviderHostPathWatcher.ts"
 import * as ProjectSettingsOverrideSweep from "./provider/ProjectSettingsOverrideSweep.ts";
 import * as TerminalManager from "./terminal/Manager.ts";
 import * as McpHttpServer from "./mcp/McpHttpServer.ts";
+import * as McpServerPreview from "./mcpServers/McpServerPreview.ts";
 import * as McpServerImport from "./mcpServers/McpServerImport.ts";
 import * as McpRegistry from "./mcpServers/McpRegistry.ts";
 import * as McpConnectors from "./mcpServers/McpConnectors.ts";
@@ -954,7 +955,14 @@ const layerMakeRoutes = Layer.mergeAll(
     ServerBrowserStream.routeLayer,
     PreviewTunnel.routeLayer,
     ServerHttp.layerStaticAndDevRoute,
-    Ws.layer,
+    Ws.layer.pipe(
+      Layer.provide(
+        McpServerPreview.layer.pipe(
+          Layer.provide(ProviderAdapterRegistry.layerFromProviderInstanceRegistry),
+          Layer.provide(NativeMcpConfigs.layer),
+        ),
+      ),
+    ),
     speechStreamRouteLayer,
   ),
   McpHttpServer.layer.pipe(

@@ -104,6 +104,7 @@ import * as ManagedProjectFolders from "./project/ManagedProjectFolders.ts";
 import * as ScratchThreadPromotion from "./project/ScratchThreadPromotion.ts";
 import * as McpAppRequests from "./mcpApps/McpAppRequests.ts";
 import * as McpSignIn from "./mcpApps/McpSignIn.ts";
+import { McpServerPreview } from "./mcpServers/McpServerPreview.ts";
 import * as McpServerImport from "./mcpServers/McpServerImport.ts";
 import * as McpRegistry from "./mcpServers/McpRegistry.ts";
 import * as McpConnectors from "./mcpServers/McpConnectors.ts";
@@ -868,6 +869,7 @@ const layerUnusedConfigRpcServices = Layer.mergeAll(
   Layer.mock(McpAppRequests.McpAppRequests)({}),
   Layer.mock(McpSignIn.McpSignIn)({}),
   Layer.mock(McpServerImport.McpServerImport)({}),
+  Layer.mock(McpServerPreview)({}),
   Layer.mock(McpRegistry.McpRegistry)({}),
   Layer.mock(McpConnectors.McpConnectors)({}),
   Layer.mock(McpServerChecks.McpServerChecks)({}),

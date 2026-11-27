@@ -1,5 +1,6 @@
 import {
   McpServerConfig,
+  isSecretReference,
   type McpImportInput,
   type McpImportSource,
   type McpImportableServer,
@@ -10,6 +11,7 @@ import {
   type McpServerId,
   ProviderDriverKind,
 } from "@t3tools/contracts";
+import * as SecretResolver from "@t3tools/secret-provider-core/server/SecretResolver";
 import * as HostProcess from "@t3tools/shared/HostProcess";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
@@ -64,8 +66,19 @@ const isInGustaf = (native: NativeMcpServer, configs: ReadonlyArray<McpServerCon
               transport: "stdio",
               command: transport.command,
               args: transport.args,
+              env: transport.env,
+              ...(transport.cwd === "thread" ? {} : { cwd: transport.cwd }),
             }
-          : { name: native.name, transport: "http", url: transport.url },
+          : {
+              name: native.name,
+              transport: "http",
+              url: transport.url,
+              headers: transport.headers,
+              ...(transport.requiresSignIn === true ? { requiresSignIn: true } : {}),
+              ...(transport.bearerTokenEnvVar === undefined
+                ? {}
+                : { bearerTokenEnvVar: transport.bearerTokenEnvVar }),
+            },
         [native],
       ) !== undefined,
   );
@@ -73,6 +86,7 @@ const isInGustaf = (native: NativeMcpServer, configs: ReadonlyArray<McpServerCon
 const toImportable = (
   native: NativeMcpServer,
   configs: ReadonlyArray<McpServerConfig>,
+  environment: NodeJS.ProcessEnv,
 ): McpImportableServer => ({
   source: native.source,
   name: native.name,
@@ -96,6 +110,20 @@ const toImportable = (
             ? {}
             : { bearerTokenEnvVar: native.bearerTokenEnvVar }),
         },
+  ...(native.transport === "http"
+    ? {
+        authStatus:
+          native.bearerTokenEnvVar !== undefined
+            ? environment[native.bearerTokenEnvVar]?.trim()
+              ? ("credentials-available" as const)
+              : ("missing-environment-variable" as const)
+            : Object.keys(native.headers).some((key) => key.toLowerCase() === "authorization")
+              ? ("credentials-available" as const)
+              : native.requiresSignIn === true
+                ? ("sign-in-required" as const)
+                : ("unknown" as const),
+      }
+    : {}),
   alreadyInGustaf: isInGustaf(native, configs),
 });
 
@@ -103,6 +131,7 @@ const make = Effect.gen(function* () {
   const nativeConfigs = yield* NativeMcpConfigs;
   const settings = yield* ServerSettings.ServerSettingsService;
   const policy = yield* ManagedPolicy.ManagedPolicy;
+  const secrets = yield* SecretResolver.SecretResolver;
 
   const readNative = Effect.fn("McpServerImport.readNative")(function* (projectDir?: string) {
     const homeDir = yield* HostProcess.HomeDirectory;
@@ -120,10 +149,33 @@ const make = Effect.gen(function* () {
   );
 
   const list = Effect.fn("McpServerImport.list")(function* (input: McpListImportableInput) {
-    const configs = Object.values(yield* currentServers);
+    const configs = yield* Effect.forEach(Object.values(yield* currentServers), (config) =>
+      Effect.gen(function* () {
+        const slots =
+          config.transport.type === "stdio" ? config.transport.env : config.transport.headers;
+        const entries = Object.entries(slots);
+        const references = entries.map(([, value]) => value).filter(isSecretReference);
+        const values = references.length === 0 ? [] : yield* secrets.read(references);
+        const resolved = new Map(references.map((reference, index) => [reference, values[index]]));
+        const literals = Object.fromEntries(
+          entries.map(([key, value]) => [
+            key,
+            isSecretReference(value) ? (resolved.get(value) ?? value) : value,
+          ]),
+        );
+        return {
+          ...config,
+          transport:
+            config.transport.type === "stdio"
+              ? { ...config.transport, env: literals }
+              : { ...config.transport, headers: literals },
+        };
+      }),
+    );
     const { servers, errors } = yield* readNative(input.projectDir);
+    const environment = yield* HostProcess.Environment;
     return {
-      servers: servers.map((native) => toImportable(native, configs)),
+      servers: servers.map((native) => toImportable(native, configs, environment)),
       unreadablePaths: errors.map((error) => error.sourcePath),
     };
   });
@@ -164,7 +216,15 @@ const make = Effect.gen(function* () {
                 env: native.env,
                 ...(native.cwd === undefined ? {} : { cwd: native.cwd }),
               }
-            : { type: "http", url: native.url, headers: native.headers },
+            : {
+                type: "http",
+                url: native.url,
+                headers: native.headers,
+                ...(native.bearerTokenEnvVar === undefined
+                  ? {}
+                  : { bearerTokenEnvVar: native.bearerTokenEnvVar }),
+                ...(native.requiresSignIn === true ? { requiresSignIn: true } : {}),
+              },
       }).pipe(Effect.mapError((cause) => fail("invalid-entry", cause)));
     }
     yield* settings

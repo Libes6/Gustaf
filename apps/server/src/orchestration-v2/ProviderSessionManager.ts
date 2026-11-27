@@ -679,7 +679,7 @@ export const layerWithOptions = (
           };
           const unusable = yield* knownUnusableFor(keyInput.abortsOnFailedMcpServer);
           const withUnusable = unusable === undefined || unusable.size === 0 ? {} : { unusable };
-          const filtersTools = keyInput.filtersTools ? { filtersTools: true } : {};
+          const filtersTools = { filtersTools: keyInput.filtersTools };
           const { servers, skipped } = yield* mcpUserServers.value.resolveForThread({
             projectId,
             driver: adapter.driver,
@@ -714,7 +714,7 @@ export const layerWithOptions = (
           const key = yield* mcpUserServers.value.sessionKey({
             ...input,
             ...(unusable === undefined || unusable.size === 0 ? {} : { unusable }),
-            ...(filtersTools ? { filtersTools: true } : {}),
+            filtersTools,
           });
           return key === opened.key;
         },

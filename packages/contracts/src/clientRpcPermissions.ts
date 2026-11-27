@@ -112,6 +112,7 @@ export const CLIENT_GUARDED_RPC_SCOPES = {
   // Both need settings:write too, and importing a stdio server terminal:operate; see below.
   [WS_METHODS.mcpServersListImportable]: AuthProvidersManageScope,
   [WS_METHODS.mcpServersImport]: AuthProvidersManageScope,
+  [WS_METHODS.mcpServersPreview]: AuthProvidersManageScope,
   [WS_METHODS.mcpServersSearchRegistry]: AuthProvidersManageScope,
   // Listing starts the provider's configured MCP servers; signing in stores provider credentials.
   [WS_METHODS.mcpConnectorsList]: AuthProvidersManageScope,

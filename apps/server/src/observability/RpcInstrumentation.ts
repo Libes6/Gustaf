@@ -77,6 +77,7 @@ const RPC_AGGREGATES = {
   [WS_METHODS.peerLinksAnswerRequest]: "peerLinks",
   [WS_METHODS.mcpServersListImportable]: "server",
   [WS_METHODS.mcpServersImport]: "server",
+  [WS_METHODS.mcpServersPreview]: "server",
   [WS_METHODS.mcpServersSearchRegistry]: "server",
   [WS_METHODS.mcpServersStatus]: "server",
   [WS_METHODS.mcpServersSignIn]: "server",

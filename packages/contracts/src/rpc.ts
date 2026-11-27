@@ -449,6 +449,8 @@ import {
   McpServerStatusListResult,
   McpImportInput,
   McpImportResult,
+  McpPreviewInput,
+  McpPreviewResult,
   McpListImportableInput,
   McpListImportableResult,
   McpRegistryError,
@@ -689,6 +691,7 @@ export const WS_METHODS = {
 
   mcpServersListImportable: "mcpServers.listImportable",
   mcpServersImport: "mcpServers.import",
+  mcpServersPreview: "mcpServers.preview",
   mcpServersSearchRegistry: "mcpServers.searchRegistry",
   mcpServersStatus: "mcpServers.status",
   mcpServersSignIn: "mcpServers.signIn",
@@ -2600,6 +2603,12 @@ const WsMcpServersListImportableRpc = Rpc.make(WS_METHODS.mcpServersListImportab
   error: Schema.Union([McpServerImportError, EnvironmentAuthorizationError]),
 });
 
+const WsMcpServersPreviewRpc = Rpc.make(WS_METHODS.mcpServersPreview, {
+  payload: McpPreviewInput,
+  success: McpPreviewResult,
+  error: Schema.Union([McpServerImportError, EnvironmentAuthorizationError]),
+});
+
 const WsMcpServersImportRpc = Rpc.make(WS_METHODS.mcpServersImport, {
   payload: McpImportInput,
   success: McpImportResult,
@@ -2783,6 +2792,7 @@ export const WsRpcGroup = RpcGroup.make(
   WsSubscriptionsUpsertRpc,
   WsSubscriptionsDeleteRpc,
   WsMcpServersListImportableRpc,
+  WsMcpServersPreviewRpc,
   WsMcpServersImportRpc,
   WsMcpServersSearchRegistryRpc,
   WsMcpServersStatusRpc,

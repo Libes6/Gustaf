@@ -93,6 +93,7 @@ const keyOf = (parts: unknown) => JSON.stringify(parts);
 /** An http server is sent a Gustaf sign-in's token unless the user set their own header. */
 export const usesGustafSignIn = ({ transport }: McpServerConfig) =>
   transport.type === "http" &&
+  transport.bearerTokenEnvVar === undefined &&
   !Object.keys(transport.headers).some((key) => key.toLowerCase() === "authorization");
 
 const slotsOf = ({ transport }: McpServerConfig) =>
@@ -107,6 +108,7 @@ export const SKIP_REASONS = {
   command: "Its command was not found.",
   needsAuth: "Needs sign-in.",
   failed: "Did not start.",
+  toolFilter: "This provider cannot enforce disabled tools.",
 } as const;
 
 type Unusable = { readonly unusable: string; readonly reason: string };
@@ -120,6 +122,9 @@ const withSecrets = Effect.fnUntraced(function* (
   bearer: string | undefined,
   filtersTools = true,
 ): Effect.fn.Return<ResolvedMcpServer | Unusable> {
+  if (!filtersTools && (server.disabledTools?.length ?? 0) > 0) {
+    return { unusable: SKIP_REASONS.toolFilter, reason: SKIP_REASONS.toolFilter };
+  }
   const values: Record<string, string> = {};
   for (const [key, value] of Object.entries(slotsOf(server))) {
     const secret = literal(value);
@@ -134,12 +139,30 @@ const withSecrets = Effect.fnUntraced(function* (
       ? {}
       : { disabledTools: server.disabledTools };
   if (transport.type === "http") {
+    const environment = yield* HostProcess.Environment;
+    const token =
+      transport.bearerTokenEnvVar === undefined
+        ? bearer
+        : environment[transport.bearerTokenEnvVar]?.trim();
+    if (transport.bearerTokenEnvVar !== undefined && !token) {
+      return {
+        unusable: "The bearer token environment variable is unavailable.",
+        reason: SKIP_REASONS.secret,
+      };
+    }
+    if (
+      transport.requiresSignIn === true &&
+      token === undefined &&
+      !Object.keys(values).some((key) => key.toLowerCase() === "authorization")
+    ) {
+      return { unusable: SKIP_REASONS.needsAuth, reason: SKIP_REASONS.needsAuth };
+    }
     return {
       type: "http",
       id,
       ...disabledTools,
       url: transport.url,
-      headers: bearer === undefined ? values : { ...values, Authorization: `Bearer ${bearer}` },
+      headers: token === undefined ? values : { ...values, Authorization: `Bearer ${token}` },
     };
   }
   const platform = yield* HostProcess.Platform;
@@ -176,13 +199,6 @@ const withSecrets = Effect.fnUntraced(function* (
   };
 });
 
-function sameValues(left: Record<string, string>, right: Readonly<Record<string, string>>) {
-  return (
-    Object.keys(left).length === Object.keys(right).length &&
-    Object.entries(left).every(([key, value]) => right[key] === value)
-  );
-}
-
 const make = Effect.gen(function* () {
   const settings = yield* ServerSettings.ServerSettingsService;
   const secrets = yield* SecretResolver.SecretResolver;
@@ -211,7 +227,11 @@ const make = Effect.gen(function* () {
     }
     return nativeServersForProvider(native.provider, servers, cwd, {
       includeProjectMcpJson: native.includeProjectMcpJson ?? false,
-    }).map((server) => ({ ...server, name: toMcpServerName(server.name) }));
+    }).map((server) => ({
+      ...server,
+      ...(server.transport === "stdio" ? { cwd: server.cwd ?? cwd } : {}),
+      name: toMcpServerName(server.name),
+    }));
   });
 
   const enabledFor = (
@@ -286,30 +306,27 @@ const make = Effect.gen(function* () {
       const { transport } = server;
       const duplicate = findNativeDuplicate(
         transport.type === "http"
-          ? { name: id, transport: "http", url: transport.url }
-          : { name: id, transport: "stdio", command: transport.command, args: transport.args },
+          ? {
+              name: id,
+              transport: "http",
+              url: transport.url,
+              headers: result.type === "http" ? result.headers : {},
+            }
+          : {
+              name: id,
+              transport: "stdio",
+              command: transport.command,
+              args: transport.args,
+              cwd: transport.cwd === "thread" ? input.cwd : transport.cwd,
+              env: Object.fromEntries(
+                Object.entries(transport.env).map(([key, value]) => [key, literal(value)]),
+              ),
+            },
         nativeServers,
       );
       // Native copies share this server's name, so a copy with tools switched off takes the native
       // one's place in the provider's config rather than running beside it.
-      if (result.disabledTools === undefined) {
-        if (
-          result.type === "http" &&
-          duplicate?.transport === "http" &&
-          duplicate.bearerTokenEnvVar === undefined &&
-          sameValues(result.headers, duplicate.headers)
-        )
-          continue;
-        if (
-          transport.type === "stdio" &&
-          duplicate?.transport === "stdio" &&
-          Object.keys(transport.env).length === Object.keys(duplicate.env).length &&
-          Object.entries(transport.env).every(
-            ([key, value]) => duplicate.env[key] === literal(value),
-          )
-        )
-          continue;
-      }
+      if (result.disabledTools === undefined && duplicate !== undefined) continue;
       servers.push(result);
     }
     return { servers, skipped };
@@ -346,10 +363,9 @@ const make = Effect.gen(function* () {
     if (Option.isNone(current)) return keyOf(null);
     const parts = yield* Effect.forEach(enabledFor(current.value, input), ([id, server]) =>
       Effect.gen(function* () {
-        const { disabledTools: _disabledTools, ...rest } = server;
         return [
           id,
-          input.filtersTools === true ? server : rest,
+          server,
           server.transport.type === "http" && usesGustafSignIn(server)
             ? yield* auth.tokenState(id, server.transport.url)
             : null,

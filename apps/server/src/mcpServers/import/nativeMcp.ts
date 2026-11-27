@@ -25,6 +25,7 @@ export type NativeMcpServer = {
       readonly url: string;
       readonly headers: Readonly<Record<string, string>>;
       readonly bearerTokenEnvVar?: string;
+      readonly requiresSignIn?: boolean;
     }
 );
 
@@ -55,6 +56,8 @@ const entry = Schema.Struct({
   headers: Schema.optional(stringMap),
   http_headers: Schema.optional(stringMap),
   bearer_token_env_var: Schema.optional(Schema.String),
+  bearerTokenEnvVar: Schema.optional(Schema.String),
+  auth: Schema.optional(Schema.Unknown),
   enabled: Schema.optional(Schema.Boolean),
   disabled: Schema.optional(Schema.Boolean),
 });
@@ -82,14 +85,14 @@ const serversFromObject = (
       if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
         throw new Error("Unsupported MCP URL protocol");
       }
+      const bearerTokenEnvVar = config.bearer_token_env_var ?? config.bearerTokenEnvVar;
       return {
         ...base,
         transport: "http",
         url,
         headers: (source === "codex" ? config.http_headers : config.headers) ?? {},
-        ...(source === "codex" && config.bearer_token_env_var !== undefined
-          ? { bearerTokenEnvVar: config.bearer_token_env_var }
-          : {}),
+        ...(bearerTokenEnvVar === undefined ? {} : { bearerTokenEnvVar }),
+        ...(config.auth === undefined || config.auth === false ? {} : { requiresSignIn: true }),
       };
     }
     if (!config.command?.trim()) throw new Error("Missing MCP command or URL");

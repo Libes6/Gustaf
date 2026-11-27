@@ -189,11 +189,14 @@ it.effect(
           },
         },
       };
-      // An agent without a tool filter is never sent the list.
-      assert.notProperty(
-        (yield* resolve(settings, { driver: "antigravity" })).servers[1],
-        "disabledTools",
-      );
+      const unsupported = yield* resolve(settings, { driver: "antigravity" });
+      assert.deepEqual(ids(unsupported), ["thread"]);
+      assert.deepEqual(unsupported.skipped, [
+        {
+          id: McpServerId.make("pinned"),
+          reason: "This provider cannot enforce disabled tools.",
+        },
+      ]);
       const { servers } = yield* resolve(settings, { filtersTools: true });
       assert.deepEqual(servers, [
         {
@@ -307,7 +310,7 @@ it.effect("leaves out a server the provider already loads from its own config", 
       name: string,
       args: ReadonlyArray<string>,
       env: Readonly<Record<string, string>> = {},
-    ): NativeMcpServer => ({
+    ): Extract<NativeMcpServer, { transport: "stdio" }> => ({
       source: "codex",
       sourcePath: "/home/u/.codex/config.toml",
       name,
@@ -323,8 +326,9 @@ it.effect("leaves out a server the provider already loads from its own config", 
           playwright: stdio(true, { args: ["-y", "@playwright/mcp@latest"] }),
           other: stdio(true, { args: ["-y", "server"] }),
           rotated: http(true, { Authorization: vault("op://rotated") }),
-          unchanged: http(true, { Authorization: vault("op://unchanged") }),
+          unchanged: http(true, { authorization: vault("op://unchanged") }),
           "configured-env": stdio(true, { env: { PROFILE: "gustaf" } }),
+          "different-cwd": stdio(true, { cwd: "/other", args: ["server.js"] }),
         },
       },
       {
@@ -335,6 +339,7 @@ it.effect("leaves out a server the provider already loads from its own config", 
             native("Playwright", ["-y", "@playwright/mcp@latest"]),
             native("other", ["-y", "different"]),
             native("configured-env", ["-y", "server"], { PROFILE: "native" }),
+            { ...native("different-cwd", ["server.js"]), cwd: "/first" },
             ...(["rotated", "unchanged"] as const).map((name): NativeMcpServer => ({
               source: "codex",
               sourcePath: "/home/u/.codex/config.toml",
@@ -348,7 +353,7 @@ it.effect("leaves out a server the provider already loads from its own config", 
         },
       },
     );
-    assert.deepStrictEqual(ids(resolved), ["other", "rotated", "configured-env"]);
+    assert.deepStrictEqual(ids(resolved), ["other", "rotated", "configured-env", "different-cwd"]);
   }),
 );
 
@@ -460,10 +465,51 @@ it.effect(
       ]) {
         assert.notStrictEqual(yield* changed, key);
       }
-      assert.strictEqual(yield* sessionKey(settings(["delete_issue"]), base), key);
+      assert.notStrictEqual(yield* sessionKey(settings(["delete_issue"]), base), key);
       assert.notStrictEqual(
         yield* sessionKey(settings(["delete_issue"]), { ...base, filtersTools: true }),
         yield* sessionKey(settings([]), { ...base, filtersTools: true }),
+      );
+    }),
+);
+
+it.effect(
+  "resolves imported HTTP credentials on this environment and fails closed when unavailable",
+  () =>
+    Effect.gen(function* () {
+      const settings = {
+        mcpServers: {
+          bearer: {
+            ...http(true),
+            transport: { ...http(true).transport, bearerTokenEnvVar: "MCP_TOKEN" },
+          },
+          missing: {
+            ...http(true),
+            transport: { ...http(true).transport, bearerTokenEnvVar: "MISSING" },
+          },
+          oauth: { ...http(true), transport: { ...http(true).transport, requiresSignIn: true } },
+        },
+      };
+      const result = yield* resolve(settings, { environment: { MCP_TOKEN: "available" } });
+      assert.deepEqual(ids(result), ["bearer"]);
+      assert.deepEqual(result.servers[0], {
+        id: McpServerId.make("bearer"),
+        type: "http",
+        url: "https://mcp.example.test/mcp",
+        headers: { Authorization: "Bearer available" },
+      });
+      assert.deepEqual(
+        result.skipped.map((server) => server.reason),
+        ["A secret it needs cannot be read.", "Needs sign-in."],
+      );
+      assert.deepEqual(
+        ids(
+          yield* resolve(settings, {
+            environment: { MCP_TOKEN: "available" },
+            tokens: { oauth: "signed-in" },
+          }),
+        ),
+        ["bearer", "oauth"],
       );
     }),
 );
