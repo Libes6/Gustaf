@@ -744,6 +744,8 @@ export const ServerConfig = Schema.Struct({
   threadSnapshotPagination: Schema.optionalKey(Schema.Boolean),
   threadFind: Schema.optionalKey(Schema.Boolean),
   threadFindProgressive: Schema.optionalKey(Schema.Boolean),
+  /** The server runs shared skills and answers the `skills.*` methods. */
+  sharedSkills: Schema.optionalKey(Schema.Boolean),
   featureFlags: Schema.optionalKey(ServerFeatureFlags),
   /** Settings patches may carry `secretProviders`; older servers drop the key without an error. */
   secretProviderSettings: Schema.optionalKey(Schema.Boolean),

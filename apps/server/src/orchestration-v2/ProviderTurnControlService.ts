@@ -20,6 +20,8 @@ import * as Stream from "effect/Stream";
 
 import * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
 import * as McpAppModelContext from "../mcpApps/McpAppModelContext.ts";
+import * as SharedSkills from "../skills/SharedSkills.ts";
+import { isSlashCommandMessage, withSkillContext } from "./ContextHandoffDelivery.ts";
 import * as EventSink from "./EventSink.ts";
 import * as ProjectionStore from "./ProjectionStore.ts";
 import * as ProviderSessionManager from "./ProviderSessionManager.ts";
@@ -118,6 +120,7 @@ export const layer: Layer.Layer<
   | McpAppModelContext.McpAppModelContext
   | ProjectionStore.ProjectionStoreV2
   | ProviderSessionManager.ProviderSessionManagerV2
+  | SharedSkills.SharedSkills
 > = Layer.effect(
   ProviderTurnControlServiceV2,
   Effect.gen(function* () {
@@ -125,6 +128,7 @@ export const layer: Layer.Layer<
     const projections = yield* ProjectionStore.ProjectionStoreV2;
     const sessions = yield* ProviderSessionManager.ProviderSessionManagerV2;
     const mcpAppModelContext = yield* McpAppModelContext.McpAppModelContext;
+    const sharedSkills = yield* SharedSkills.SharedSkills;
 
     const load = Effect.fn("ProviderTurnControlService.load")(function* (input: {
       readonly threadId: ThreadId;
@@ -452,6 +456,26 @@ export const layer: Layer.Layer<
             mcpAppModelContext,
             input.threadId,
           );
+          const steerText = withMessageSenderNote(
+            message,
+            projectComposerContextForProvider({
+              text: message.text,
+              records: message.context?.records ?? [],
+            }),
+          );
+          const skillContext =
+            message.createdBy !== "user"
+              ? ""
+              : yield* sharedSkills.promptContext({
+                  text: message.text,
+                  cwd: loaded.session.value.providerSession.cwd,
+                  instanceId: run.providerInstanceId,
+                });
+          const { text: providerText, inlineContextLength } = withSkillContext(
+            skillContext,
+            steerText,
+            isSlashCommandMessage(message),
+          );
           yield* loaded.session.value
             .steerTurn({
               threadId: input.threadId,
@@ -462,15 +486,10 @@ export const layer: Layer.Layer<
                 ? {}
                 : { modelSelection: input.modelSelection }),
               ...(appContext.length === 0 ? {} : { appContext }),
+              ...(inlineContextLength === 0 ? {} : { inlineContextLength }),
               message: {
                 messageId: message.id,
-                text: withMessageSenderNote(
-                  message,
-                  projectComposerContextForProvider({
-                    text: message.text,
-                    records: message.context?.records ?? [],
-                  }),
-                ),
+                text: providerText,
                 attachments: message.attachments,
                 createdBy: message.createdBy,
                 creationSource: message.creationSource,

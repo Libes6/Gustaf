@@ -45,6 +45,7 @@ import * as ProjectService from "../project/ProjectService.ts";
 import * as ProjectSetupScriptRunner from "../project/ProjectSetupScriptRunner.ts";
 import * as ProviderAuthService from "../provider/ProviderAuthService.ts";
 import * as ServerSettings from "../serverSettings.ts";
+import * as SharedSkills from "../skills/SharedSkills.ts";
 import {
   makeRestoreMissingWorktree,
   ThreadWorktreeRestore,
@@ -68,6 +69,7 @@ import {
 import {
   deliverContextHandoffs,
   isSlashCommandMessage,
+  withSkillContext,
   withInlineContext,
 } from "./ContextHandoffDelivery.ts";
 import { isProviderCommand, outputInstructions } from "./runOutput.ts";
@@ -298,6 +300,7 @@ export const layer: Layer.Layer<
   | ProjectService.ProjectService
   | ProjectSetupScriptRunner.ProjectSetupScriptRunner
   | ProviderAuthService.ProviderAuthService
+  | SharedSkills.SharedSkills
   | ProjectionStore.ProjectionStoreV2
   | ProviderSessionManager.ProviderSessionManagerV2
   | RunExecutionService.RunExecutionServiceV2
@@ -317,6 +320,7 @@ export const layer: Layer.Layer<
     const projects = yield* ProjectService.ProjectService;
     const setupScripts = yield* ProjectSetupScriptRunner.ProjectSetupScriptRunner;
     const providerAuth = yield* ProviderAuthService.ProviderAuthService;
+    const sharedSkills = yield* SharedSkills.SharedSkills;
     const projectionStore = yield* ProjectionStore.ProjectionStoreV2;
     const providerSessions = yield* ProviderSessionManager.ProviderSessionManagerV2;
     const runExecution = yield* RunExecutionService.RunExecutionServiceV2;
@@ -1093,11 +1097,25 @@ export const layer: Layer.Layer<
         session.driver === "claudeAgent" ||
         session.providerSession.capabilities.turns.supportsNativeGoals === true;
       const goalCommand = goalDriver && parseGoalCommand(providerMessage) !== null;
+      // Only what a person typed runs a shared skill, never quoted context or an agent's message.
+      const skillContext =
+        providerMessage.createdBy !== "user" || goalCommand || isProviderCommand(providerMessage)
+          ? ""
+          : yield* sharedSkills.promptContext({
+              text: providerMessage.text,
+              cwd: resolvedRuntimePolicy.cwd,
+              instanceId: run.providerInstanceId,
+            });
       // Part of the user text, so every way a turn starts carries it, after the user's own words.
-      const userText =
+      const requestedText =
         run.outputSchema === undefined || goalCommand || isProviderCommand(providerMessage)
           ? messageText
           : `${messageText}\n\n${outputInstructions(run.outputSchema)}`;
+      const { text: userText, inlineContextLength: skillContextLength } = withSkillContext(
+        skillContext,
+        requestedText,
+        slashCommand,
+      );
       // The provider turn marks cancellation work delivered; restart continuations use their own text or resume natively.
       const noteContinuation = isRestartNoteContinuation(
         run,
@@ -2240,9 +2258,9 @@ export const layer: Layer.Layer<
                       ? {}
                       : { attachments: [...missedAttachments, ...turnInput.message.attachments] }),
                   },
-                  ...(text === userText
+                  ...(text === userText && skillContextLength === 0
                     ? {}
-                    : { inlineContextLength: text.length - userText.length }),
+                    : { inlineContextLength: text.length - userText.length + skillContextLength }),
                 });
           yield* operation.pipe(
             // Clear pending handoff markers for refused prompts so the next turn retains the native session.
@@ -2353,6 +2371,7 @@ export const layer: Layer.Layer<
             }),
           ),
         loadUnsettledWork: runControls.loadUnsettledWork,
+        ...(skillContextLength === 0 ? {} : { inlineContextLength: skillContextLength }),
         message: {
           messageId: message.id,
           text: userText,

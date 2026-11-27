@@ -59,6 +59,7 @@ import * as ProviderTurnControlService from "../ProviderTurnControlService.ts";
 import * as ProviderTurnStartService from "../ProviderTurnStartService.ts";
 import * as ProviderTurnStartServiceTestkit from "../ProviderTurnStartService.testkit.ts";
 import * as McpAppModelContext from "../../mcpApps/McpAppModelContext.ts";
+import * as SharedSkills from "../../skills/SharedSkills.ts";
 import * as PreviewAgentActivity from "../../preview/PreviewAgentActivity.ts";
 import * as RunExecutionService from "../RunExecutionService.ts";
 import * as RunFinalizationService from "../RunFinalizationService.ts";
@@ -481,6 +482,7 @@ export function layerWithRegistry<Error>(
   const layerProviderTurnStartServiceProvided = ProviderTurnStartService.layer.pipe(
     Layer.provide(
       Layer.mergeAll(
+        Layer.mock(SharedSkills.SharedSkills)({ promptContext: () => Effect.succeed("") }),
         layerContextHandoffServiceProvided,
         layerEventSinkProvided,
         IdAllocator.layer,
@@ -500,6 +502,7 @@ export function layerWithRegistry<Error>(
   const layerProviderTurnControlServiceProvided = ProviderTurnControlService.layer.pipe(
     Layer.provide(
       Layer.mergeAll(
+        Layer.mock(SharedSkills.SharedSkills)({ promptContext: () => Effect.succeed("") }),
         layerEventSinkProvided,
         McpAppModelContext.layerEmpty,
         layerStores,

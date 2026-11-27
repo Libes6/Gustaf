@@ -137,6 +137,7 @@ import * as ServerOwnership from "./serverOwnership.ts";
 import * as AgentAwarenessRelay from "./relay/AgentAwarenessRelay.ts";
 import { hasCloudPublicConfig } from "./cloud/publicConfig.ts";
 import * as ServerSettings from "./serverSettings.ts";
+import * as SharedSkills from "./skills/SharedSkills.ts";
 import * as ManagedLimits from "./policy/managedLimits.ts";
 import * as ManagedPolicy from "./policy/ManagedPolicy.ts";
 import * as ProjectEnrichmentService from "./project/ProjectEnrichmentService.ts";
@@ -805,6 +806,8 @@ const layerRuntimeCoreDependenciesBase = Layer.mergeAll(
 )
   .pipe(
     Layer.provideMerge(layerOrchestrationApplication),
+    // The same instance the orchestration runtime reads, for the WebSocket handlers.
+    Layer.provideMerge(SharedSkills.layer),
     // One hub, which the feeders above and the workflow store inside the runtime publish to.
     Layer.provideMerge(MilestoneHub.layer),
     Layer.provideMerge(layerTaskFolders),

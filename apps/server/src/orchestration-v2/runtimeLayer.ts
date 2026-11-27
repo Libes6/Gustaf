@@ -7,6 +7,7 @@ import * as GitVcsDriver from "../vcs/GitVcsDriver.ts";
 import * as OrchestrationCommandReceipts from "../persistence/OrchestrationCommandReceipts.ts";
 import * as OrchestrationEventStore from "../persistence/OrchestrationEventStore.ts";
 import * as McpAppModelContext from "../mcpApps/McpAppModelContext.ts";
+import * as SharedSkills from "../skills/SharedSkills.ts";
 import * as PreviewAgentActivity from "../preview/PreviewAgentActivity.ts";
 import * as McpAppRequests from "../mcpApps/McpAppRequests.ts";
 import * as McpSignIn from "../mcpApps/McpSignIn.ts";
@@ -186,6 +187,7 @@ const layerRunExecutionServiceProvided = RunExecutionService.layer.pipe(
 const layerProviderTurnStartServiceProvided = ProviderTurnStartService.layer.pipe(
   Layer.provide(
     Layer.mergeAll(
+      SharedSkills.layer,
       layerContextHandoffServiceProvided,
       layerEventSink,
       IdAllocator.layer,
@@ -204,6 +206,7 @@ const layerProviderTurnStartServiceProvided = ProviderTurnStartService.layer.pip
 const layerProviderTurnControlServiceProvided = ProviderTurnControlService.layer.pipe(
   Layer.provide(
     Layer.mergeAll(
+      SharedSkills.layer,
       layerEventSink,
       McpAppModelContext.layer,
       ProjectionStore.layer,

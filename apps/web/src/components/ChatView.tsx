@@ -210,6 +210,7 @@ import {
 import { threadPullRequestPanelTarget } from "./pullRequest/pullRequestDetail.logic";
 import { LinkPullRequestDialogHost } from "./pullRequest/LinkPullRequestDialog";
 import { GuestPendingMessages } from "./chat/GuestShareControls";
+import { useSharedSkills } from "~/state/skills";
 import { useDeviceState } from "~/state/device";
 import { BranchToolbar, type BranchToolbarHandle } from "./BranchToolbar";
 import { ComposerContextPermissions } from "./ComposerContextPermissions";
@@ -275,6 +276,7 @@ import { primaryServerKeybindingsAtom, serverEnvironment } from "../state/server
 import { hostEnvironmentIdAtom } from "../state/primaryEnvironment";
 import { threadEnvironment } from "../state/threads";
 import {
+  mergeSharedSkills,
   resolveProviderSkillsForCwd,
   resolveProvidersForCwd,
 } from "@t3tools/client-runtime/providerSkills";
@@ -2921,9 +2923,13 @@ export default function ChatView(props: ChatViewProps) {
     isDesktop: isElectron,
   });
   const getShortcutContextStable = useStableCallback(getShortcutContext);
-  const timelineSkills = activeProviderStatus
-    ? resolveProviderSkillsForCwd(activeProviderStatus, gitCwd)
-    : EMPTY_PROVIDER_SKILLS;
+  const { skills: sharedSkills } = useSharedSkills(environmentId, gitCwd);
+  const timelineSkills = mergeSharedSkills(
+    activeProviderStatus
+      ? resolveProviderSkillsForCwd(activeProviderStatus, gitCwd)
+      : EMPTY_PROVIDER_SKILLS,
+    sharedSkills,
+  );
   const threadFindEnabled = isServerThread && serverConfig?.threadFind === true;
   const isThreadFindActive = useThreadFindOpen(activeThreadRef, threadFindEnabled);
   const openThreadFindStable = useStableCallback((threadRef: ScopedThreadRef) => {

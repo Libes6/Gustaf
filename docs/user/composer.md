@@ -328,6 +328,27 @@ once the provider reports usage.
 Claude instances can also compact idle threads for you. See
 [compact long conversations](./providers-claude.md#compact-long-conversations).
 
+## Shared skills
+
+A shared skill runs with every provider. Put one folder per skill, holding its
+`SKILL.md`, in either place on the environment's computer:
+
+- `.agents/skills/<name>/` in a project or worktree, for that folder only.
+- `skills/<name>/` in Gustaf's data folder (`~/.t3/userdata` by default), for
+  every project.
+
+Pick one from the `/` or `$` menu, or type `$name` yourself. Only your own
+messages run them. If the selected provider already runs the same skill, it
+loads it itself; otherwise Gustaf sends the instructions with your message,
+along with the folder that `references/` and `scripts/` paths start from. When
+the name is already taken, the menu offers `$project:name` or `$global:name`.
+
+On web and desktop, **Settings → Skills** lists shared skills, turns them on or
+off, deletes them, and imports skills from Claude Code (`~/.claude/skills` and a
+project's `.claude/skills`). An import copies the whole folder and leaves the
+original alone. Some Claude-only features, such as `$ARGUMENTS` or inline shell
+commands, do not run in a shared skill; the list marks those.
+
 ## Goals
 
 With Codex, Claude, and OpenCode 2.2.5 or later, send `/goal` followed by what "done" means, for example

@@ -26,6 +26,7 @@ import * as Stream from "effect/Stream";
 
 import { CodexProviderCapabilitiesV2 } from "./Adapters/CodexAdapterV2.ts";
 import * as McpAppModelContext from "../mcpApps/McpAppModelContext.ts";
+import * as SharedSkills from "../skills/SharedSkills.ts";
 import * as EventSink from "./EventSink.ts";
 import * as ProjectionStore from "./ProjectionStore.ts";
 import type * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
@@ -329,6 +330,7 @@ it.effect(
             layerSessionManager,
             Layer.mock(EventSink.EventSinkV2)({}),
             McpAppModelContext.layerEmpty,
+            Layer.mock(SharedSkills.SharedSkills)({ promptContext: () => Effect.succeed("") }),
           ),
         ),
       );
@@ -429,6 +431,7 @@ it.effect("steers a running turn with its sender and the thread's MCP app model 
           ),
           layerSessions(sessionId, runtime),
           Layer.mock(EventSink.EventSinkV2)({}),
+          Layer.mock(SharedSkills.SharedSkills)({ promptContext: () => Effect.succeed("") }),
           Layer.mock(McpAppModelContext.McpAppModelContext)({
             forThread: () =>
               Effect.succeed([

@@ -24,6 +24,7 @@ import {
 } from "@t3tools/shared/composerContextReferences";
 import { environmentComposerContext, pullRequestComposerContext } from "../../lib/composerContext";
 import { uuidv4 } from "../../lib/uuid";
+import { useSharedSkills } from "../../state/skills";
 import {
   getComposerDraftSnapshot,
   setComposerDraftContext,
@@ -46,6 +47,7 @@ import {
   getProviderSkillsForSlashMenu,
   getProviderSlashCommandsForSlashMenu,
   isProviderSkillUserInvocable,
+  mergeSharedSkills,
   resolveProviderSkillsForCwd,
   resolveProviderSlashCommandsForCwd,
 } from "@t3tools/client-runtime/providerSkills";
@@ -318,9 +320,11 @@ export function useComposerCommandMenu({
   const setSelection = (next: ComposerEditorSelection) =>
     setLocalSelection({ ownerKey, start: next.start, end: next.end });
 
-  const skills = selectedProviderStatus
-    ? resolveProviderSkillsForCwd(selectedProviderStatus, projectCwd)
-    : [];
+  const sharedSkills = useSharedSkills(environmentId, projectCwd);
+  const skills = mergeSharedSkills(
+    selectedProviderStatus ? resolveProviderSkillsForCwd(selectedProviderStatus, projectCwd) : [],
+    sharedSkills,
+  );
   const selectedProviderInstanceId = selectedProviderStatus?.instanceId;
   const refreshWorkspaceSnapshot = useAtomRefresh(
     environmentId && projectCwd && selectedProviderInstanceId

@@ -117,6 +117,8 @@ const SKILL_SOURCE_SYMBOL_BY_KIND: Record<ProviderSkillSourceKind, AppSymbolName
   project: "folder",
   personal: "person.crop.circle",
   system: "gearshape",
+  "shared-project": "folder",
+  "shared-global": "person.crop.circle",
   other: "cube",
 };
 

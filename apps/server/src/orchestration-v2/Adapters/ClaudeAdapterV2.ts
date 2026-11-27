@@ -14708,14 +14708,15 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
                 existing.openedPermissionMode === currentTurn.queryPolicy.permissionMode)
                 ? steerSelection
                 : undefined;
+            const steerText = applyClaudePromptEffortPrefix(
+              turnInput.message.text,
+              (
+                liveSteerSelection ??
+                compileClaudeModelSelection(currentTurn.input.modelSelection, modelCatalog)
+              ).promptEffort,
+            );
             const steerMessage = yield* makeClaudeUserMessageWithAttachments({
-              text: applyClaudePromptEffortPrefix(
-                turnInput.message.text,
-                (
-                  liveSteerSelection ??
-                  compileClaudeModelSelection(currentTurn.input.modelSelection, modelCatalog)
-                ).promptEffort,
-              ),
+              text: steerText,
               attachments: turnInput.message.attachments,
               // "now" makes Claude Code cancel the tool calls in flight and report them as a user refusal.
               priority: "next",
@@ -14724,6 +14725,14 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
               fileSystem,
               pdfReservation,
               skills: yield* userInvocableSkills(currentTurn.input.runtimePolicy.cwd),
+              // Mentions inside injected skill instructions are not this message's.
+              ...(turnInput.inlineContextLength === undefined
+                ? {}
+                : {
+                    skillMentionsFrom:
+                      steerText.length -
+                      turnInput.message.text.slice(turnInput.inlineContextLength).trimEnd().length,
+                  }),
             }).pipe(
               Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, spawner),
               Effect.provideService(Path.Path, path),

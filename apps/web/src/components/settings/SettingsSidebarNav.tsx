@@ -10,6 +10,7 @@ import {
 import {
   ArchiveIcon,
   FlaskConicalIcon,
+  BookOpenIcon,
   BotIcon,
   createLucideIcon,
   CalendarClockIcon,
@@ -117,6 +118,7 @@ const SETTINGS_SECTION_ICONS: Readonly<
   "/settings/connections": ServerIcon,
   "/settings/access": ShieldCheckIcon,
   "/settings/mcp": PlugIcon,
+  "/settings/skills": BookOpenIcon,
   "/settings/secrets": KeyRoundIcon,
   "/settings/subscriptions": CreditCardIcon,
   "/settings/computer-use": MonitorIcon,

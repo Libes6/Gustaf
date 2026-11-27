@@ -58,7 +58,7 @@ function parseFrontmatterBoolean(value: unknown): boolean | undefined {
   }
 }
 
-function parseSkillFrontmatter(contents: string): SkillFrontmatter {
+export function parseSkillFrontmatter(contents: string): SkillFrontmatter {
   const match = FRONTMATTER_PATTERN.exec(contents);
   if (!match) {
     return { kind: "missing" };
@@ -641,7 +641,7 @@ const discoverPluginSkillRoots = Effect.fn("discoverPluginSkillRoots")(function*
   return roots;
 });
 
-const resolveClaudeConfigDirPath = Effect.fn("resolveClaudeConfigDirPath")(function* (
+export const resolveClaudeConfigDirPath = Effect.fn("resolveClaudeConfigDirPath")(function* (
   config: Pick<ClaudeSettings, "homePath">,
   environment: NodeJS.ProcessEnv,
   cwd?: string,

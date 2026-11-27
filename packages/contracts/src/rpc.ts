@@ -526,6 +526,17 @@ import {
 } from "./sourceControl.ts";
 import { VcsError } from "./vcs.ts";
 import { Project, ProjectMutation, ProjectMutationError } from "./project.ts";
+import {
+  SharedSkillError,
+  SkillsImportInput,
+  SkillsListInput,
+  SkillsListResult,
+  SkillsMutationResult,
+  SkillsReadInput,
+  SkillsReadResult,
+  SkillsRemoveInput,
+  SkillsSetEnabledInput,
+} from "./skills.ts";
 
 export const WS_METHODS = {
   projectsListEntries: "projects.listEntries",
@@ -538,6 +549,12 @@ export const WS_METHODS = {
   projectsEnsureScratch: "projects.ensureScratch",
   projectsCreateNew: "projects.createNew",
   projectsCreateFromThread: "projects.createFromThread",
+
+  skillsList: "skills.list",
+  skillsRead: "skills.read",
+  skillsSetEnabled: "skills.setEnabled",
+  skillsRemove: "skills.remove",
+  skillsImport: "skills.import",
 
   shellOpenInEditor: "shell.openInEditor",
 
@@ -1744,6 +1761,36 @@ const WsProjectsReadFileRpc = Rpc.make(WS_METHODS.projectsReadFile, {
   error: Schema.Union([ProjectReadFileError, EnvironmentAuthorizationError]),
 });
 
+const WsSkillsListRpc = Rpc.make(WS_METHODS.skillsList, {
+  payload: SkillsListInput,
+  success: SkillsListResult,
+  error: Schema.Union([SharedSkillError, EnvironmentAuthorizationError]),
+});
+
+const WsSkillsReadRpc = Rpc.make(WS_METHODS.skillsRead, {
+  payload: SkillsReadInput,
+  success: SkillsReadResult,
+  error: Schema.Union([SharedSkillError, EnvironmentAuthorizationError]),
+});
+
+const WsSkillsSetEnabledRpc = Rpc.make(WS_METHODS.skillsSetEnabled, {
+  payload: SkillsSetEnabledInput,
+  success: SkillsMutationResult,
+  error: Schema.Union([SharedSkillError, EnvironmentAuthorizationError]),
+});
+
+const WsSkillsRemoveRpc = Rpc.make(WS_METHODS.skillsRemove, {
+  payload: SkillsRemoveInput,
+  success: SkillsMutationResult,
+  error: Schema.Union([SharedSkillError, EnvironmentAuthorizationError]),
+});
+
+const WsSkillsImportRpc = Rpc.make(WS_METHODS.skillsImport, {
+  payload: SkillsImportInput,
+  success: SkillsMutationResult,
+  error: Schema.Union([SharedSkillError, EnvironmentAuthorizationError]),
+});
+
 const WsProjectsWriteFileRpc = Rpc.make(WS_METHODS.projectsWriteFile, {
   payload: ProjectWriteFileInput,
   success: ProjectWriteFileResult,
@@ -2852,6 +2899,11 @@ export const WsRpcGroup = RpcGroup.make(
   WsProjectsCreateNewRpc,
   WsProjectsCreateFromThreadRpc,
   WsProjectsWriteFileRpc,
+  WsSkillsListRpc,
+  WsSkillsReadRpc,
+  WsSkillsSetEnabledRpc,
+  WsSkillsRemoveRpc,
+  WsSkillsImportRpc,
   WsProjectsMutateRpc,
   WsShellOpenInEditorRpc,
   WsFilesystemBrowseRpc,

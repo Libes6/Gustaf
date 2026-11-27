@@ -275,6 +275,10 @@
       "types": "./src/state/filesystem.ts",
       "default": "./src/state/filesystem.ts"
     },
+    "./state/skills": {
+      "types": "./src/state/skills.ts",
+      "default": "./src/state/skills.ts"
+    },
     "./state/git": {
       "types": "./src/state/git.ts",
       "default": "./src/state/git.ts"

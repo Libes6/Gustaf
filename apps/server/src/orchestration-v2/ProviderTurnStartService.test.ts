@@ -64,6 +64,7 @@ import { layerNoTaskFolders, layerRealGit } from "./ProviderTurnStartService.tes
 import * as ProjectService from "../project/ProjectService.ts";
 import * as ProjectSetupScriptRunner from "../project/ProjectSetupScriptRunner.ts";
 import * as ProviderAuthService from "../provider/ProviderAuthService.ts";
+import * as SharedSkills from "../skills/SharedSkills.ts";
 import * as ServerSettings from "../serverSettings.ts";
 import * as ContextHandoffService from "./ContextHandoffService.ts";
 import { withInlineContext } from "./ContextHandoffDelivery.ts";
@@ -238,6 +239,7 @@ function startWithMissingWorktree(
           tryHandlePromptCommand: () => Effect.succeed(false),
         }),
         Layer.mock(RunExecutionService.RunExecutionServiceV2)({ startRootRun }),
+        Layer.mock(SharedSkills.SharedSkills)({ promptContext: () => Effect.succeed("") }),
         Layer.mock(RuntimePolicy.RuntimePolicyV2)({}),
       ),
     ),
@@ -1432,6 +1434,7 @@ function makeLocalCommandHarness(input: {
             ),
         }),
         Layer.mock(ProviderAuthService.ProviderAuthService)({ tryHandlePromptCommand }),
+        Layer.mock(SharedSkills.SharedSkills)({ promptContext: () => Effect.succeed("") }),
         Layer.mock(RunExecutionService.RunExecutionServiceV2)({
           startRootRun,
           forkBaseline: () => Effect.succeed(Effect.void),
