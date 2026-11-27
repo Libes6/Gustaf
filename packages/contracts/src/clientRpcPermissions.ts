@@ -91,6 +91,10 @@ export const CLIENT_GUARDED_RPC_SCOPES = {
   [WS_METHODS.scheduledTasksRotateWebhookToken]: AuthOrchestrationOperateScope,
   [WS_METHODS.subscriptionsUpsert]: AuthSettingsWriteScope,
   [WS_METHODS.subscriptionsDelete]: AuthSettingsWriteScope,
+  [WS_METHODS.memoryWrite]: AuthSettingsWriteScope,
+  [WS_METHODS.memoryClear]: AuthSettingsWriteScope,
+  [WS_METHODS.memoryListImportableFromClaude]: AuthSettingsWriteScope,
+  [WS_METHODS.memoryImportFromClaude]: AuthSettingsWriteScope,
   [ORCHESTRATION_V2_WS_METHODS.stopWorkflow]: AuthOrchestrationOperateScope,
   // An answer, a resume and a cancel each decide what a run's agents do next.
   [WS_METHODS.workflowsAnswer]: AuthOrchestrationOperateScope,

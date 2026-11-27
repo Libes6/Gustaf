@@ -1672,6 +1672,10 @@ export function createServerEnvironmentAtoms<R, E>(
       label: "environment-data:server:subscriptions",
       tag: WS_METHODS.subscriptionsList,
     }),
+    memoryNote: createEnvironmentRpcQueryAtomFamily(runtime, {
+      label: "environment-data:server:memory:read",
+      tag: WS_METHODS.memoryRead,
+    }),
     // A cold transcript scan is measured in seconds, so keep the result around
     // long enough that switching windows or re-rendering does not rescan. With
     // nothing to show yet, the server's last scan answers first, then a plain
@@ -1971,6 +1975,22 @@ export function createServerEnvironmentAtoms<R, E>(
     deleteSubscription: createEnvironmentRpcCommand(runtime, {
       label: "environment-data:server:subscription:delete",
       tag: WS_METHODS.subscriptionsDelete,
+    }),
+    writeMemoryNote: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:server:memory:write",
+      tag: WS_METHODS.memoryWrite,
+    }),
+    clearMemoryNote: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:server:memory:clear",
+      tag: WS_METHODS.memoryClear,
+    }),
+    listImportableMemoryFromClaude: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:server:memory:list-importable-claude",
+      tag: WS_METHODS.memoryListImportableFromClaude,
+    }),
+    importMemoryFromClaude: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:server:memory:import-claude",
+      tag: WS_METHODS.memoryImportFromClaude,
     }),
     // Deliberately not on the config lane: run-now blocks until the run is
     // dispatched, and a slow run must not stall settings/keybinding/provider

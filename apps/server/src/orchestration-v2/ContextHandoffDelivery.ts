@@ -1,4 +1,5 @@
 import type {
+  MemoryNote,
   OrchestrationV2ContextHandoff,
   OrchestrationV2ProviderThread,
 } from "@t3tools/contracts";
@@ -7,6 +8,7 @@ import { ContextHandoffBudgetError } from "@t3tools/provider-core/server/failure
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import {
+  estimateTextTokens,
   historyCost,
   renderHistory,
   selectHistory,
@@ -178,4 +180,86 @@ export class ContextHandoffDeliveryUncertainError extends Schema.TaggedError<Con
   override get message() {
     return "Historical context delivery is uncertain; replace the native thread before retrying.";
   }
+}
+
+export interface MemoryDeliveryState {
+  readonly globalRevision: number;
+  readonly projectRevision: number;
+}
+
+export interface MemoryInlineDeliveryResult {
+  readonly context: string;
+  readonly nextDelivered: MemoryDeliveryState | null;
+}
+
+const MEMORY_MIN_BUDGET_TOKENS = 64;
+const MEMORY_TRUNCATION_SUFFIX = "\n…(truncated to fit context budget)";
+
+/**
+ * Formats user/project Gustaf Memory notes for inline delivery into a provider turn.
+ * Delivers on the first eligible turn of a native session and whenever either note's revision
+ * changes. Deferred on slash-command or compaction turns; cleared notes stop future delivery.
+ */
+export function buildMemoryInlineContext(input: {
+  readonly global: Pick<MemoryNote, "content" | "revision">;
+  readonly project: Pick<MemoryNote, "content" | "revision"> | null;
+  readonly delivered?: MemoryDeliveryState;
+  readonly budgetTokens?: number;
+  readonly deferInline?: boolean;
+}): MemoryInlineDeliveryResult {
+  if (input.deferInline === true) {
+    return { context: "", nextDelivered: null };
+  }
+  const nextDelivered: MemoryDeliveryState = {
+    globalRevision: input.global.revision,
+    projectRevision: input.project?.revision ?? 0,
+  };
+  const globalText = input.global.content.trim();
+  const projectText = input.project?.content.trim() ?? "";
+
+  const includeGlobal =
+    globalText !== "" &&
+    (input.delivered === undefined || input.delivered.globalRevision !== input.global.revision);
+  const includeProject =
+    projectText !== "" &&
+    (input.delivered === undefined ||
+      input.delivered.projectRevision !== (input.project?.revision ?? 0));
+
+  if (!includeGlobal && !includeProject) {
+    return { context: "", nextDelivered };
+  }
+
+  const header =
+    input.delivered === undefined
+      ? "Gustaf Memory (user-maintained preferences and project notes; follow unless overridden by the user):"
+      : "Gustaf Memory update (the user updated their memory notes since your last turn):";
+  const sections = [
+    ...(includeGlobal ? [`[Global memory]\n${globalText}`] : []),
+    ...(includeProject ? [`[Project memory]\n${projectText}`] : []),
+  ];
+  let rendered = `${header}\n\n${sections.join("\n\n")}`;
+
+  if (input.budgetTokens !== undefined) {
+    if (input.budgetTokens < MEMORY_MIN_BUDGET_TOKENS) {
+      return { context: "", nextDelivered: null };
+    }
+    if (estimateTextTokens(rendered) > input.budgetTokens) {
+      const headerTokens = estimateTextTokens(`${header}\n\n${MEMORY_TRUNCATION_SUFFIX}`);
+      if (headerTokens >= input.budgetTokens) {
+        return { context: "", nextDelivered: null };
+      }
+      const body = sections.join("\n\n");
+      let maxChars = Math.min(body.length, Math.max(0, (input.budgetTokens - headerTokens) * 4));
+      rendered = `${header}\n\n${body.slice(0, maxChars).trimEnd()}${MEMORY_TRUNCATION_SUFFIX}`;
+      while (maxChars > 0 && estimateTextTokens(rendered) > input.budgetTokens) {
+        maxChars = Math.floor(maxChars * 0.8);
+        rendered = `${header}\n\n${body.slice(0, maxChars).trimEnd()}${MEMORY_TRUNCATION_SUFFIX}`;
+      }
+      if (maxChars <= 0 || estimateTextTokens(rendered) > input.budgetTokens) {
+        return { context: "", nextDelivered: null };
+      }
+    }
+  }
+
+  return { context: rendered, nextDelivered };
 }

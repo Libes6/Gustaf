@@ -13342,5 +13342,89 @@
   "27d76249d09eb69f": "Guide de revue prêt",
   "faa3bb26abb39c93": "Échec du guide de revue",
   "b7df38b7d8792d78": "Ouvrir le guide",
-  "9e91e9a77b664e4e": "Impossible de démarrer un guide de revue"
+  "9e91e9a77b664e4e": "Impossible de démarrer un guide de revue",
+  "40bd7e42e5d342a8": "{count, plural, one {Saved {count} memory note} other {Saved {count} memory notes}}",
+  "7951c1a22edd1d89": "{count, plural, one {Tried to save {count} memory note} other {Tried to save {count} memory notes}}",
+  "c7271e3b222d5b51": "Memory restored",
+  "efa4b3011d654c48": "Could not undo memory update",
+  "d9bf6002a1bb694a": "Saved to project memory",
+  "2230a497c30ff3d6": "Saved to global memory",
+  "f3be6c3191bd25e8": "Replaced",
+  "3d50fd344fdeadfa": "Appended",
+  "18125122c20c5a92": [
+    "rev ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "eb2762ced90b31fa": "Undone",
+  "f510356291976f4f": "Undo",
+  "341c5c730ba00bd5": "≈ {tokens} tokens if the provider does not defer loading; ≈ {all} for {names}, which cannot switch off tools",
+  "894f0c2cfbda47be": "{names} cannot switch off single tools and will get all of them.",
+  "d99f72f9adae3158": "Connect an environment to manage memory notes.",
+  "50d9683c8b6c152d": "Global memory",
+  "1bf2cec4ae444733": "Personal preferences and conventions shared across all projects in this environment.",
+  "c6aaa396f0ed7ab6": "Add personal preferences, preferred tools, or conventions to share across providers...",
+  "f4a5247454425eb4": "Project memory",
+  "212b3d2e6b623994": "Add project decisions, test commands, or pitfalls that every provider should know...",
+  "5c95782da4ac869a": "Memory saved",
+  "5b69d2ed450f0099": "Could not save memory",
+  "e588b5799d474125": "Memory cleared",
+  "b88bf1574779e1e7": "Could not clear memory",
+  "ad39a0807757d23c": "Imported memory from Claude Code",
+  "528a4534d89423b0": "Could not import memory from Claude Code",
+  "6e8915d6db1ee13c": "Append to note",
+  "af2b6a224cd5ff76": "Replace note",
+  "38fdedc06880ca46": "Memory notes travel across every provider in this environment (Claude, Codex, Antigravity, Cursor). Clearing a note stops future delivery; an already-open native session may still retain earlier text until a new session starts.",
+  "1ddc323c25b24f19": "Add a project to this environment to store project-specific memory.",
+  "9d9dd34c7f56e516": [
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " / ",
+    {
+      "i": 2,
+      "k": "_gt_value_2",
+      "v": "v"
+    },
+    " chars"
+  ],
+  "6ca656cedd4e275b": "Import from Claude Code",
+  "4f113bb0bc732b3d": "Clear",
+  "4c9130c76b6efd5e": [
+    "Imported entries: ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "f6bcf141cfcdbb68": "Import memory from Claude Code",
+  "7dad46e39cdb78c3": "Select Claude Code memory files to copy into this project note.",
+  "a33b8ea89c6f4f9f": "Select Claude Code memory files to copy into your global memory note.",
+  "5e562550484212ee": "Scanning Claude Code memory files...",
+  "4f4378b888fdfc47": "No Claude Code memory files were found in this environment.",
+  "b06a481e2d075e48": "Import mode",
+  "9734be567772038c": [
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " chars"
+  ],
+  "3a37a5acd84c48d2": [
+    "Import (",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    ")"
+  ],
+  "6493b4a1a09ce7f5": "memory notes global project claude import remember"
 }

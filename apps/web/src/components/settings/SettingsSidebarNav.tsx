@@ -9,6 +9,7 @@ import {
 } from "react";
 import {
   ArchiveIcon,
+  BrainIcon,
   FlaskConicalIcon,
   BookOpenIcon,
   BotIcon,
@@ -119,6 +120,7 @@ const SETTINGS_SECTION_ICONS: Readonly<
   "/settings/access": ShieldCheckIcon,
   "/settings/mcp": PlugIcon,
   "/settings/skills": BookOpenIcon,
+  "/settings/memory": BrainIcon,
   "/settings/secrets": KeyRoundIcon,
   "/settings/subscriptions": CreditCardIcon,
   "/settings/computer-use": MonitorIcon,

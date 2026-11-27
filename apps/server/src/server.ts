@@ -70,6 +70,7 @@ import * as PullRequestFilesViewed from "./persistence/PullRequestFilesViewed.ts
 import * as PullRequestReviewGuides from "./persistence/PullRequestReviewGuides.ts";
 import * as PullRequestReviewGuideService from "./pullRequest/PullRequestReviewGuideService.ts";
 import * as SubscriptionService from "./subscriptions/SubscriptionService.ts";
+import * as MemoryService from "./memory/MemoryService.ts";
 import * as ServerLifecycleEvents from "./serverLifecycleEvents.ts";
 import * as AnalyticsService from "./telemetry/AnalyticsService.ts";
 import * as DelegatedTaskAnalytics from "./telemetry/DelegatedTaskAnalytics.ts";
@@ -681,6 +682,7 @@ const layerOrchestrationV2Runtime = RuntimeLayer.layerProduction.pipe(
   ),
   Layer.provide(layerCheckpointStore),
   Layer.provide(layerGitWorkflow),
+  Layer.provide(MemoryService.layer),
   Layer.provide(
     RunFinalizationService.layerObserver.pipe(
       Layer.provide(ProjectionStoreV2.layer),
@@ -983,6 +985,8 @@ const layerMakeRoutes = Layer.mergeAll(
   ),
   // Settings (WebSocket) and agents (/mcp) read the same list.
   Layer.provide(SubscriptionService.layer),
+  // Settings (WebSocket), turns (inline delivery), and agents (/mcp) share memory notes.
+  Layer.provide(MemoryService.layer),
   // delegate_task to a linked environment, from /mcp and the follower above.
   Layer.provide(RemoteDelegation.layer.pipe(Layer.provide(ProjectionStoreV2.layer))),
   // Links agents ask for: shown in a thread from /mcp, answered over WebSocket.

@@ -901,6 +901,23 @@ export function summarizeT3ToolCalls(
           );
       break;
     }
+    case "memory-save": {
+      const count = selected.length;
+      label = done
+        ? resolve(
+            msg(
+              "{count, plural, one {Saved {count} memory note} other {Saved {count} memory notes}}",
+              { count },
+            ),
+          )
+        : resolve(
+            msg(
+              "{count, plural, one {Tried to save {count} memory note} other {Tried to save {count} memory notes}}",
+              { count },
+            ),
+          );
+      break;
+    }
     case "thread-list": {
       const count = selected.length;
       label = done

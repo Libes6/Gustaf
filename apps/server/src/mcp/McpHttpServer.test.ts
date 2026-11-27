@@ -53,6 +53,7 @@ import * as GitManager from "../git/GitManager.ts";
 import * as PullRequestReviewGuideService from "../pullRequest/PullRequestReviewGuideService.ts";
 import * as PullRequestService from "../pullRequest/PullRequestService.ts";
 import * as SubscriptionService from "../subscriptions/SubscriptionService.ts";
+import * as MemoryService from "../memory/MemoryService.ts";
 import * as ServerConfig from "../config.ts";
 import * as ServerHttp from "../http.ts";
 import * as ServerSettings from "../serverSettings.ts";
@@ -1936,6 +1937,7 @@ it.effect(
               }),
               Layer.mock(GitManager.GitManager)({}),
               Layer.mock(SubscriptionService.SubscriptionService)({}),
+              Layer.mock(MemoryService.MemoryService)({}),
               // The desktop gave this server its executor, so /mcp offers the Mac.
               Layer.mock(ComputerUseService.ComputerUseService)({ available: true }),
               Layer.mock(Orchestrator.OrchestratorV2)({}),

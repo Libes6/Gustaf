@@ -46,6 +46,17 @@ import {
 } from "./providerSetup.ts";
 import * as Schema from "effect/Schema";
 import * as Rpc from "effect/rpc/Rpc";
+import {
+  MemoryClearInput,
+  MemoryError,
+  MemoryImportFromClaudeInput,
+  MemoryImportFromClaudeResult,
+  MemoryListImportableFromClaudeInput,
+  MemoryListImportableFromClaudeResult,
+  MemoryNote,
+  MemoryReadInput,
+  MemoryWriteInput,
+} from "./memory.ts";
 import { WorktreeInventoryInput, WorktreeInventoryResult } from "./worktreeInventory.ts";
 import * as RpcGroup from "effect/rpc/RpcGroup";
 import * as RpcMiddleware from "effect/rpc/RpcMiddleware";
@@ -743,6 +754,12 @@ export const WS_METHODS = {
   subscriptionsList: "subscriptions.list",
   subscriptionsUpsert: "subscriptions.upsert",
   subscriptionsDelete: "subscriptions.delete",
+
+  memoryRead: "memory.read",
+  memoryWrite: "memory.write",
+  memoryClear: "memory.clear",
+  memoryListImportableFromClaude: "memory.listImportableFromClaude",
+  memoryImportFromClaude: "memory.importFromClaude",
 
   cloudGetRelayClientStatus: "cloud.getRelayClientStatus",
   cloudInstallRelayClient: "cloud.installRelayClient",
@@ -2639,6 +2656,36 @@ const WsSubscriptionsUpsertRpc = Rpc.make(WS_METHODS.subscriptionsUpsert, {
   error: Schema.Union([SubscriptionError, EnvironmentAuthorizationError]),
 });
 
+const WsMemoryReadRpc = Rpc.make(WS_METHODS.memoryRead, {
+  payload: MemoryReadInput,
+  success: MemoryNote,
+  error: Schema.Union([MemoryError, EnvironmentAuthorizationError]),
+});
+
+const WsMemoryWriteRpc = Rpc.make(WS_METHODS.memoryWrite, {
+  payload: MemoryWriteInput,
+  success: MemoryNote,
+  error: Schema.Union([MemoryError, EnvironmentAuthorizationError]),
+});
+
+const WsMemoryClearRpc = Rpc.make(WS_METHODS.memoryClear, {
+  payload: MemoryClearInput,
+  success: MemoryNote,
+  error: Schema.Union([MemoryError, EnvironmentAuthorizationError]),
+});
+
+const WsMemoryListImportableFromClaudeRpc = Rpc.make(WS_METHODS.memoryListImportableFromClaude, {
+  payload: MemoryListImportableFromClaudeInput,
+  success: MemoryListImportableFromClaudeResult,
+  error: Schema.Union([MemoryError, EnvironmentAuthorizationError]),
+});
+
+const WsMemoryImportFromClaudeRpc = Rpc.make(WS_METHODS.memoryImportFromClaude, {
+  payload: MemoryImportFromClaudeInput,
+  success: MemoryImportFromClaudeResult,
+  error: Schema.Union([MemoryError, EnvironmentAuthorizationError]),
+});
+
 const WsSubscriptionsDeleteRpc = Rpc.make(WS_METHODS.subscriptionsDelete, {
   payload: SubscriptionDeleteInput,
   error: Schema.Union([SubscriptionError, EnvironmentAuthorizationError]),
@@ -3018,4 +3065,9 @@ export const WsRpcGroup = RpcGroup.make(
   WsOrchestrationV2SubscribeThreadRpc,
   WsOrchestrationV2SubscribeCommandOutputRpc,
   WsOrchestrationV2SubscribePromptSuggestionRpc,
+  WsMemoryReadRpc,
+  WsMemoryWriteRpc,
+  WsMemoryClearRpc,
+  WsMemoryListImportableFromClaudeRpc,
+  WsMemoryImportFromClaudeRpc,
 ).middleware(RpcScopeAuthorization);
