@@ -59,6 +59,7 @@ export interface ServerDerivedPaths {
   readonly environmentIdPath: string;
   readonly serverRuntimeStatePath: string;
   readonly secretsDir: string;
+  readonly memoryDir: string;
 }
 
 export interface DeriveServerPathsOptions {
@@ -182,6 +183,7 @@ export const deriveServerPaths = Effect.fn(function* (
     environmentIdPath: join(stateDir, "environment-id"),
     serverRuntimeStatePath: join(stateDir, "server-runtime.json"),
     secretsDir: join(stateDir, "secrets"),
+    memoryDir: join(stateDir, "memory"),
   };
 });
 

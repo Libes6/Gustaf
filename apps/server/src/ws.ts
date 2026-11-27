@@ -140,6 +140,7 @@ import * as ThreadMessageIntake from "./orchestration-v2/ThreadMessageIntake.ts"
 import * as DocumentText from "./provider/DocumentText.ts";
 import * as ScheduledTasks from "./scheduledTasks/ScheduledTaskService.ts";
 import * as SubscriptionService from "./subscriptions/SubscriptionService.ts";
+import * as MemoryService from "./memory/MemoryService.ts";
 import * as Workflows from "./workflows/Workflows.ts";
 import * as WorkflowRuntime from "./workflows/WorkflowRuntime.ts";
 import * as SecretRequests from "./secrets/SecretRequests.ts";
@@ -1518,6 +1519,7 @@ export const layerWsRpc = (
       const providerSessionManager = yield* ProviderSessionManager.ProviderSessionManagerV2;
       const scheduledTasks = yield* ScheduledTasks.ScheduledTaskService;
       const subscriptions = yield* SubscriptionService.SubscriptionService;
+      const memory = yield* MemoryService.MemoryService;
       const workflows = yield* Workflows.Workflows;
       const workflowDefinitions = yield* WorkflowRuntime.WorkflowDefinitions;
       // The service's messages are built from its own attributes, so they are safe to send.
@@ -2470,6 +2472,11 @@ export const layerWsRpc = (
           Effect.annotateCurrentSpan({ "subscription.id": input.id }).pipe(
             Effect.andThen(subscriptions.delete(input)),
           ),
+        [WS_METHODS.memoryRead]: (input) => memory.read(input),
+        [WS_METHODS.memoryWrite]: (input) => memory.write(input),
+        [WS_METHODS.memoryClear]: (input) => memory.clear(input),
+        [WS_METHODS.memoryListImportableFromClaude]: (_input) => memory.listImportableFromClaude(),
+        [WS_METHODS.memoryImportFromClaude]: (input) => memory.importFromClaude(input),
         [WS_METHODS.serverProbe]: (_input) =>
           Effect.map(DateTime.now, (now) => ({ serverTime: DateTime.formatIso(now) })),
         [WS_METHODS.serverGetConfig]: (_input) =>
@@ -3815,6 +3822,7 @@ export const layer = Layer.unwrap(
     const issueTrackers = yield* IssueTrackerConnections.IssueTrackerConnections;
     const reviewGuides = yield* PullRequestReviewGuideService.PullRequestReviewGuideService;
     const subscriptions = yield* SubscriptionService.SubscriptionService;
+    const memory = yield* MemoryService.MemoryService;
     const peerLinks = yield* PeerLinks.PeerLinks;
     const peerLinkRequests = yield* PeerLinkRequests.PeerLinkRequests;
     const peerThreadRelay = yield* PeerThreadRelay.PeerThreadRelay;
@@ -3924,6 +3932,7 @@ export const layer = Layer.unwrap(
                 ),
               ),
               Layer.provide(Layer.succeed(SubscriptionService.SubscriptionService, subscriptions)),
+              Layer.provide(Layer.succeed(MemoryService.MemoryService, memory)),
               Layer.provide(Layer.succeed(PeerLinks.PeerLinks, peerLinks)),
               Layer.provide(Layer.succeed(PeerLinkRequests.PeerLinkRequests, peerLinkRequests)),
               Layer.provide(Layer.succeed(PeerThreadRelay.PeerThreadRelay, peerThreadRelay)),

@@ -26,7 +26,9 @@ import type { McpAppReference } from "@t3tools/shared/mcpApp";
 import {
   htmlRenderFromToolItem,
   mcpAppFromToolItem,
+  memorySaveFromToolItem,
   sentMessageFromToolItem,
+  type MemorySaveReference,
 } from "@t3tools/shared/toolOutput";
 import {
   contextCompactionLabel,
@@ -132,6 +134,13 @@ export type TimelineEntry = (
       readonly createdAt: string;
       readonly runId: RunId | null;
       readonly text: string;
+    }
+  | {
+      readonly id: string;
+      readonly kind: "memory-save";
+      readonly createdAt: string;
+      readonly runId: RunId | null;
+      readonly memorySave: MemorySaveReference;
     }
   | {
       readonly id: string;
@@ -720,6 +729,22 @@ export function deriveTimelineEntriesFromVisibleTurnItems(
         createdAt,
         runId: item.runId,
         text: sentMessage,
+        ...attemptMetadata,
+      });
+      continue;
+    }
+
+    const memorySave =
+      item.type === "dynamic_tool" && item.status === "completed"
+        ? memorySaveFromToolItem(item)
+        : undefined;
+    if (memorySave !== undefined) {
+      entries.push({
+        id: item.id,
+        kind: "memory-save",
+        createdAt,
+        runId: item.runId,
+        memorySave,
         ...attemptMetadata,
       });
       continue;

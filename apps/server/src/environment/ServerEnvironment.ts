@@ -232,6 +232,7 @@ export const make = Effect.gen(function* () {
       linkedThreadRefreshes: true,
       issueLinkedThreads: true,
       issueTrackerAccounts: true,
+      memory: true,
       sideChats: true,
       vcsBranchStatus: true,
       inlineMessageContext: true,

@@ -1,6 +1,9 @@
 import {
   isProviderSendTurnSupportedImageMimeType,
+  MEMORY_MAX_CHARS,
   PROVIDER_SEND_TURN_MAX_IMAGE_BYTES,
+  type MemorySaveAction,
+  type MemoryScope,
 } from "@t3tools/contracts";
 import * as Predicate from "effect/Predicate";
 
@@ -20,6 +23,17 @@ import { resolveT3McpToolId } from "./t3McpToolPresentation.ts";
 export const SEND_TO_USER_TOOL_NAME = "send_to_user";
 // 4,000 UTF-16 units stay inside MAX_PARSED_BYTES even as 3-byte characters.
 export const SEND_TO_USER_MAX_LENGTH = 4_000;
+export const MEMORY_SAVE_TOOL_NAME = "memory_save";
+
+export interface MemorySaveReference {
+  readonly scope: MemoryScope;
+  readonly projectId: string | null;
+  readonly action: MemorySaveAction;
+  readonly entry: string;
+  readonly previousContent: string;
+  readonly previousRevision: number;
+  readonly revision: number;
+}
 
 const MAX_PARSED_BYTES = 16_384;
 const MAX_METADATA_BYTES = 8_192;
@@ -238,6 +252,73 @@ export function sentMessageFromToolItem(item: {
   return output?.isError ? undefined : output?.sentMessage;
 }
 
+function readMemorySaveRecord(raw: unknown): MemorySaveReference | undefined {
+  if (!Predicate.isObject(raw)) return undefined;
+  const candidate = Predicate.isObject(raw.memorySave) ? raw.memorySave : raw;
+  const scope = candidate.scope;
+  const action = candidate.action;
+  if (
+    (scope !== "global" && scope !== "project") ||
+    (action !== "append" && action !== "replace")
+  ) {
+    return undefined;
+  }
+  const projectId =
+    candidate.projectId === null || candidate.projectId === undefined
+      ? null
+      : typeof candidate.projectId === "string" && candidate.projectId.trim() !== ""
+        ? candidate.projectId
+        : undefined;
+  if (projectId === undefined) return undefined;
+  if (
+    typeof candidate.entry !== "string" ||
+    candidate.entry.length > MEMORY_MAX_CHARS ||
+    typeof candidate.previousContent !== "string" ||
+    candidate.previousContent.length > MEMORY_MAX_CHARS ||
+    typeof candidate.revision !== "number" ||
+    !Number.isSafeInteger(candidate.revision) ||
+    candidate.revision < 0
+  ) {
+    return undefined;
+  }
+  const previousRevision =
+    typeof candidate.previousRevision === "number" &&
+    Number.isSafeInteger(candidate.previousRevision) &&
+    candidate.previousRevision >= 0
+      ? candidate.previousRevision
+      : Math.max(0, candidate.revision - 1);
+  return {
+    scope,
+    projectId,
+    action,
+    entry: candidate.entry,
+    previousContent: candidate.previousContent,
+    previousRevision,
+    revision: candidate.revision,
+  };
+}
+
+/** Structured result of `memory_save` for rendering an Undo/Edit card in the chat timeline. */
+export function memorySaveFromToolItem(item: {
+  readonly toolName: string | null | undefined;
+  readonly output?: unknown;
+}): MemorySaveReference | undefined {
+  if (
+    item.toolName !== OPENCODE_CODE_MODE_TOOL_NAME &&
+    resolveT3McpToolId(item.toolName) !== MEMORY_SAVE_TOOL_NAME
+  ) {
+    return undefined;
+  }
+  const budget: ResultReadBudget = {
+    remainingBytes: 48_000,
+    remainingNodes: MAX_ENVELOPE_NODES,
+    exceeded: false,
+  };
+  const result = readResult(item.output, budget);
+  if (result.failed || budget.exceeded) return undefined;
+  return readMemorySaveRecord(result.data);
+}
+
 /** The thread-owned file `preview_recording_stop` stored for the agent. */
 export function previewRecordingIdFromToolItem(item: {
   readonly toolName: string | null | undefined;
@@ -268,6 +349,12 @@ export function compactT3McpToolOutput(
     const recordingId = previewRecordingIdFromToolItem({ toolName: resolved, output: value });
     if (recordingId !== undefined) {
       return { ...compact, id: recordingId };
+    }
+  }
+  if (resolved === MEMORY_SAVE_TOOL_NAME && !compact?.isError) {
+    const memorySave = memorySaveFromToolItem({ toolName: resolved, output: value });
+    if (memorySave !== undefined) {
+      return { ...compact, memorySave };
     }
   }
   return compact === undefined ? undefined : { ...compact };

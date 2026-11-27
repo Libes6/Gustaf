@@ -41,6 +41,7 @@ import {
 } from "./Adapters/ClaudeAdapterV2.ts";
 import { withTurnStartReservation, withWorkspaceLease } from "../workspace/workspaceLease.ts";
 import * as GitWorkflowService from "../git/GitWorkflowService.ts";
+import * as MemoryService from "../memory/MemoryService.ts";
 import * as ProjectService from "../project/ProjectService.ts";
 import * as ProjectSetupScriptRunner from "../project/ProjectSetupScriptRunner.ts";
 import * as ProviderAuthService from "../provider/ProviderAuthService.ts";
@@ -66,9 +67,11 @@ import {
   latestNativeContextUsage,
 } from "@t3tools/provider-core/server/handoffBudget";
 import {
+  buildMemoryInlineContext,
   deliverContextHandoffs,
   isSlashCommandMessage,
   withInlineContext,
+  type MemoryDeliveryState,
 } from "./ContextHandoffDelivery.ts";
 import { isProviderCommand, outputInstructions } from "./runOutput.ts";
 import * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
@@ -324,6 +327,17 @@ export const layer: Layer.Layer<
     const restoreMissingWorktree = yield* makeRestoreMissingWorktree;
     const worktreeRestore = yield* ThreadWorktreeRestore;
     const turnItemPositions = yield* TurnItemPositionStore.TurnItemPositionStoreV2;
+    const memoryService = yield* Effect.serviceOption(MemoryService.MemoryService);
+    const deliveredMemoryByNativeSession = new Map<string, MemoryDeliveryState>();
+    const MAX_TRACKED_MEMORY_SESSIONS = 512;
+    const recordDeliveredMemory = (sessionKey: string, state: MemoryDeliveryState) => {
+      deliveredMemoryByNativeSession.delete(sessionKey);
+      deliveredMemoryByNativeSession.set(sessionKey, state);
+      if (deliveredMemoryByNativeSession.size > MAX_TRACKED_MEMORY_SESSIONS) {
+        const oldest = deliveredMemoryByNativeSession.keys().next().value;
+        if (oldest !== undefined) deliveredMemoryByNativeSession.delete(oldest);
+      }
+    };
 
     // Build draining callbacks outside startup scope so they cannot retain full thread history.
     const makeRunControls = (input: {
@@ -2202,7 +2216,62 @@ export const layer: Layer.Layer<
             ),
             ...(sideChatContext === "" || sideChatHandoff === undefined ? [] : [sideChatHandoff]),
           ];
-          const context = [delivery.context, sideChatContext, restartNote]
+          const baseContextParts = [delivery.context, sideChatContext, restartNote].filter(
+            (part) => part !== "",
+          );
+          const memorySessionKey =
+            runningProviderThread.nativeThreadRef?.nativeId ?? runningProviderThread.id;
+          const memoryDelivery = Option.isSome(memoryService)
+            ? yield* memoryService.value
+                .readBundle({ projectId: projection.thread.projectId })
+                .pipe(
+                  Effect.flatMap((bundle) => {
+                    const hasAnyContent =
+                      bundle.global.content.trim() !== "" ||
+                      (bundle.project?.content.trim() ?? "") !== "";
+                    if (!hasAnyContent) {
+                      return Effect.succeed(
+                        buildMemoryInlineContext({
+                          global: bundle.global,
+                          project: bundle.project,
+                          delivered: deliveredMemoryByNativeSession.get(memorySessionKey),
+                          deferInline: compact || slashCommand,
+                        }),
+                      );
+                    }
+                    const baseContextTokens = baseContextParts.reduce(
+                      (sum, part) => sum + estimateTextTokens(part),
+                      0,
+                    );
+                    return (
+                      typeof budget === "number"
+                        ? Effect.succeed(budget)
+                        : budget.pipe(Effect.orElseSucceed(() => DEFAULT_HANDOFF_TOKEN_CAP))
+                    ).pipe(
+                      Effect.map((totalBudget) =>
+                        buildMemoryInlineContext({
+                          global: bundle.global,
+                          project: bundle.project,
+                          delivered: deliveredMemoryByNativeSession.get(memorySessionKey),
+                          budgetTokens: Math.max(0, totalBudget - baseContextTokens),
+                          deferInline: compact || slashCommand,
+                        }),
+                      ),
+                    );
+                  }),
+                  Effect.catchCause(() =>
+                    Effect.logWarning("Failed to read Gustaf Memory for turn start", {
+                      runId: run.id,
+                    }).pipe(
+                      Effect.as({
+                        context: "",
+                        nextDelivered: null as MemoryDeliveryState | null,
+                      }),
+                    ),
+                  ),
+                )
+            : { context: "", nextDelivered: null as MemoryDeliveryState | null };
+          const context = [memoryDelivery.context, ...baseContextParts]
             .filter((part) => part !== "")
             .join("\n\n");
           const { restartContinuationOfRunId: _resumedRunId, ...promptedInput } = turnInput;
@@ -2262,6 +2331,9 @@ export const layer: Layer.Layer<
           yield* inlineDeliveryLock.withPermits(1)(
             Effect.gen(function* () {
               if (promptDroppedOnTerminal) return;
+              if (memoryDelivery.nextDelivered !== null) {
+                recordDeliveredMemory(memorySessionKey, memoryDelivery.nextDelivered);
+              }
               // After provider acceptance, failed delivery bookkeeping must not stop live ingestion.
               const nativeThreadId = runningProviderThread.nativeThreadRef?.nativeId;
               yield* Effect.forEach(

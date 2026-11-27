@@ -1,4 +1,5 @@
 import * as DateTime from "effect/DateTime";
+import type { MemorySaveReference } from "@t3tools/shared/toolOutput";
 import { msg } from "gt-react";
 import { worktreeSetupAgentStarted } from "@t3tools/client-runtime/worktree-setup";
 import { resolveUserMessagePresentation } from "@t3tools/client-runtime/user-message";
@@ -90,7 +91,12 @@ export function timelineEntryRunId(entry: TimelineEntry): RunId | null {
   if (entry.kind === "proposed-plan") {
     return entry.proposedPlan.runId;
   }
-  if (entry.kind === "html-render" || entry.kind === "mcp-app" || entry.kind === "sent-message") {
+  if (
+    entry.kind === "html-render" ||
+    entry.kind === "mcp-app" ||
+    entry.kind === "sent-message" ||
+    entry.kind === "memory-save"
+  ) {
     return entry.runId;
   }
   return entry.kind === "work" ? (entry.entry.runId ?? null) : null;
@@ -683,6 +689,12 @@ type MessagesTimelineRowContent =
       text: string;
     }
   | {
+      kind: "memory-save";
+      id: string;
+      createdAt: string;
+      memorySave: MemorySaveReference;
+    }
+  | {
       kind: "mcp-app";
       id: string;
       createdAt: string;
@@ -866,6 +878,7 @@ function deriveSupersededAttemptFolds(
       entry.kind === "html-render" ||
       entry.kind === "mcp-app" ||
       entry.kind === "sent-message" ||
+      entry.kind === "memory-save" ||
       timelineEntryIsPersistentResourceCard(entry) ||
       liveSubagentEntryIds.has(entry.id) ||
       (entry.kind === "work" && entry.entry.itemType === "system_notice")
@@ -2243,6 +2256,16 @@ export function deriveMessagesTimelineRows(
       continue;
     }
 
+    if (timelineEntry.kind === "memory-save") {
+      nextRows.push({
+        kind: "memory-save",
+        id: timelineEntry.id,
+        createdAt: timelineEntry.createdAt,
+        memorySave: timelineEntry.memorySave,
+      });
+      continue;
+    }
+
     if (timelineEntry.kind === "mcp-app") {
       nextRows.push({
         kind: "mcp-app",
@@ -2853,6 +2876,19 @@ function isRowUnchanged(a: MessagesTimelineRow, b: MessagesTimelineRow): boolean
     case "sent-message": {
       const bs = b as typeof a;
       return a.createdAt === bs.createdAt && a.text === bs.text;
+    }
+
+    case "memory-save": {
+      const bm = b as typeof a;
+      return (
+        a.createdAt === bm.createdAt &&
+        a.memorySave.scope === bm.memorySave.scope &&
+        a.memorySave.projectId === bm.memorySave.projectId &&
+        a.memorySave.action === bm.memorySave.action &&
+        a.memorySave.entry === bm.memorySave.entry &&
+        a.memorySave.previousContent === bm.memorySave.previousContent &&
+        a.memorySave.revision === bm.memorySave.revision
+      );
     }
 
     case "mcp-app": {

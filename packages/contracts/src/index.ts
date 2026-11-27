@@ -72,6 +72,7 @@ export * from "./previewCapture.ts";
 export * from "./usage.ts";
 export * from "./scheduledTask.ts";
 export * from "./subscription.ts";
+export * from "./memory.ts";
 export * from "./milestones.ts";
 export * from "./workflow.ts";
 export * from "./worktreeMcp.ts";

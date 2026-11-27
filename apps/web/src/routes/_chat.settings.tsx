@@ -187,6 +187,7 @@ function SettingsRouteLayout() {
       search={rawSearch}
       singleEnvironment={
         pathname === "/settings/mcp" ||
+        pathname === "/settings/memory" ||
         pathname === "/settings/providers" ||
         pathname === "/settings/secrets"
       }

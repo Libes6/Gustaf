@@ -38,6 +38,7 @@ export type SettingsPath =
   | "/settings/connections"
   | "/settings/access"
   | "/settings/mcp"
+  | "/settings/memory"
   | "/settings/secrets"
   | "/settings/subscriptions"
   | "/settings/computer-use"
@@ -122,6 +123,7 @@ export const SETTINGS_SECTION_LABELS: Readonly<Record<SettingsPath, string>> = {
   "/settings/connections": msg("Environments"),
   "/settings/access": msg("Sharing & access"),
   "/settings/mcp": msg("MCP"),
+  "/settings/memory": msg("Memory"),
   "/settings/secrets": msg("Secrets"),
   "/settings/subscriptions": msg("Subscriptions"),
   "/settings/computer-use": msg("Control Mac"),
@@ -167,6 +169,7 @@ const ALL_SETTINGS_NAV_GROUPS: ReadonlyArray<SettingsNavGroup> = [
     heading: msg("Agents"),
     paths: [
       "/settings/providers",
+      "/settings/memory",
       "/settings/threads",
       "/settings/browser",
       "/settings/computer-use",
@@ -1163,6 +1166,13 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: [msg("mcp servers import tools stdio http marketplace connectors")],
   },
   {
+    id: "memory",
+    title: msg("Memory"),
+    to: "/settings/memory",
+    environmentOnly: true,
+    searchTerms: [msg("memory notes global project claude import remember")],
+  },
+  {
     id: "scheduled-tasks",
     title: msg("Scheduled tasks"),
     to: "/settings/scheduled-tasks",
@@ -1611,6 +1621,7 @@ const SETTINGS_CATEGORY_SCOPES: Readonly<Record<SettingsPath, SettingsSearchScop
   "/settings/subscriptions": null,
   "/settings/computer-use": null,
   "/settings/mcp": null,
+  "/settings/memory": null,
   "/settings/scheduled-tasks": null,
   "/settings/maintenance": null,
   "/settings/labs": null,
